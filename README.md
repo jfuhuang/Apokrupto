@@ -111,6 +111,8 @@ npm start
 - [ ] Kill and sabotage mechanics
 - [ ] UI/UX design and implementation
 
+For a detailed breakdown of tasks and sub-tasks for AI agents, see [TASKS.md](TASKS.md).
+
 ## License
 
 This project is private and all rights are reserved.
