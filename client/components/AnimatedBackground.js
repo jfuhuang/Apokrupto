@@ -49,7 +49,7 @@ class Dot {
 export default function AnimatedBackground() {
   const dotsRef = useRef([]);
   const lastKillTimeRef = useRef(Date.now());
-  const [, forceUpdate] = useState({});
+  const [updateCounter, setUpdateCounter] = useState(0);
 
   useEffect(() => {
     // Initialize dots
@@ -92,8 +92,8 @@ export default function AnimatedBackground() {
         lastKillTimeRef.current = currentTime;
       }
 
-      // Force re-render
-      forceUpdate({});
+      // Force re-render using counter
+      setUpdateCounter(prev => prev + 1);
     }, 1000 / 30); // 30 FPS
 
     return () => {

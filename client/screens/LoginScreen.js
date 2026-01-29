@@ -11,7 +11,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import AnimatedBackground from '../components/AnimatedBackground';
 import { API_URL } from '../config';
 
@@ -61,30 +61,31 @@ export default function LoginScreen({ onBack, onSuccess }) {
       const data = await response.json();
 
       if (!response.ok) {
+        setIsLoading(false);
         if (response.status === 401) {
           Alert.alert('Error', 'Invalid username/email or password. Please try again.');
         } else {
           Alert.alert('Error', data.error || 'Login failed. Please try again.');
         }
-        setIsLoading(false);
         return;
       }
 
-      // Store JWT token
+      // Store JWT token securely
       if (data.token) {
         try {
-          await AsyncStorage.setItem('jwtToken', data.token);
+          await SecureStore.setItemAsync('jwtToken', data.token);
+          setIsLoading(false);
           onSuccess(data.token);
         } catch (storageError) {
           console.error('Error storing token:', storageError);
+          setIsLoading(false);
           Alert.alert('Error', 'Failed to save login credentials.');
         }
       }
     } catch (error) {
       console.error('Login error:', error);
-      Alert.alert('Error', 'Network error. Please check your connection and try again.');
-    } finally {
       setIsLoading(false);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
     }
   };
 

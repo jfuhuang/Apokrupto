@@ -114,10 +114,11 @@ The app expects the following API endpoints on the backend:
 
 ## Development Notes
 
-- The app uses `AsyncStorage` to securely store JWT tokens
+- The app uses `expo-secure-store` to securely store JWT tokens
 - Form validation is performed client-side before API calls
 - The animated background runs at 30 FPS for smooth performance
 - Navigation is currently implemented using component state (can be upgraded to React Navigation)
+- Password requirements: minimum 8 characters with uppercase, lowercase, and number
 
 ## Troubleshooting
 

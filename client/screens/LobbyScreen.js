@@ -1,14 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
-export default function LobbyScreen({ token }) {
+export default function LobbyScreen({ token, onLogout }) {
   const handleLogout = async () => {
     try {
-      await AsyncStorage.removeItem('jwtToken');
-      // In a real app, you'd navigate back to the welcome screen
-      // For now, just reload the app
-      console.log('Logged out');
+      await SecureStore.deleteItemAsync('jwtToken');
+      onLogout();
     } catch (error) {
       console.error('Error logging out:', error);
     }
