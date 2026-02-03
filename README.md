@@ -1,10 +1,10 @@
-# Among Us IRL
+# Apokrupto
 
 A full-stack, JavaScript-based mobile application that brings the popular game "Among Us" into the real world using GPS technology.
 
 ## Project Overview
 
-Among Us IRL is a location-based mobile game where players' physical movements dictate their in-game actions. Similar to Geoguessr IRL, this game leverages GPS to create an immersive real-world gaming experience inspired by the popular Among Us game.
+Apokrupto is a location-based mobile game where players' physical movements dictate their in-game actions. Similar to Geoguessr IRL, this game leverages GPS to create an immersive real-world gaming experience inspired by the popular Among Us game.
 
 ## Gameplay Mechanics
 
@@ -66,7 +66,7 @@ The application uses **Socket.IO** for real-time communication to address:
 ## Project Structure
 
 ```
-among-us-irl/
+apokrupto/
 ├── client/          # React Native mobile application
 │   └── package.json
 ├── server/          # Node.js backend
