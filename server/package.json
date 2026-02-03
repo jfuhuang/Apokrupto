@@ -1,11 +1,12 @@
 {
-  "name": "among-us-irl-server",
+  "name": "apokrupto-server",
   "version": "1.0.0",
-  "description": "Among Us IRL - Node.js backend server",
+  "description": "Apokrupto - Node.js backend server",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "dev": "nodemon app.js"
+    "dev": "nodemon app.js",
+    "docker:start": "docker-compose up --build"
   },
   "dependencies": {
     "@turf/turf": "^7.0.0",

@@ -1,12 +1,12 @@
 # Initial Loading Page - Implementation Summary
 
 ## Overview
-This PR implements the complete front-end authentication flow for the Among Us IRL mobile application, including an animated welcome screen, user registration, login, and lobby functionality.
+This PR implements the complete front-end authentication flow for the Apokrupto mobile application, including an animated welcome screen, user registration, login, and lobby functionality.
 
 ## What Was Built
 
 ### 1. Welcome Screen (`screens/WelcomeScreen.js`)
-- Beautiful Among Us-themed UI with title and buttons
+- Beautiful Apokrupto-themed UI with title and buttons
 - Two main action buttons:
   - **CREATE ACCOUNT** - Navigates to registration
   - **LOGIN** - Navigates to login

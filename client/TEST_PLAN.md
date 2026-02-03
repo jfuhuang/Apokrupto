@@ -11,7 +11,7 @@ This document outlines the test scenarios for the initial loading page implement
 **Test Steps**:
 1. Launch the app for the first time
 2. Verify the welcome screen appears with:
-   - "AMONG US IRL" title
+   - "APOKRUPTO" title
    - "Real World Deception" subtitle
    - "CREATE ACCOUNT" button
    - "LOGIN" button

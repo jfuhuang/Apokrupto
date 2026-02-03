@@ -17,7 +17,7 @@ export default function LobbyScreen({ token, onLogout }) {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <Text style={styles.title}>LOBBY</Text>
-          <Text style={styles.subtitle}>Welcome to Among Us IRL!</Text>
+          <Text style={styles.subtitle}>Welcome to Apokrupto!</Text>
         </View>
 
         <View style={styles.content}>

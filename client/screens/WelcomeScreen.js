@@ -1,22 +1,25 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, useWindowDimensions } from 'react-native';
 import AnimatedBackground from '../components/AnimatedBackground';
 
 export default function WelcomeScreen({ onCreateAccount, onLogin }) {
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+
   return (
     <View style={styles.container}>
       <AnimatedBackground />
-      <SafeAreaView style={styles.content}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>AMONG US IRL</Text>
-          <Text style={styles.subtitle}>Real World Deception</Text>
+      <SafeAreaView style={[styles.content, isLandscape && styles.contentLandscape]}>
+        <View style={[styles.titleContainer, isLandscape && styles.titleContainerLandscape]}>
+          <Text style={[styles.title, isLandscape && styles.titleLandscape]}>APOKRUPTO</Text>
+          <Text style={[styles.subtitle, isLandscape && styles.subtitleLandscape]}>Real World Deception</Text>
         </View>
-        
-        <View style={styles.buttonContainer}>
+
+        <View style={[styles.buttonContainer, isLandscape && styles.buttonContainerLandscape]}>
           <TouchableOpacity style={styles.button} onPress={onCreateAccount}>
             <Text style={styles.buttonText}>CREATE ACCOUNT</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={onLogin}>
             <Text style={styles.buttonText}>LOGIN</Text>
           </TouchableOpacity>
@@ -59,6 +62,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     gap: 20,
   },
+  buttonContainerLandscape: {
+    width: '40%',
+    alignItems: 'center',
+    gap: 20,
+  },
   button: {
     backgroundColor: '#ff0000',
     paddingVertical: 16,
@@ -80,5 +88,24 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     letterSpacing: 1,
+  },
+  /* Landscape-specific styles */
+  contentLandscape: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 40,
+    paddingHorizontal: 60,
+  },
+  titleContainerLandscape: {
+    width: '55%',
+    alignItems: 'flex-start',
+    marginTop: 0,
+  },
+  titleLandscape: {
+    fontSize: 48,
+  },
+  subtitleLandscape: {
+    fontSize: 18,
   },
 });

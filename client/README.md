@@ -1,6 +1,6 @@
-# Among Us IRL - Client
+# Apokrupto - Client
 
-React Native mobile client for Among Us IRL game.
+React Native mobile client for Apokrupto game.
 
 ## Features
 
