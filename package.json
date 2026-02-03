@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "expo": "^54.0.32",
     "jsonwebtoken": "^9.0.3"
   }
 }
