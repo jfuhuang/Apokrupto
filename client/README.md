@@ -18,10 +18,22 @@ React Native mobile client for Apokrupto game.
   - Username or email login
   - Secure JWT token storage
   - Form validation and error handling
+
+- **Lobby List**
+  - Browse all active lobbies
+  - Search lobbies by name, host, or ID
+  - Auto-refresh every 10 seconds
+  - Pull-to-refresh for manual updates
+  - Create new lobbies with custom settings
+  - Join lobbies by clicking or entering ID
+  - Real-time player count display
+  - Visual indicators for full lobbies
   
-- **Lobby** (placeholder)
-  - Basic authenticated screen
-  - Logout functionality
+- **Lobby Details**
+  - View lobby information
+  - See current player count
+  - Leave lobby functionality
+  - Ready for game features integration
 
 ## Prerequisites
 
@@ -116,12 +128,14 @@ client/
 ├── app.json                    # Expo configuration
 ├── config.js                   # API configuration
 ├── components/
-│   └── AnimatedBackground.js   # Animated dots background
+│   ├── AnimatedBackground.js   # Animated dots background
+│   └── LobbyCard.js            # Lobby card component for list
 └── screens/
     ├── WelcomeScreen.js        # Initial screen with login/register buttons
     ├── RegistrationScreen.js   # User registration form
     ├── LoginScreen.js          # Login form
-    └── LobbyScreen.js          # Authenticated lobby (placeholder)
+    ├── LobbyListScreen.js      # Browse and manage lobbies
+    └── LobbyScreen.js          # Individual lobby view
 ```
 
 ## Configuration
@@ -145,13 +159,38 @@ Edit `app.json` to customize:
 
 The app expects the following API endpoints on the backend:
 
+### User Endpoints
+
 - `POST /api/users/register` - Create new user account
   - Body: `{ username, email, password }`
-  - Returns: `{ user }` on success, `{ error }` on failure
+  - Returns: `{ username, token }` on success, `{ error }` on failure
 
 - `POST /api/users/login` - Login user
   - Body: `{ usernameOrEmail, password }`
-  - Returns: `{ token }` (JWT) on success, `{ error }` on failure
+  - Returns: `{ username, token }` (JWT) on success, `{ error }` on failure
+
+### Lobby Endpoints (require JWT authentication via Bearer token)
+
+- `GET /api/lobbies` - Get all active lobbies
+  - Headers: `Authorization: Bearer <token>`
+  - Returns: `{ lobbies: [...] }` array of lobby objects
+
+- `GET /api/lobbies/:id` - Get specific lobby details
+  - Headers: `Authorization: Bearer <token>`
+  - Returns: `{ lobby: {...} }` lobby object
+
+- `POST /api/lobbies` - Create a new lobby
+  - Headers: `Authorization: Bearer <token>`
+  - Body: `{ name, max_players }`
+  - Returns: `{ lobby: {...} }` created lobby object
+
+- `POST /api/lobbies/:id/join` - Join a lobby
+  - Headers: `Authorization: Bearer <token>`
+  - Returns: `{ message, lobbyId }` on success
+
+- `POST /api/lobbies/:id/leave` - Leave a lobby
+  - Headers: `Authorization: Bearer <token>`
+  - Returns: `{ message }` on success
 
 ## Development Notes
 
@@ -160,6 +199,9 @@ The app expects the following API endpoints on the backend:
 - The animated background runs at 30 FPS for smooth performance
 - Navigation is currently implemented using component state (can be upgraded to React Navigation)
 - Password requirements: minimum 8 characters with uppercase, lowercase, and number
+- Lobby list auto-refreshes every 10 seconds to show latest data
+- JWT tokens are sent via Authorization header with Bearer scheme
+- Session expiration is handled gracefully with automatic logout
 
 ## Troubleshooting
 

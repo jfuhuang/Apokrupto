@@ -101,15 +101,48 @@ npm start
 ## Development Roadmap
 
 - [x] Initial project scaffolding
+- [x] User authentication (registration and login)
+- [x] JWT token management
+- [x] Game lobby system (create, join, list lobbies)
+- [x] Lobby list UI with search and auto-refresh
 - [ ] Core server architecture with Socket.IO
-- [ ] Database schema design
+- [ ] Real-time game state synchronization
 - [ ] GPS location tracking implementation
 - [ ] Map integration with Mapbox
 - [ ] Task system implementation
-- [ ] Game lobby and matchmaking
-- [ ] Real-time game state synchronization
 - [ ] Kill and sabotage mechanics
-- [ ] UI/UX design and implementation
+- [ ] UI/UX polish and animations
+
+## Features Implemented
+
+### Authentication
+- User registration with validation
+- Secure login with JWT tokens
+- Token persistence using secure storage
+- Password hashing with bcrypt
+
+### Lobby System
+- Create lobbies with custom names and player limits (4-15 players)
+- Browse all active lobbies
+- Search lobbies by name, host, or ID
+- Join lobbies directly from the list
+- Join lobbies by entering a specific ID
+- Auto-refresh lobby list every 10 seconds
+- Real-time player count tracking
+- Leave lobby functionality
+
+## API Endpoints
+
+### User Endpoints
+- `POST /api/users/register` - Create a new user account
+- `POST /api/users/login` - Authenticate and receive JWT token
+
+### Lobby Endpoints (require JWT authentication)
+- `GET /api/lobbies` - List all active lobbies
+- `GET /api/lobbies/:id` - Get details of a specific lobby
+- `POST /api/lobbies` - Create a new lobby
+- `POST /api/lobbies/:id/join` - Join a lobby
+- `POST /api/lobbies/:id/leave` - Leave a lobby
 
 ## License
 
