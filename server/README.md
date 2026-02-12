@@ -342,6 +342,9 @@ server/
 - All lobby endpoints require valid JWT authentication
 - Database queries use parameterized statements to prevent SQL injection
 - User input is validated before database operations
+- No hardcoded secrets (server fails if JWT_SECRET not set)
+
+**Note:** Rate limiting is not implemented in this version. For production deployment, add rate limiting middleware (e.g., `express-rate-limit`) to prevent abuse. See `SECURITY_SUMMARY.md` for detailed security information.
 
 ## Development
 
