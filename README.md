@@ -52,25 +52,37 @@ The game provides real-time updates for all players, including:
 - **Key Dependencies:**
   - `express` - REST API framework
   - `socket.io` - Real-time bidirectional communication
-  - `mongoose` - MongoDB object modeling
+  - `ioredis` - Redis client for state management
+  - `pg` - PostgreSQL database client
   - `@turf/turf` - Geospatial calculations and analysis
 
 ### Communication Architecture
 
-The application uses **Socket.IO** for real-time communication to address:
+The application uses **Socket.IO** with **Redis** for real-time communication to address:
 - Network instability on mobile devices (Wi-Fi to cellular transitions)
-- Automatic reconnection handling
+- Automatic reconnection handling with session resume
 - Fallback mechanisms for degraded connections
 - Low-latency updates for game state synchronization
+- Horizontal scaling via Redis Pub/Sub
+
+**See [REALTIME_LOBBY_DESIGN.md](./REALTIME_LOBBY_DESIGN.md) for detailed documentation on the lobby and reconnection system.**
 
 ## Project Structure
 
 ```
 apokrupto/
-├── client/          # React Native mobile application
+├── client/                    # React Native mobile application
 │   └── package.json
-├── server/          # Node.js backend
+├── server/                    # Node.js backend
+│   ├── middleware/           # Express & Socket.IO middleware
+│   ├── routes/               # REST API routes
+│   ├── services/             # Business logic services
+│   ├── store/                # Redis data access layer
+│   ├── websocket/            # WebSocket server
+│   ├── __tests__/            # Test files
+│   ├── app.js               # Application entry point
 │   └── package.json
+├── REALTIME_LOBBY_DESIGN.md  # Lobby system documentation
 └── README.md
 ```
 
@@ -79,10 +91,27 @@ apokrupto/
 ### Prerequisites
 - Node.js (v16 or higher)
 - npm or yarn
-- Expo CLI
-- MongoDB
+- Expo CLI (for mobile client)
+- PostgreSQL
+- Redis
 
 ### Installation
+
+#### Server Setup
+```bash
+cd server
+npm install
+
+# Copy environment template and configure
+cp .env.example .env
+# Edit .env with your database credentials
+
+# Start with Docker (includes PostgreSQL and Redis)
+npm run docker:start
+
+# OR start manually (requires PostgreSQL and Redis running)
+npm start
+```
 
 #### Client Setup
 ```bash
@@ -91,17 +120,19 @@ npm install
 npm start
 ```
 
-#### Server Setup
+#### Running Tests
 ```bash
 cd server
-npm install
-npm start
+npm test
 ```
 
 ## Development Roadmap
 
 - [x] Initial project scaffolding
-- [ ] Core server architecture with Socket.IO
+- [x] Core server architecture with Socket.IO
+- [x] Redis-backed lobby system
+- [x] Mobile reconnection handling
+- [x] Real-time game state synchronization
 - [ ] Database schema design
 - [ ] GPS location tracking implementation
 - [ ] Map integration with Mapbox
