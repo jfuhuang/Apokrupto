@@ -11,6 +11,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  AppState,
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import LobbyCard from '../components/LobbyCard';
@@ -31,21 +32,49 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
   const [isJoining, setIsJoining] = useState(false);
   
   const refreshInterval = useRef(null);
+  const appState = useRef(AppState.currentState);
 
   useEffect(() => {
     fetchLobbies();
     
-    // Auto-refresh every 10 seconds
-    refreshInterval.current = setInterval(() => {
-      fetchLobbies(true);
-    }, 10000);
+    // Start auto-refresh
+    startAutoRefresh();
+    
+    // Listen for app state changes
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
     
     return () => {
-      if (refreshInterval.current) {
-        clearInterval(refreshInterval.current);
-      }
+      stopAutoRefresh();
+      subscription.remove();
     };
   }, []);
+
+  const handleAppStateChange = (nextAppState) => {
+    if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+      // App came to foreground, restart auto-refresh and fetch immediately
+      fetchLobbies(true);
+      startAutoRefresh();
+    } else if (nextAppState.match(/inactive|background/)) {
+      // App went to background, stop auto-refresh
+      stopAutoRefresh();
+    }
+    appState.current = nextAppState;
+  };
+
+  const startAutoRefresh = () => {
+    if (!refreshInterval.current) {
+      refreshInterval.current = setInterval(() => {
+        fetchLobbies(true);
+      }, 10000);
+    }
+  };
+
+  const stopAutoRefresh = () => {
+    if (refreshInterval.current) {
+      clearInterval(refreshInterval.current);
+      refreshInterval.current = null;
+    }
+  };
 
   useEffect(() => {
     // Filter lobbies based on search query

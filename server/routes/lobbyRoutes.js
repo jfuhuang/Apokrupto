@@ -167,27 +167,40 @@ router.post('/:id/leave', async (req, res) => {
     const { id } = req.params;
     const userId = req.user.sub;
     
-    // Remove player from lobby
-    const result = await pool.query(`
-      DELETE FROM lobby_players
-      WHERE lobby_id = $1 AND user_id = $2
-      RETURNING id
-    `, [id, userId]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Not in this lobby' });
+    // Use a transaction to handle leaving and cleanup atomically
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Remove player from lobby
+      const result = await client.query(`
+        DELETE FROM lobby_players
+        WHERE lobby_id = $1 AND user_id = $2
+        RETURNING id
+      `, [id, userId]);
+      
+      if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Not in this lobby' });
+      }
+      
+      // Check if lobby is now empty and delete if so
+      const remainingPlayers = await client.query(`
+        SELECT COUNT(*) as count FROM lobby_players WHERE lobby_id = $1
+      `, [id]);
+      
+      if (parseInt(remainingPlayers.rows[0].count) === 0) {
+        await client.query(`DELETE FROM lobbies WHERE id = $1`, [id]);
+      }
+      
+      await client.query('COMMIT');
+      res.json({ message: 'Successfully left lobby' });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
-    
-    // Check if lobby is now empty, if so delete it
-    const remainingPlayers = await pool.query(`
-      SELECT COUNT(*) as count FROM lobby_players WHERE lobby_id = $1
-    `, [id]);
-    
-    if (parseInt(remainingPlayers.rows[0].count) === 0) {
-      await pool.query(`DELETE FROM lobbies WHERE id = $1`, [id]);
-    }
-    
-    res.json({ message: 'Successfully left lobby' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
