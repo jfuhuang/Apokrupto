@@ -5,9 +5,9 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 // Create Redis client with configuration
 const redis = new Redis({
   host: process.env.REDIS_HOST || '127.0.0.1',
-  port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : 6379,
+  port: parseInt(process.env.REDIS_PORT, 10) || 6379,
   password: process.env.REDIS_PASSWORD || undefined,
-  db: process.env.REDIS_DB ? Number(process.env.REDIS_DB) : 0,
+  db: parseInt(process.env.REDIS_DB, 10) || 0,
   retryStrategy: (times) => {
     const delay = Math.min(times * 50, 2000);
     return delay;
@@ -18,9 +18,9 @@ const redis = new Redis({
 // Create separate client for pub/sub
 const redisSub = new Redis({
   host: process.env.REDIS_HOST || '127.0.0.1',
-  port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : 6379,
+  port: parseInt(process.env.REDIS_PORT, 10) || 6379,
   password: process.env.REDIS_PASSWORD || undefined,
-  db: process.env.REDIS_DB ? Number(process.env.REDIS_DB) : 0,
+  db: parseInt(process.env.REDIS_DB, 10) || 0,
   retryStrategy: (times) => {
     const delay = Math.min(times * 50, 2000);
     return delay;

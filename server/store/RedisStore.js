@@ -35,7 +35,7 @@ class RedisStore {
     const lobbyData = {
       lobbyId,
       hostId,
-      name: name || `Lobby ${lobbyId.slice(0, 8)}`,
+      name: name || this._generateDefaultLobbyName(lobbyId),
       maxPlayers: maxPlayers.toString(),
       isPublic: isPublic ? '1' : '0',
       status: 'open', // open, full, in-game, closed
@@ -398,6 +398,12 @@ class RedisStore {
 
   _generateResumeToken() {
     return crypto.randomBytes(32).toString('hex');
+  }
+
+  _generateDefaultLobbyName(lobbyId) {
+    // Extract first 8 characters of the generated ID for display
+    const shortId = lobbyId.split('_')[1]?.slice(0, 8) || lobbyId.slice(0, 8);
+    return `Lobby ${shortId}`;
   }
 
   _parseLobby(data) {

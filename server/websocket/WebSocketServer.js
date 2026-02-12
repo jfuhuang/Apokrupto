@@ -290,7 +290,7 @@ class WebSocketServer {
       await this.store.addLobbyEvent(lobbyId, {
         type: 'player_joined',
         playerId: socket.userId,
-        username: socket.username
+        username: socket.username || 'Unknown'
       });
 
       // Broadcast to all in lobby
@@ -339,7 +339,7 @@ class WebSocketServer {
         await this.store.addLobbyEvent(lobbyId, {
           type: 'player_left',
           playerId: socket.userId,
-          username: socket.username,
+          username: socket.username || 'Unknown',
           newHost: result.newHost
         });
 
