@@ -6,10 +6,12 @@ import WelcomeScreen from './screens/WelcomeScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegistrationScreen from './screens/RegistrationScreen';
 import LobbyScreen from './screens/LobbyScreen';
+import LobbyListScreen from './screens/LobbyListScreen';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('loading');
   const [token, setToken] = useState(null);
+  const [currentLobbyId, setCurrentLobbyId] = useState(null);
 
   useEffect(() => {
     // Check for existing token on app start
@@ -21,7 +23,7 @@ export default function App() {
       const storedToken = await SecureStore.getItemAsync('jwtToken');
       if (storedToken) {
         setToken(storedToken);
-        setCurrentScreen('lobby');
+        setCurrentScreen('lobbyList');
       } else {
         setCurrentScreen('welcome');
       }
@@ -33,12 +35,23 @@ export default function App() {
 
   const handleLogin = (jwtToken) => {
     setToken(jwtToken);
-    setCurrentScreen('lobby');
+    setCurrentScreen('lobbyList');
   };
 
   const handleLogout = () => {
     setToken(null);
+    setCurrentLobbyId(null);
     setCurrentScreen('welcome');
+  };
+
+  const handleJoinLobby = (lobbyId) => {
+    setCurrentLobbyId(lobbyId);
+    setCurrentScreen('lobby');
+  };
+
+  const handleLeaveLobby = () => {
+    setCurrentLobbyId(null);
+    setCurrentScreen('lobbyList');
   };
 
   const renderScreen = () => {
@@ -70,8 +83,23 @@ export default function App() {
             onSuccess={handleLogin}
           />
         );
+      case 'lobbyList':
+        return (
+          <LobbyListScreen
+            token={token}
+            onLogout={handleLogout}
+            onJoinLobby={handleJoinLobby}
+          />
+        );
       case 'lobby':
-        return <LobbyScreen token={token} onLogout={handleLogout} />;
+        return (
+          <LobbyScreen
+            token={token}
+            lobbyId={currentLobbyId}
+            onLogout={handleLogout}
+            onLeaveLobby={handleLeaveLobby}
+          />
+        );
       default:
         return <WelcomeScreen />;
     }
