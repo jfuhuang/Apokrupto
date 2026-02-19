@@ -138,14 +138,14 @@ router.post('/:id/join', async (req, res) => {
       return res.status(400).json({ error: 'Lobby is full' });
     }
     
-    // Check if user is already in the lobby
+    // Check if user is already in the lobby — if so, let them back in (reconnect case)
     const playerCheck = await pool.query(`
       SELECT id FROM lobby_players
       WHERE lobby_id = $1 AND user_id = $2
     `, [id, userId]);
-    
+
     if (playerCheck.rows.length > 0) {
-      return res.status(400).json({ error: 'Already in this lobby' });
+      return res.json({ message: 'Already in lobby', lobbyId: id });
     }
     
     // Add player to lobby
