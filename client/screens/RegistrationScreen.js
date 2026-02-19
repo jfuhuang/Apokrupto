@@ -132,9 +132,9 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
             <TouchableOpacity style={styles.backButton} onPress={onBack}>
               <Text style={styles.backButtonText}>← Back</Text>
             </TouchableOpacity>
-            <Animated.Text 
+            <Animated.Text
               style={[
-                styles.title, 
+                styles.title,
                 isLandscape && styles.titleLandscape,
                 { transform: [{ translateY: floatAnim }] }
               ]}

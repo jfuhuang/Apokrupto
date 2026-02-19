@@ -6,20 +6,27 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "docker:start": "docker-compose up --build"
+    "docker:start": "docker-compose up --build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@turf/turf": "^7.0.0",
     "bcrypt": "^6.0.0",
-    "jsonwebtoken": "^9.0.0",
     "dotenv": "^17.2.3",
     "express": "^4.22.1",
+    "jsonwebtoken": "^9.0.0",
     "mongoose": "^8.0.0",
     "pg": "^8.16.3",
     "socket.io": "^4.7.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.0"
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.2",
+    "nodemon": "^3.0.0",
+    "prettier": "^3.8.1"
   },
   "private": true,
   "keywords": [],
