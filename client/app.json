@@ -13,7 +13,10 @@
       "bundleIdentifier": "com.anonymous.apokrupto"
     },
     "android": {
-      "package": "com.anonymous.apokrupto"
+      "package": "com.anonymous.apokrupto",
+      "navigationBar": {
+        "visible": "sticky-immersive"
+      }
     },
     "web": {},
     "plugins": [

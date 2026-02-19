@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   FlatList,
   TextInput,
@@ -13,6 +12,7 @@ import {
   RefreshControl,
   AppState,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import LobbyCard from '../../components/LobbyCard';
 import {
@@ -20,6 +20,8 @@ import {
   createLobby as apiCreateLobby,
   joinLobby as apiJoinLobby,
 } from '../../utils/api';
+import { colors } from '../../theme/colors';
+import { typography } from '../../theme/typography';
 
 export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
   const [lobbies, setLobbies] = useState([]);
@@ -209,7 +211,7 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#00aaff" />
+        <ActivityIndicator size="large" color={colors.primary.electricBlue} />
         <Text style={styles.loadingText}>Loading lobbies...</Text>
       </View>
     );
@@ -226,28 +228,17 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
           </TouchableOpacity>
         </View>
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search by name, host, or ID..."
-            placeholderTextColor="#666666"
-          />
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
+        {/* Controls Row */}
+        <View style={styles.controlsRow}>
           <TouchableOpacity
-            style={[styles.actionButton, styles.createButton]}
+            style={styles.createButton}
             onPress={() => setShowCreateModal(true)}
           >
-            <Text style={styles.actionButtonText}>+ Create Lobby</Text>
+            <Text style={styles.actionButtonText}>+ Create</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionButton, styles.joinButton]}
+            style={styles.joinButton}
             onPress={() => setShowJoinModal(true)}
           >
             <Text style={styles.actionButtonText}>Join by ID</Text>
@@ -256,37 +247,47 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
 
         {/* Lobby List */}
         <View style={styles.listContainer}>
-          {filteredLobbies.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                {searchQuery ? 'No lobbies match your search' : 'No active lobbies'}
-              </Text>
-              <Text style={styles.emptySubtext}>
-                {!searchQuery && 'Create a lobby to get started!'}
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={filteredLobbies}
-              renderItem={({ item }) => (
-                <LobbyCard
-                  lobby={item}
-                  onPress={() => joinLobby(item.id)}
-                />
-              )}
-              keyExtractor={(item) => item.id.toString()}
-              horizontal={false}
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={isRefreshing}
-                  onRefresh={handleRefresh}
-                  tintColor="#00aaff"
-                  colors={['#00aaff']}
-                />
-              }
-            />
-          )}
+          <FlatList
+            data={filteredLobbies}
+            renderItem={({ item }) => (
+              <LobbyCard
+                lobby={item}
+                onPress={() => joinLobby(item.id)}
+              />
+            )}
+            keyExtractor={(item) => item.id.toString()}
+            numColumns={2}
+            key="lobbies-grid"
+            horizontal={false}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <TextInput
+                style={styles.searchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search lobbies..."
+                placeholderTextColor={colors.text.placeholder}
+              />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>
+                  {searchQuery ? 'No lobbies match your search' : 'No active lobbies'}
+                </Text>
+                <Text style={styles.emptySubtext}>
+                  {!searchQuery && 'Create a lobby to get started!'}
+                </Text>
+              </View>
+            }
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                tintColor={colors.primary.electricBlue}
+                colors={[colors.primary.electricBlue]}
+              />
+            }
+          />
         </View>
 
         {/* Auto-refresh indicator */}
@@ -315,7 +316,7 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
                 value={newLobbyName}
                 onChangeText={setNewLobbyName}
                 placeholder="Enter lobby name"
-                placeholderTextColor="#666666"
+                placeholderTextColor={colors.text.placeholder}
                 maxLength={100}
               />
             </View>
@@ -327,7 +328,7 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
                 value={maxPlayers}
                 onChangeText={setMaxPlayers}
                 placeholder="10"
-                placeholderTextColor="#666666"
+                placeholderTextColor={colors.text.placeholder}
                 keyboardType="numeric"
                 maxLength={2}
               />
@@ -351,7 +352,7 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
                 disabled={isCreating}
               >
                 {isCreating ? (
-                  <ActivityIndicator color="#ffffff" />
+                  <ActivityIndicator color={colors.text.primary} />
                 ) : (
                   <Text style={styles.modalButtonText}>Create</Text>
                 )}
@@ -379,7 +380,7 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
                 value={joinLobbyId}
                 onChangeText={setJoinLobbyId}
                 placeholder="Enter lobby ID"
-                placeholderTextColor="#666666"
+                placeholderTextColor={colors.text.placeholder}
                 keyboardType="numeric"
               />
             </View>
@@ -401,7 +402,7 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
                 disabled={isJoining}
               >
                 {isJoining ? (
-                  <ActivityIndicator color="#ffffff" />
+                  <ActivityIndicator color={colors.text.primary} />
                 ) : (
                   <Text style={styles.modalButtonText}>Join</Text>
                 )}
@@ -417,20 +418,20 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.background.space,
   },
   safeArea: {
     flex: 1,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.background.space,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    color: '#ffffff',
-    fontSize: 16,
+    ...typography.body,
+    color: colors.text.secondary,
     marginTop: 10,
   },
   header: {
@@ -438,72 +439,78 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#2a2a2a',
-    borderBottomWidth: 2,
-    borderBottomColor: '#00aaff',
+    backgroundColor: colors.background.void,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.focus,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    letterSpacing: 2,
+    ...typography.h1,
+    color: colors.primary.electricBlue,
+    textShadowColor: colors.shadow.electricBlue,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 15,
   },
   logoutButton: {
-    backgroundColor: '#ff0000',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
+    backgroundColor: colors.primary.neonRed,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.accent.neonPink,
   },
   logoutButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold',
+    ...typography.tiny,
+    color: colors.text.primary,
+    letterSpacing: 0.5,
   },
-  searchContainer: {
-    padding: 16,
-    backgroundColor: '#2a2a2a',
-  },
-  searchInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: '#ffffff',
-    fontSize: 16,
-  },
-  actionButtons: {
+  controlsRow: {
     flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 5,
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: colors.background.void,
   },
   createButton: {
-    backgroundColor: '#00aaff',
-    shadowColor: '#00aaff',
+    backgroundColor: colors.primary.electricBlue,
+    shadowColor: colors.shadow.electricBlue,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 4,
   },
   joinButton: {
-    backgroundColor: '#ff9900',
-    shadowColor: '#ff9900',
+    backgroundColor: colors.accent.amber,
+    shadowColor: colors.accent.amber,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 4,
+    marginLeft: 'auto',
   },
   actionButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    ...typography.buttonSecondary,
+    color: colors.text.glow,
   },
   listContainer: {
     flex: 1,
-    padding: 8,
+    marginHorizontal: 12,
+  },
+  searchInput: {
+    ...typography.body,
+    backgroundColor: colors.input.background,
+    borderWidth: 1,
+    borderColor: colors.input.border,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    color: colors.text.primary,
+    marginVertical: 8,
   },
   emptyContainer: {
     flex: 1,
@@ -512,44 +519,43 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyText: {
-    color: '#ffffff',
-    fontSize: 18,
+    ...typography.h3,
+    color: colors.text.primary,
     textAlign: 'center',
     marginBottom: 10,
   },
   emptySubtext: {
-    color: '#999999',
-    fontSize: 14,
+    ...typography.small,
+    color: colors.text.muted,
     textAlign: 'center',
   },
   autoRefreshIndicator: {
     padding: 8,
     alignItems: 'center',
-    backgroundColor: '#2a2a2a',
+    backgroundColor: colors.background.void,
   },
   autoRefreshText: {
-    color: '#666666',
-    fontSize: 12,
+    ...typography.tiny,
+    color: colors.text.disabled,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: colors.overlay.dark,
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: colors.background.elevated,
     borderRadius: 12,
     padding: 24,
     width: '85%',
     maxWidth: 400,
-    borderWidth: 2,
-    borderColor: '#00aaff',
+    borderWidth: 1,
+    borderColor: colors.border.focus,
   },
   modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    ...typography.h1,
+    color: colors.text.primary,
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -557,20 +563,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalLabel: {
-    color: '#ffffff',
-    fontSize: 14,
+    ...typography.label,
+    color: colors.text.secondary,
     marginBottom: 8,
-    fontWeight: '600',
   },
   modalInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    ...typography.body,
+    backgroundColor: colors.input.background,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: colors.input.border,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    color: '#ffffff',
-    fontSize: 16,
+    color: colors.text.primary,
   },
   modalButtons: {
     flexDirection: 'row',
@@ -584,17 +589,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalCancelButton: {
-    backgroundColor: '#666666',
+    backgroundColor: colors.background.frost,
   },
   modalCreateButton: {
-    backgroundColor: '#00aaff',
+    backgroundColor: colors.primary.electricBlue,
   },
   modalJoinButton: {
-    backgroundColor: '#ff9900',
+    backgroundColor: colors.accent.amber,
   },
   modalButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    ...typography.button,
+    color: colors.text.glow,
   },
 });
