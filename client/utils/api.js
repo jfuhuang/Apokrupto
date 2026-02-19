@@ -1,4 +1,4 @@
-import { getCurrentApiUrl } from '../config';
+import { getApiUrl } from './networkUtils';
 
 // --- Helpers ---
 
@@ -6,7 +6,8 @@ const authHeader = (token) => ({ Authorization: `Bearer ${token}` });
 const jsonHeaders = { 'Content-Type': 'application/json' };
 
 async function request(path, options = {}) {
-  const url = `${getCurrentApiUrl()}${path}`;
+  const baseUrl = await getApiUrl();
+  const url = `${baseUrl}${path}`;
   const res = await fetch(url, options);
   const data = await res.json();
   return { ok: res.ok, status: res.status, data };
