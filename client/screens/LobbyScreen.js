@@ -6,125 +6,215 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  ScrollView,
   useWindowDimensions,
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
-import { API_URL } from '../config';
+import { io } from 'socket.io-client';
+import { getCurrentApiUrl, getApiUrl } from '../config';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+
+// One color per player slot, assigned by join order (max 15 players)
+const PLAYER_COLORS = [
+  '#FF3366', '#00D4FF', '#00FF9F', '#FFA63D', '#8B5CF6',
+  '#FF006E', '#00F0FF', '#FF00FF', '#FFDD00', '#FF6B35',
+  '#4CAF50', '#E91E63', '#9C27B0', '#03A9F4', '#FF5722',
+];
+
+function parseJwt(token) {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(base64));
+  } catch {
+    return {};
+  }
+}
 
 export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
-  const [lobby, setLobby] = useState(null);
+
+  const [players, setPlayers] = useState([]);
+  const [lobbyInfo, setLobbyInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [socketConnected, setSocketConnected] = useState(false);
+
+  const myUserId = useRef(String(parseJwt(token).sub));
+  const socketRef = useRef(null);
+  const pollRef = useRef(null);
   const floatAnim = useRef(new Animated.Value(0)).current;
 
+  // Floating animation for the title
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: -8,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
+        Animated.timing(floatAnim, { toValue: -8, duration: 2000, useNativeDriver: true }),
+        Animated.timing(floatAnim, { toValue: 0, duration: 2000, useNativeDriver: true }),
       ])
     ).start();
   }, []);
 
-  useEffect(() => {
-    if (lobbyId) {
-      fetchLobbyDetails();
-    }
-  }, [lobbyId]);
-
-  const fetchLobbyDetails = async () => {
+  // REST poll — merges player list from server; socket isConnected state takes precedence
+  const fetchPlayers = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/lobbies/${lobbyId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+      const apiUrl = getCurrentApiUrl();
+      const res = await fetch(`${apiUrl}/api/lobbies/${lobbyId}/players`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (response.status === 401 || response.status === 403) {
-        Alert.alert('Session Expired', 'Please login again.');
+      if (res.status === 401 || res.status === 403) {
         handleLogout();
         return;
       }
 
-      const data = await response.json();
+      if (!res.ok) return;
 
-      if (response.ok) {
-        setLobby(data.lobby);
-      } else {
-        Alert.alert('Error', data.error || 'Failed to load lobby');
-        onLeaveLobby();
-      }
-    } catch (error) {
-      console.error('Error fetching lobby:', error);
-      Alert.alert('Error', 'Failed to load lobby details');
+      const data = await res.json();
+
+      // Only update from REST if socket isn't supplying live data, or to
+      // catch players who joined without a socket event reaching us.
+      setLobbyInfo(data.lobbyInfo);
+      setPlayers((prev) => {
+        // Keep socket-supplied isConnected flags; REST is authoritative for membership
+        const connectedMap = {};
+        prev.forEach((p) => { connectedMap[p.id] = p.isConnected; });
+
+        return data.players.map((p) => ({
+          ...p,
+          isConnected: connectedMap[p.id] !== undefined ? connectedMap[p.id] : false,
+        }));
+      });
+    } catch (err) {
+      console.error('[LobbyScreen] Poll error:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleLeaveLobby = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/lobbies/${lobbyId}/leave`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+  // Socket connection
+  useEffect(() => {
+    let socket;
+
+    const connect = async () => {
+      // Make sure the API URL is resolved before connecting
+      const baseUrl = await getApiUrl();
+
+      socket = io(baseUrl, {
+        auth: { token },
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionDelay: 1000,
+      });
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        console.log('[WS] Connected');
+        setSocketConnected(true);
+        socket.emit('joinRoom', { lobbyId });
       });
 
-      if (response.ok) {
+      socket.on('disconnect', () => {
+        console.log('[WS] Disconnected');
+        setSocketConnected(false);
+      });
+
+      socket.on('lobbyUpdate', (state) => {
+        if (!state) return;
+        setPlayers(state.players || []);
+        setLobbyInfo({
+          id: state.lobbyId,
+          name: state.name,
+          maxPlayers: state.maxPlayers,
+          status: state.status,
+        });
+        setIsLoading(false);
+      });
+
+      socket.on('gameStarted', (state) => {
+        Alert.alert(
+          'Game Started!',
+          `${state?.name || 'The game'} has begun. Good luck!`,
+          [{ text: 'OK' }]
+        );
+      });
+
+      socket.on('connect_error', (err) => {
+        console.warn('[WS] Connection error:', err.message);
+      });
+    };
+
+    // Initial REST fetch so the screen shows something while socket connects
+    fetchPlayers();
+
+    connect();
+
+    // 10-second polling as the main authority for lobby membership
+    pollRef.current = setInterval(fetchPlayers, 10000);
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [lobbyId]);
+
+  const handleLeaveLobby = async () => {
+    try {
+      const apiUrl = getCurrentApiUrl();
+      const res = await fetch(`${apiUrl}/api/lobbies/${lobbyId}/leave`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
         onLeaveLobby();
       } else {
-        const data = await response.json();
+        const data = await res.json();
         Alert.alert('Error', data.error || 'Failed to leave lobby');
       }
-    } catch (error) {
-      console.error('Error leaving lobby:', error);
+    } catch (err) {
       Alert.alert('Error', 'Network error. Please try again.');
     }
+  };
+
+  const handleStartGame = () => {
+    if (!socketRef.current?.connected) {
+      Alert.alert('Error', 'Not connected to server. Please wait and try again.');
+      return;
+    }
+
+    socketRef.current.emit('startGame', { lobbyId }, (res) => {
+      if (res?.error) {
+        Alert.alert('Error', res.error);
+      }
+    });
   };
 
   const handleLogout = async () => {
     try {
       await SecureStore.deleteItemAsync('jwtToken');
       onLogout();
-    } catch (error) {
-      console.error('Error logging out:', error);
+    } catch (err) {
+      console.error('Logout error:', err);
     }
   };
+
+  const isHost = lobbyInfo ? String(lobbyInfo.hostId ?? lobbyInfo.created_by) === myUserId.current : false;
+  const canStart = isHost && players.length >= 4;
 
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary.electricBlue} />
-        <Text style={styles.loadingText}>Loading lobby...</Text>
-      </View>
-    );
-  }
-
-  if (!lobby) {
-    return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>Lobby not found</Text>
-            <TouchableOpacity style={styles.button} onPress={onLeaveLobby}>
-              <Text style={styles.buttonText}>Back to Lobby List</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
+        <Text style={styles.loadingText}>Joining lobby...</Text>
       </View>
     );
   }
@@ -132,51 +222,107 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
+        {/* Header */}
         <View style={[styles.header, isLandscape && styles.headerLandscape]}>
           <View>
-            <Animated.Text 
-              style={[
-                styles.title,
-                { transform: [{ translateY: floatAnim }] }
-              ]}
+            <Animated.Text
+              style={[styles.title, { transform: [{ translateY: floatAnim }] }]}
             >
               LOBBY
             </Animated.Text>
-            <Text style={styles.subtitle}>Welcome to Apokrupto!</Text>
+            {lobbyInfo && (
+              <Text style={styles.subtitle} numberOfLines={1}>{lobbyInfo.name}</Text>
+            )}
           </View>
-          <TouchableOpacity style={styles.headerLogoutButton} onPress={handleLogout}>
-            <Text style={styles.headerLogoutButtonText}>Logout</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={[styles.content, isLandscape && styles.contentLandscape]}>
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Lobby Name:</Text>
-              <Text style={styles.infoValue}>{lobby.name}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Players:</Text>
-              <Text style={styles.infoValue}>{lobby.current_players}/{lobby.max_players}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Status:</Text>
-              <Text style={[styles.infoValue, styles.statusText]}>{lobby.status}</Text>
-            </View>
-          </View>
-
-          <View style={styles.messageContainer}>
-            <Text style={styles.message}>You've successfully joined the lobby.</Text>
-            <Text style={styles.info}>Game features coming soon...</Text>
+          <View style={styles.headerRight}>
+            <View style={[styles.connectionDot, socketConnected ? styles.dotConnected : styles.dotDisconnected]} />
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <Text style={styles.logoutButtonText}>Logout</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={[styles.button, styles.leaveButton, isLandscape && styles.logoutButtonLandscape]} 
-            onPress={handleLeaveLobby}
+        {/* Player window */}
+        <View style={[styles.playerWindow, isLandscape && styles.playerWindowLandscape]}>
+          <View style={styles.playerWindowHeader}>
+            <Text style={styles.playerWindowTitle}>PLAYERS</Text>
+            <Text style={styles.playerCount}>
+              {players.length}/{lobbyInfo?.maxPlayers ?? '?'}
+            </Text>
+          </View>
+
+          <ScrollView
+            style={styles.playerList}
+            showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.buttonText}>Leave Lobby</Text>
+            {players.map((player, index) => (
+              <View
+                key={player.id}
+                style={[
+                  styles.playerCard,
+                  !player.isConnected && styles.playerCardDisconnected,
+                ]}
+              >
+                {/* Color indicator */}
+                <View
+                  style={[
+                    styles.colorDot,
+                    {
+                      backgroundColor: PLAYER_COLORS[index % PLAYER_COLORS.length],
+                      opacity: player.isConnected ? 1 : 0.3,
+                    },
+                  ]}
+                />
+
+                {/* Crown for host */}
+                {player.isHost && (
+                  <Text style={styles.crown}>👑</Text>
+                )}
+
+                {/* Username */}
+                <Text
+                  style={[
+                    styles.playerName,
+                    !player.isConnected && styles.playerNameDisconnected,
+                    String(player.id) === myUserId.current && styles.playerNameSelf,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {player.username}
+                  {String(player.id) === myUserId.current ? ' (you)' : ''}
+                </Text>
+
+                {/* Offline badge */}
+                {!player.isConnected && (
+                  <View style={styles.offlineBadge}>
+                    <Text style={styles.offlineBadgeText}>OFFLINE</Text>
+                  </View>
+                )}
+              </View>
+            ))}
+
+            {players.length === 0 && (
+              <Text style={styles.emptyText}>Waiting for players...</Text>
+            )}
+          </ScrollView>
+
+          {players.length < 4 && (
+            <Text style={styles.waitingText}>
+              Waiting for {4 - players.length} more player{4 - players.length !== 1 ? 's' : ''} to start
+            </Text>
+          )}
+        </View>
+
+        {/* Bottom actions */}
+        <View style={styles.buttonContainer}>
+          {canStart && (
+            <TouchableOpacity style={styles.startButton} onPress={handleStartGame}>
+              <Text style={styles.startButtonText}>START GAME</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveLobby}>
+            <Text style={styles.leaveButtonText}>Leave Lobby</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -203,27 +349,23 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginTop: 16,
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    ...typography.h2,
-    color: colors.primary.neonRed,
-    marginBottom: 20,
-  },
+
+  // Header
   header: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
   },
   headerLandscape: {
     paddingHorizontal: 40,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   title: {
     ...typography.screenTitle,
@@ -231,104 +373,162 @@ const styles = StyleSheet.create({
     textShadowColor: colors.shadow.electricBlue,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 15,
-    marginBottom: 5,
   },
   subtitle: {
-    ...typography.subtitle,
-    color: colors.text.secondary,
+    ...typography.label,
+    color: colors.text.tertiary,
+    marginTop: 2,
   },
-  headerLogoutButton: {
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  dotConnected: {
+    backgroundColor: colors.accent.neonGreen,
+  },
+  dotDisconnected: {
+    backgroundColor: colors.text.disabled,
+  },
+  logoutButton: {
     backgroundColor: colors.primary.neonRed,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 8,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.accent.neonPink,
-    shadowColor: colors.shadow.neonRed,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 10,
-    elevation: 8,
   },
-  headerLogoutButtonText: {
-    ...typography.button,
+  logoutButtonText: {
+    ...typography.label,
     color: colors.text.primary,
   },
-  content: {
+
+  // Player window
+  playerWindow: {
     flex: 1,
-    padding: 20,
-  },
-  contentLandscape: {
-    paddingHorizontal: 40,
-  },
-  infoCard: {
-    backgroundColor: colors.background.elevated,
+    margin: 16,
     borderRadius: 12,
-    padding: 20,
     borderWidth: 1,
-    borderColor: colors.border.default,
-    marginBottom: 20,
+    borderColor: colors.border.focus,
+    backgroundColor: colors.background.void,
+    overflow: 'hidden',
   },
-  infoRow: {
+  playerWindowLandscape: {
+    marginHorizontal: 40,
+  },
+  playerWindowHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  infoLabel: {
-    ...typography.body,
-    color: colors.text.secondary,
-  },
-  infoValue: {
-    ...typography.bodyBold,
-    color: colors.text.primary,
-  },
-  statusText: {
-    color: colors.accent.ultraviolet,
-    textTransform: 'uppercase',
-  },
-  messageContainer: {
-    padding: 20,
     alignItems: 'center',
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
+    backgroundColor: colors.background.panel,
   },
-  message: {
-    ...typography.h3,
-    color: colors.text.primary,
-    marginBottom: 10,
-    textAlign: 'center',
+  playerWindowTitle: {
+    ...typography.label,
+    color: colors.primary.electricBlue,
+    letterSpacing: 2,
   },
-  info: {
+  playerCount: {
+    ...typography.label,
+    color: colors.text.tertiary,
+  },
+  playerList: {
+    flex: 1,
+    padding: 8,
+  },
+  playerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    marginVertical: 4,
+    borderRadius: 8,
+    backgroundColor: colors.background.panel,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    gap: 10,
+  },
+  playerCardDisconnected: {
+    opacity: 0.4,
+  },
+  colorDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+  },
+  crown: {
+    fontSize: 16,
+  },
+  playerName: {
     ...typography.body,
-    color: colors.text.secondary,
+    color: colors.text.primary,
+    flex: 1,
+  },
+  playerNameSelf: {
+    color: colors.primary.cyan,
+  },
+  playerNameDisconnected: {
+    color: colors.text.disabled,
+  },
+  offlineBadge: {
+    backgroundColor: colors.background.frost,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  offlineBadgeText: {
+    ...typography.tiny,
+    color: colors.text.disabled,
+    letterSpacing: 1,
+  },
+  emptyText: {
+    ...typography.body,
+    color: colors.text.muted,
     textAlign: 'center',
+    marginTop: 24,
   },
+  waitingText: {
+    ...typography.small,
+    color: colors.text.muted,
+    textAlign: 'center',
+    padding: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.subtle,
+  },
+
+  // Bottom buttons
   buttonContainer: {
-    padding: 20,
+    padding: 16,
+    gap: 12,
   },
-  button: {
-    backgroundColor: colors.primary.electricBlue,
-    paddingVertical: 15,
-    paddingHorizontal: 40,
+  startButton: {
+    backgroundColor: colors.accent.neonGreen,
+    paddingVertical: 16,
     borderRadius: 10,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.primary.cyan,
-    shadowColor: colors.shadow.electricBlue,
+    borderColor: colors.accent.neonGreen,
+    shadowColor: colors.accent.neonGreen,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
     elevation: 8,
   },
-  leaveButton: {
-    backgroundColor: colors.primary.neonRed,
-    borderColor: colors.accent.neonPink,
-    shadowColor: colors.shadow.neonRed,
-  },
-  logoutButtonLandscape: {
-    marginHorizontal: 40,
-  },
-  buttonText: {
+  startButtonText: {
     ...typography.button,
-    color: colors.text.primary,
+    color: colors.background.space,
+  },
+  leaveButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  leaveButtonText: {
+    ...typography.button,
+    color: colors.text.tertiary,
   },
 });
-
