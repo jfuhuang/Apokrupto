@@ -13,9 +13,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { io } from 'socket.io-client';
-import { getCurrentApiUrl, getApiUrl } from '../config';
-import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
+import { getApiUrl } from '../../config';
+import { fetchLobbyPlayers, leaveLobby as apiLeaveLobby } from '../../utils/api';
+import { colors } from '../../theme/colors';
+import { typography } from '../../theme/typography';
 
 // One color per player slot, assigned by join order (max 15 players)
 const PLAYER_COLORS = [
@@ -60,19 +61,14 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
   // REST poll — merges player list from server; socket isConnected state takes precedence
   const fetchPlayers = async () => {
     try {
-      const apiUrl = getCurrentApiUrl();
-      const res = await fetch(`${apiUrl}/api/lobbies/${lobbyId}/players`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const { ok, status, data } = await fetchLobbyPlayers(token, lobbyId);
 
-      if (res.status === 401 || res.status === 403) {
+      if (status === 401 || status === 403) {
         handleLogout();
         return;
       }
 
-      if (!res.ok) return;
-
-      const data = await res.json();
+      if (!ok) return;
 
       // Only update from REST if socket isn't supplying live data, or to
       // catch players who joined without a socket event reaching us.
@@ -168,16 +164,11 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
 
   const handleLeaveLobby = async () => {
     try {
-      const apiUrl = getCurrentApiUrl();
-      const res = await fetch(`${apiUrl}/api/lobbies/${lobbyId}/leave`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const { ok, data } = await apiLeaveLobby(token, lobbyId);
 
-      if (res.ok) {
+      if (ok) {
         onLeaveLobby();
       } else {
-        const data = await res.json();
         Alert.alert('Error', data.error || 'Failed to leave lobby');
       }
     } catch (err) {

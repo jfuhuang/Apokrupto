@@ -13,10 +13,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import AnimatedBackground from '../components/AnimatedBackground';
-import { API_URL } from '../config';
-import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
+import AnimatedBackground from '../../components/AnimatedBackground';
+import { register } from '../../utils/api';
+import { colors } from '../../theme/colors';
+import { typography } from '../../theme/typography';
 
 export default function RegistrationScreen({ onBack, onSuccess }) {
   const [username, setUsername] = useState('');
@@ -53,7 +53,6 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
   const validateForm = () => {
     const newErrors = {};
 
-    // Username validation
     if (!username.trim()) {
       newErrors.username = 'Username is required';
     } else if (username.length < 3) {
@@ -64,12 +63,10 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
       newErrors.username = 'Username can only contain letters, numbers, and underscores';
     }
 
-    // Password validation
     if (!password) {
       newErrors.password = 'Password is required';
     }
 
-    // Confirm password validation
     if (password !== confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
@@ -79,34 +76,20 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
   };
 
   const handleRegister = async () => {
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsLoading(true);
     setErrors({});
 
     try {
-      const response = await fetch(`${API_URL}/api/users/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: username.trim(),
-          password,
-        }),
-      });
+      const { ok, status, data } = await register(username.trim(), password);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 409) {
+      if (!ok) {
+        if (status === 409) {
           Alert.alert('Error', 'Username already exists. Please choose a different username.');
         } else {
           Alert.alert('Error', data.error || 'Failed to create account. Please try again.');
         }
-        setIsLoading(false);
         return;
       }
 
@@ -125,10 +108,7 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
     <View style={styles.container}>
       <AnimatedBackground />
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior="padding"
-          style={styles.keyboardView}
-        >
+        <KeyboardAvoidingView behavior="padding" style={styles.keyboardView}>
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
