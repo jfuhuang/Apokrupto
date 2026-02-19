@@ -1,19 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  useWindowDimensions,
+  Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { API_URL } from '../config';
+import { colors } from '../theme/colors';
+import { typography } from '../theme/typography';
 
 export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) {
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
   const [lobby, setLobby] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const floatAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -8,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
 
   useEffect(() => {
     if (lobbyId) {
@@ -84,7 +108,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#00aaff" />
+        <ActivityIndicator size="large" color={colors.primary.electricBlue} />
         <Text style={styles.loadingText}>Loading lobby...</Text>
       </View>
     );
@@ -108,50 +132,48 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
+        <View style={[styles.header, isLandscape && styles.headerLandscape]}>
           <View>
-            <Text style={styles.title}>{lobby.name}</Text>
-            <Text style={styles.subtitle}>Lobby ID: {lobby.id}</Text>
+            <Animated.Text 
+              style={[
+                styles.title,
+                { transform: [{ translateY: floatAnim }] }
+              ]}
+            >
+              LOBBY
+            </Animated.Text>
+            <Text style={styles.subtitle}>Welcome to Apokrupto!</Text>
           </View>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutButtonText}>Logout</Text>
+          <TouchableOpacity style={styles.headerLogoutButton} onPress={handleLogout}>
+            <Text style={styles.headerLogoutButtonText}>Logout</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.content}>
+        <View style={[styles.content, isLandscape && styles.contentLandscape]}>
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Host:</Text>
-              <Text style={styles.infoValue}>{lobby.host_username}</Text>
+              <Text style={styles.infoLabel}>Lobby Name:</Text>
+              <Text style={styles.infoValue}>{lobby.name}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Players:</Text>
-              <Text style={styles.infoValue}>
-                {lobby.current_players}/{lobby.max_players}
-              </Text>
+              <Text style={styles.infoValue}>{lobby.current_players}/{lobby.max_players}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Status:</Text>
-              <Text style={[styles.infoValue, styles.statusText]}>
-                {lobby.status.toUpperCase()}
-              </Text>
+              <Text style={[styles.infoValue, styles.statusText]}>{lobby.status}</Text>
             </View>
           </View>
 
           <View style={styles.messageContainer}>
-            <Text style={styles.message}>You've joined the lobby!</Text>
-            <Text style={styles.info}>
-              Waiting for other players to join...
-            </Text>
-            <Text style={styles.info}>
-              Game features coming soon!
-            </Text>
+            <Text style={styles.message}>You've successfully joined the lobby.</Text>
+            <Text style={styles.info}>Game features coming soon...</Text>
           </View>
         </View>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.button, styles.leaveButton]}
+          <TouchableOpacity 
+            style={[styles.button, styles.leaveButton, isLandscape && styles.logoutButtonLandscape]} 
             onPress={handleLeaveLobby}
           >
             <Text style={styles.buttonText}>Leave Lobby</Text>
@@ -165,64 +187,86 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.background.dark,
   },
   safeArea: {
     flex: 1,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.background.dark,
   },
   loadingText: {
-    color: '#ffffff',
-    fontSize: 16,
-    marginTop: 10,
+    ...typography.body,
+    color: colors.text.secondary,
+    marginTop: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    ...typography.h2,
+    color: colors.primary.neonRed,
+    marginBottom: 20,
   },
   header: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: 20,
-    backgroundColor: '#2a2a2a',
-    borderBottomWidth: 2,
-    borderBottomColor: '#00aaff',
+    alignItems: 'center',
+  },
+  headerLandscape: {
+    paddingHorizontal: 40,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    letterSpacing: 1,
+    ...typography.screenTitle,
+    color: colors.primary.electricBlue,
+    textShadowColor: colors.effects.glow.blue,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 15,
+    marginBottom: 5,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#cccccc',
-    marginTop: 5,
+    ...typography.subtitle,
+    color: colors.text.secondary,
   },
-  logoutButton: {
-    backgroundColor: '#ff0000',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
+  headerLogoutButton: {
+    backgroundColor: colors.primary.neonRed,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.accent.neonPink,
+    shadowColor: colors.effects.glow.red,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
   },
-  logoutButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold',
+  headerLogoutButtonText: {
+    ...typography.button,
+    color: colors.text.primary,
   },
   content: {
     flex: 1,
     padding: 20,
   },
+  contentLandscape: {
+    paddingHorizontal: 40,
+  },
   infoCard: {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: colors.surface.elevated,
     borderRadius: 12,
     padding: 20,
-    borderWidth: 2,
-    borderColor: '#00aaff',
-    marginBottom: 30,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    marginBottom: 20,
   },
   infoRow: {
     flexDirection: 'row',
@@ -230,60 +274,59 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   infoLabel: {
-    color: '#999999',
-    fontSize: 16,
+    ...typography.body,
+    color: colors.text.secondary,
   },
   infoValue: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
+    ...typography.bodyBold,
+    color: colors.text.primary,
   },
   statusText: {
-    color: '#00ff00',
+    color: colors.accent.ultraviolet,
+    textTransform: 'uppercase',
   },
   messageContainer: {
+    padding: 20,
     alignItems: 'center',
-    marginTop: 20,
   },
   message: {
-    fontSize: 20,
-    color: '#ffffff',
-    marginBottom: 20,
+    ...typography.h3,
+    color: colors.text.primary,
+    marginBottom: 10,
     textAlign: 'center',
   },
   info: {
-    fontSize: 14,
-    color: '#999999',
+    ...typography.body,
+    color: colors.text.secondary,
     textAlign: 'center',
-    marginBottom: 10,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 30,
-  },
-  errorText: {
-    fontSize: 20,
-    color: '#ff0000',
-    marginBottom: 20,
   },
   buttonContainer: {
     padding: 20,
   },
   button: {
-    backgroundColor: '#00aaff',
-    paddingVertical: 16,
-    borderRadius: 8,
+    backgroundColor: colors.primary.electricBlue,
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 10,
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.accent.cyan,
+    shadowColor: colors.effects.glow.blue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
   },
   leaveButton: {
-    backgroundColor: '#ff0000',
+    backgroundColor: colors.primary.neonRed,
+    borderColor: colors.accent.neonPink,
+    shadowColor: colors.effects.glow.red,
+  },
+  logoutButtonLandscape: {
+    marginHorizontal: 40,
   },
   buttonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    ...typography.button,
+    color: colors.text.primary,
   },
 });
 

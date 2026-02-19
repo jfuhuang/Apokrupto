@@ -14,26 +14,26 @@ if (!JWT_SECRET) {
 
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, password } = req.body;
 
     // Check if input fields are valid
-    if (!username || !email || !password) {
+    if (!username || !password) {
       return res.status(400).json({ error: 'Missing fields' });
     }
 
     // Check if user exists
-    const checkQuery = `SELECT id FROM users WHERE username = $1 OR email = $2`;
-    const checkResult = await pool.query(checkQuery, [username, email]);
+    const checkQuery = `SELECT id FROM users WHERE username = $1`;
+    const checkResult = await pool.query(checkQuery, [username]);
 
     if (checkResult.rows.length > 0) {
-      return res.status(409).json({ error: 'Username or email already exists' });
+      return res.status(409).json({ error: 'Username already exists' });
     }
 
     // Hash password and store username and hashed password into database
     const hashed = await bcrypt.hash(password, SALT_ROUNDS);
     const result = await pool.query(
-      `INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email, created_at`,
-      [username, email, hashed]
+      `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username, created_at`,
+      [username, hashed]
     );
     const user = result.rows[0];
 
@@ -51,16 +51,16 @@ router.post('/register', async (req, res) => {
 
 router.post('/login', async (req, res) => {
   try {
-    const { usernameOrEmail, password } = req.body;
+    const { username, password } = req.body;
 
     // Check if input fields are valid
-    if (!usernameOrEmail || !password) {
+    if (!username || !password) {
       return res.status(400).json({ error: 'Missing fields' });
     }
 
     // Check if user exists
-    const q = `SELECT id, username, email, password_hash FROM users WHERE username = $1 OR email = $1`;
-    const result = await pool.query(q, [usernameOrEmail]);
+    const q = `SELECT id, username, password_hash FROM users WHERE username = $1`;
+    const result = await pool.query(q, [username]);
 
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
