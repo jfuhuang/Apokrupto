@@ -1,26 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
-  Platform,
+  ScrollView,
   Alert,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import AnimatedBackground from '../components/AnimatedBackground';
 import { API_URL } from '../config';
+import { colors } from '../theme/colors';
+import { typography } from '../theme/typography';
 
 export default function RegistrationScreen({ onBack, onSuccess }) {
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const floatAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+    };
+  }, []);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -8,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
 
   const validateForm = () => {
     const newErrors = {};
@@ -34,13 +62,6 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
       newErrors.username = 'Username must be less than 50 characters';
     } else if (!/^[a-zA-Z0-9_]+$/.test(username)) {
       newErrors.username = 'Username can only contain letters, numbers, and underscores';
-    }
-
-    // Email validation
-    if (!email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = 'Invalid email format';
     }
 
     // Password validation
@@ -77,7 +98,6 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
         },
         body: JSON.stringify({
           username: username.trim(),
-          email: email.trim(),
           password,
         }),
       });
@@ -86,7 +106,7 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
 
       if (!response.ok) {
         if (response.status === 409) {
-          Alert.alert('Error', 'Username or email already exists. Please choose different credentials.');
+          Alert.alert('Error', 'Username already exists. Please choose a different username.');
         } else {
           Alert.alert('Error', data.error || 'Failed to create account. Please try again.');
         }
@@ -110,86 +130,83 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
       <AnimatedBackground />
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.content}
+          behavior="padding"
+          style={styles.keyboardView}
         >
-          <View style={styles.header}>
-            <TouchableOpacity style={styles.backButton} onPress={onBack}>
-              <Text style={styles.backButtonText}>← Back</Text>
-            </TouchableOpacity>
-            <Text style={styles.title}>CREATE ACCOUNT</Text>
-          </View>
-
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Username</Text>
-              <TextInput
-                style={[styles.input, errors.username && styles.inputError]}
-                value={username}
-                onChangeText={setUsername}
-                placeholder="Enter username"
-                placeholderTextColor="#666666"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.header}>
+              <TouchableOpacity style={styles.backButton} onPress={onBack}>
+                <Text style={styles.backButtonText}>← Back</Text>
+              </TouchableOpacity>
+              <Animated.Text
+                style={[styles.title, { transform: [{ translateY: floatAnim }] }]}
+              >
+                CREATE ACCOUNT
+              </Animated.Text>
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={[styles.input, errors.email && styles.inputError]}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="Enter email"
-                placeholderTextColor="#666666"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
-            </View>
+            <View style={styles.form}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Username</Text>
+                <TextInput
+                  style={[styles.input, errors.username && styles.inputError]}
+                  value={username}
+                  onChangeText={setUsername}
+                  placeholder="Enter username"
+                  placeholderTextColor="#666666"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
+              </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Password</Text>
-              <TextInput
-                style={[styles.input, errors.password && styles.inputError]}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Enter password"
-                placeholderTextColor="#666666"
-                secureTextEntry
-                autoCapitalize="none"
-              />
-              {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-            </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Password</Text>
+                <TextInput
+                  style={[styles.input, errors.password && styles.inputError]}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Enter password"
+                  placeholderTextColor="#666666"
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+                {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+              </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Confirm Password</Text>
-              <TextInput
-                style={[styles.input, errors.confirmPassword && styles.inputError]}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                placeholder="Confirm password"
-                placeholderTextColor="#666666"
-                secureTextEntry
-                autoCapitalize="none"
-              />
-              {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
-            </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Confirm Password</Text>
+                <TextInput
+                  style={[styles.input, errors.confirmPassword && styles.inputError]}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Confirm password"
+                  placeholderTextColor="#666666"
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+                {errors.confirmPassword && (
+                  <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+                )}
+              </View>
 
-            <TouchableOpacity
-              style={[styles.button, isLoading && styles.buttonDisabled]}
-              onPress={handleRegister}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text style={styles.buttonText}>CREATE ACCOUNT</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                style={[styles.button, isLoading && styles.buttonDisabled]}
+                onPress={handleRegister}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.buttonText}>CREATE ACCOUNT</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -199,14 +216,18 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.background.space,
   },
   safeArea: {
     flex: 1,
   },
-  content: {
+  keyboardView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 30,
+    paddingBottom: 40,
   },
   header: {
     marginTop: 20,
@@ -216,64 +237,68 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   backButtonText: {
-    color: '#00aaff',
-    fontSize: 16,
+    ...typography.label,
+    color: colors.primary.electricBlue,
+    textShadowColor: colors.glow.blue.soft,
+    textShadowRadius: 6,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    letterSpacing: 2,
+    ...typography.screenTitle,
+    color: colors.text.glow,
+    textShadowColor: colors.shadow.neonRed,
+    textShadowRadius: 10,
   },
-  form: {
-    flex: 1,
-  },
+  form: {},
   inputContainer: {
     marginBottom: 20,
   },
   label: {
-    color: '#ffffff',
-    fontSize: 14,
+    ...typography.label,
+    color: colors.text.secondary,
     marginBottom: 8,
-    fontWeight: '600',
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 8,
+    ...typography.body,
+    backgroundColor: colors.input.background,
+    borderWidth: 2,
+    borderColor: colors.input.border,
+    borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: '#ffffff',
-    fontSize: 16,
+    paddingVertical: 14,
+    color: colors.text.primary,
   },
   inputError: {
-    borderColor: '#ff0000',
+    borderColor: colors.input.borderError,
+    shadowColor: colors.glow.red.soft,
+    shadowRadius: 8,
+    shadowOpacity: 1,
   },
   errorText: {
-    color: '#ff0000',
-    fontSize: 12,
+    ...typography.small,
+    color: colors.state.error,
     marginTop: 4,
   },
   button: {
-    backgroundColor: '#ff0000',
-    paddingVertical: 16,
-    borderRadius: 8,
+    backgroundColor: colors.primary.neonRed,
+    paddingVertical: 18,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.border.neon,
     alignItems: 'center',
     marginTop: 20,
-    shadowColor: '#ff0000',
+    shadowColor: colors.shadow.neonRed,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    elevation: 8,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   buttonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    letterSpacing: 1,
+    ...typography.button,
+    color: colors.text.glow,
+    textShadowColor: colors.shadow.white,
+    textShadowRadius: 4,
   },
 });

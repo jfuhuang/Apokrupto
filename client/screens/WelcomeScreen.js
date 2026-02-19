@@ -1,28 +1,57 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, useWindowDimensions } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Animated } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedBackground from '../components/AnimatedBackground';
+import { colors } from '../theme/colors';
+import { typography } from '../theme/typography';
 
 export default function WelcomeScreen({ onCreateAccount, onLogin }) {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -10,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
 
   return (
     <View style={styles.container}>
       <AnimatedBackground />
       <SafeAreaView style={[styles.content, isLandscape && styles.contentLandscape]}>
-        <View style={[styles.titleContainer, isLandscape && styles.titleContainerLandscape]}>
+        <Animated.View 
+          style={[
+            styles.titleContainer, 
+            isLandscape && styles.titleContainerLandscape,
+            { transform: [{ translateY: floatAnim }] }
+          ]}
+        >
           <Text style={[styles.title, isLandscape && styles.titleLandscape]}>APOKRUPTO</Text>
           <Text style={[styles.subtitle, isLandscape && styles.subtitleLandscape]}>Real World Deception</Text>
-        </View>
+        </Animated.View>
 
         <View style={[styles.buttonContainer, isLandscape && styles.buttonContainerLandscape]}>
+          <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={onLogin}>
+            <Text style={styles.buttonText}>LOGIN</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.button} onPress={onCreateAccount}>
             <Text style={styles.buttonText}>CREATE ACCOUNT</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={onLogin}>
-            <Text style={styles.buttonText}>LOGIN</Text>
-          </TouchableOpacity>
+
         </View>
       </SafeAreaView>
     </View>
@@ -32,7 +61,7 @@ export default function WelcomeScreen({ onCreateAccount, onLogin }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.background.space,
   },
   content: {
     flex: 1,
@@ -44,50 +73,56 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   title: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    letterSpacing: 2,
-    textShadowColor: '#ff0000',
+    ...typography.appTitle,
+    color: colors.text.glow,
+    textShadowColor: colors.shadow.neonRed,
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
+    textShadowRadius: 15,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#cccccc',
+    ...typography.subtitle,
+    color: colors.text.secondary,
     marginTop: 10,
-    letterSpacing: 1,
+    textShadowColor: colors.shadow.electricBlue,
+    textShadowRadius: 8,
   },
   buttonContainer: {
     paddingHorizontal: 40,
     gap: 20,
   },
   buttonContainerLandscape: {
-    width: '40%',
-    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
     gap: 20,
+    paddingLeft: 40,
   },
   button: {
-    backgroundColor: '#ff0000',
-    paddingVertical: 16,
+    backgroundColor: colors.primary.neonRed,
+    paddingVertical: 18,
     paddingHorizontal: 40,
-    borderRadius: 8,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.border.neon,
     alignItems: 'center',
-    shadowColor: '#ff0000',
+    justifyContent: 'center',
+    shadowColor: colors.shadow.neonRed,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    elevation: 8,
   },
   secondaryButton: {
-    backgroundColor: '#00aaff',
-    shadowColor: '#00aaff',
+    backgroundColor: colors.primary.electricBlue,
+    borderColor: colors.border.glow,
+    shadowColor: colors.shadow.electricBlue,
+    textAlign: 'center',
   },
   buttonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    letterSpacing: 1,
+    ...typography.button,
+    color: colors.text.glow,
+    textShadowColor: colors.shadow.white,
+    textShadowRadius: 4,
+    textAlign: 'center',
   },
   /* Landscape-specific styles */
   contentLandscape: {
@@ -98,14 +133,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 60,
   },
   titleContainerLandscape: {
-    width: '55%',
+    flex: 1,
     alignItems: 'flex-start',
+    justifyContent: 'center',
     marginTop: 0,
   },
   titleLandscape: {
-    fontSize: 48,
+    fontSize: 52,
   },
   subtitleLandscape: {
-    fontSize: 18,
+    fontSize: 24,
   },
 });

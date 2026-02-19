@@ -3,11 +3,13 @@ const http = require('http');
 const app = express(); // Create an Express application instance
 const port = process.env.PORT || 3000; // Define the port number
 const userRoutes = require('./routes/userRoutes');
+const lobbyRoutes = require('./routes/lobbyRoutes');
 const { connectRedis } = require('./redis');
 const WebSocketServer = require('./websocket/WebSocketServer');
 
 app.use(express.json());
 app.use('/api/users', userRoutes);
+app.use('/api/lobbies', lobbyRoutes);
 
 app.get('/', (req, res) => {
   res.send('Apokrupto Server - Lobby & Realtime System Active');
@@ -35,7 +37,7 @@ async function start() {
     console.log('[Startup] WebSocket server initialized');
 
     // Start listening
-    httpServer.listen(port, () => {
+    httpServer.listen(port, '0.0.0.0', () => {
       console.log(`[Startup] Server listening on port ${port}`);
       console.log(`[Startup] Environment: ${process.env.NODE_ENV || 'development'}`);
     });

@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Dimensions, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 const DOT_COUNT = 30;
 const MAX_CONNECTION_DISTANCE = 150;
 const IMPOSTOR_COUNT = 3;
@@ -10,14 +9,16 @@ const KILL_INTERVAL = 3000; // Kill every 3 seconds
 const RESPAWN_DELAY = 2000; // Respawn after 2 seconds
 
 class Dot {
-  constructor(isImpostor = false) {
-    this.x = Math.random() * SCREEN_WIDTH;
-    this.y = Math.random() * SCREEN_HEIGHT;
+  constructor(isImpostor = false, width = 800, height = 600) {
+    this.x = Math.random() * width;
+    this.y = Math.random() * height;
     this.vx = (Math.random() - 0.5) * 2;
     this.vy = (Math.random() - 0.5) * 2;
     this.isImpostor = isImpostor;
     this.isAlive = true;
     this.respawnTime = null;
+    this.width = width;
+    this.height = height;
   }
 
   update() {
@@ -33,12 +34,12 @@ class Dot {
     this.y += this.vy;
 
     // Bounce off walls
-    if (this.x <= 0 || this.x >= SCREEN_WIDTH) this.vx *= -1;
-    if (this.y <= 0 || this.y >= SCREEN_HEIGHT) this.vy *= -1;
+    if (this.x <= 0 || this.x >= this.width) this.vx *= -1;
+    if (this.y <= 0 || this.y >= this.height) this.vy *= -1;
 
     // Keep within bounds
-    this.x = Math.max(0, Math.min(SCREEN_WIDTH, this.x));
-    this.y = Math.max(0, Math.min(SCREEN_HEIGHT, this.y));
+    this.x = Math.max(0, Math.min(this.width, this.x));
+    this.y = Math.max(0, Math.min(this.height, this.y));
   }
 
   distanceTo(other) {
@@ -47,6 +48,7 @@ class Dot {
 }
 
 export default function AnimatedBackground() {
+  const { width, height } = Dimensions.get('screen');
   const dotsRef = useRef([]);
   const lastKillTimeRef = useRef(Date.now());
   const [updateCounter, setUpdateCounter] = useState(0);
@@ -55,10 +57,10 @@ export default function AnimatedBackground() {
     // Initialize dots
     const dots = [];
     for (let i = 0; i < IMPOSTOR_COUNT; i++) {
-      dots.push(new Dot(true));
+      dots.push(new Dot(true, width, height));
     }
     for (let i = IMPOSTOR_COUNT; i < DOT_COUNT; i++) {
-      dots.push(new Dot(false));
+      dots.push(new Dot(false, width, height));
     }
     dotsRef.current = dots;
 
@@ -94,7 +96,7 @@ export default function AnimatedBackground() {
 
       // Force re-render using counter
       setUpdateCounter(prev => prev + 1);
-    }, 1000 / 30); // 30 FPS
+    }, 1000 / 60); // 30 FPS
 
     return () => {
       clearInterval(interval);
@@ -103,6 +105,11 @@ export default function AnimatedBackground() {
 
   return (
     <View style={styles.container}>
+      <LinearGradient
+        colors={['#0a0a1a', '#1a0a0a', '#0a1a1a', '#000000']}
+        locations={[0, 0.3, 0.6, 1]}
+        style={styles.gradient}
+      />
       <View style={styles.canvas}>
         {dotsRef.current.map((dot, i) => (
           <React.Fragment key={i}>
@@ -160,7 +167,9 @@ export default function AnimatedBackground() {
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#000000',
+  },
+  gradient: {
+    ...StyleSheet.absoluteFillObject,
   },
   canvas: {
     flex: 1,
@@ -170,6 +179,10 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+    shadowColor: '#ffffff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
   },
   line: {
     position: 'absolute',
