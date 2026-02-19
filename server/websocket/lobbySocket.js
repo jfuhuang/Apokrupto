@@ -5,6 +5,9 @@ const pool = require('../db');
 // In-memory map of lobbyId -> Set of connected userIds (as strings)
 const lobbyConnections = new Map();
 
+// Module-level io reference so helpers outside this file can broadcast
+let _io = null;
+
 /**
  * Query Postgres for the current lobby state and annotate each player
  * with whether they have an active socket connection.
@@ -94,14 +97,25 @@ function startIdleLobbyCleaner(io) {
   }, INTERVAL_MS);
 }
 
+async function broadcastLobbyUpdate(lobbyId) {
+  if (!_io) return;
+  try {
+    const state = await getLobbyState(lobbyId);
+    if (state) _io.to(`lobby:${String(lobbyId)}`).emit('lobbyUpdate', state);
+  } catch (err) {
+    console.error('[WS] broadcastLobbyUpdate error:', err);
+  }
+}
+
 function setupLobbySocket(httpServer) {
-  const io = new Server(httpServer, {
+  _io = new Server(httpServer, {
     cors: {
       origin: '*',
       methods: ['GET', 'POST'],
     },
     transports: ['websocket', 'polling'],
   });
+  const io = _io; // local alias so handlers below continue to work
 
   const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 
@@ -223,4 +237,4 @@ function setupLobbySocket(httpServer) {
   return io;
 }
 
-module.exports = { setupLobbySocket };
+module.exports = { setupLobbySocket, broadcastLobbyUpdate };

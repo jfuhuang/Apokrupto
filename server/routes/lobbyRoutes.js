@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const authenticateToken = require('../middleware/auth');
+const { broadcastLobbyUpdate } = require('../websocket/lobbySocket');
 
 const router = express.Router();
 
@@ -252,5 +253,74 @@ router.post('/:id/leave', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+// DEV ONLY — add a throwaway dummy player to a lobby for testing
+if (process.env.NODE_ENV !== 'production') {
+  const BOT_NAMES = [
+    'Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo',
+    'Foxtrot', 'Golf', 'Hotel', 'India', 'Juliet',
+  ];
+
+  router.post('/:id/add-dummy', async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const lobbyResult = await pool.query(
+        `SELECT id, max_players, status,
+                COUNT(lp.user_id) AS current_players
+         FROM lobbies l
+         LEFT JOIN lobby_players lp ON lp.lobby_id = l.id
+         WHERE l.id = $1
+         GROUP BY l.id`,
+        [id]
+      );
+
+      if (lobbyResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Lobby not found' });
+      }
+
+      const lobby = lobbyResult.rows[0];
+
+      if (parseInt(lobby.current_players) >= parseInt(lobby.max_players)) {
+        return res.status(400).json({ error: 'Lobby is full' });
+      }
+
+      // Pick a name not already taken in this lobby
+      const takenResult = await pool.query(
+        `SELECT u.username
+         FROM lobby_players lp
+         JOIN users u ON u.id = lp.user_id
+         WHERE lp.lobby_id = $1`,
+        [id]
+      );
+      const taken = new Set(takenResult.rows.map((r) => r.username));
+      const suffix = Date.now().toString(36).slice(-4).toUpperCase();
+      const base = BOT_NAMES.find((n) => !taken.has(`Bot_${n}`)) ?? suffix;
+      const username = `Bot_${base}`;
+
+      // Create the throwaway user (null password — can never log in)
+      const userResult = await pool.query(
+        `INSERT INTO users (username, password_hash)
+         VALUES ($1, NULL)
+         RETURNING id, username`,
+        [username]
+      );
+      const dummy = userResult.rows[0];
+
+      await pool.query(
+        'INSERT INTO lobby_players (lobby_id, user_id) VALUES ($1, $2)',
+        [id, dummy.id]
+      );
+
+      // Push live update to anyone already in the room
+      await broadcastLobbyUpdate(id);
+
+      res.json({ player: dummy });
+    } catch (err) {
+      console.error('[DEV] add-dummy error:', err);
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+}
 
 module.exports = router;

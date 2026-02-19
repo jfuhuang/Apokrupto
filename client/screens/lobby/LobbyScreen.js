@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
-import { fetchLobbyPlayers, leaveLobby as apiLeaveLobby } from '../../utils/api';
+import { fetchLobbyPlayers, leaveLobby as apiLeaveLobby, addDummyPlayer } from '../../utils/api';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 
@@ -201,6 +201,11 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
     });
   };
 
+  const handleAddDummy = async () => {
+    const { ok, data } = await addDummyPlayer(token, lobbyId);
+    if (!ok) Alert.alert('Dev', data?.error || 'Failed to add dummy');
+  };
+
   const handleLogout = async () => {
     try {
       await SecureStore.deleteItemAsync('jwtToken');
@@ -316,6 +321,12 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
           <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveLobby}>
             <Text style={styles.leaveButtonText}>Leave Lobby</Text>
           </TouchableOpacity>
+
+          {__DEV__ && (
+            <TouchableOpacity style={styles.devButton} onPress={handleAddDummy}>
+              <Text style={styles.devButtonText}>[DEV] Add Dummy Player</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
     </View>
@@ -529,5 +540,17 @@ const styles = StyleSheet.create({
   leaveButtonText: {
     ...typography.button,
     color: colors.text.tertiary,
+  },
+  devButton: {
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.accent.amber,
+    borderStyle: 'dashed',
+  },
+  devButtonText: {
+    ...typography.small,
+    color: colors.accent.amber,
   },
 });

@@ -66,3 +66,10 @@ export async function fetchLobbyPlayers(token, lobbyId) {
     headers: authHeader(token),
   });
 }
+
+export async function addDummyPlayer(token, lobbyId) {
+  return request(`/api/lobbies/${lobbyId}/add-dummy`, {
+    method: 'POST',
+    headers: authHeader(token),
+  });
+}
