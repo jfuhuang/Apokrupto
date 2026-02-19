@@ -1,4 +1,4 @@
-import { getCurrentApiUrl } from './networkUtils';
+import { getCurrentApiUrl } from '../config';
 
 // --- Helpers ---
 
