@@ -5,6 +5,9 @@ const pool = require('../db');
 // In-memory map of lobbyId -> Set of connected userIds (as strings)
 const lobbyConnections = new Map();
 
+// Tracks which entries in lobbyConnections are fake (bot) connections
+const fakeConnections = new Map();
+
 // Module-level io reference so helpers outside this file can broadcast
 let _io = null;
 
@@ -73,8 +76,12 @@ function startIdleLobbyCleaner(io) {
 
       const toClose = result.rows
         .filter(({ id }) => {
-          const connected = lobbyConnections.get(String(id));
-          return !connected || connected.size === 0;
+          const roomKey = String(id);
+          const connected = lobbyConnections.get(roomKey);
+          if (!connected || connected.size === 0) return true;
+          // Close if every connected entry is a fake (bot) connection
+          const fake = fakeConnections.get(roomKey) || new Set();
+          return [...connected].every((uid) => fake.has(uid));
         })
         .map(({ id }) => id);
 
@@ -85,6 +92,7 @@ function startIdleLobbyCleaner(io) {
       for (const lobbyId of toClose) {
         const roomKey = String(lobbyId);
         lobbyConnections.delete(roomKey);
+        fakeConnections.delete(roomKey);
         io.to(`lobby:${roomKey}`).emit('lobbyClosed', {
           lobbyId,
           reason: 'All players disconnected',
@@ -99,10 +107,13 @@ function startIdleLobbyCleaner(io) {
 
 function addFakeConnection(lobbyId, userId) {
   const roomKey = String(lobbyId);
-  if (!lobbyConnections.has(roomKey)) {
-    lobbyConnections.set(roomKey, new Set());
-  }
-  lobbyConnections.get(roomKey).add(String(userId));
+  const uid = String(userId);
+
+  if (!lobbyConnections.has(roomKey)) lobbyConnections.set(roomKey, new Set());
+  lobbyConnections.get(roomKey).add(uid);
+
+  if (!fakeConnections.has(roomKey)) fakeConnections.set(roomKey, new Set());
+  fakeConnections.get(roomKey).add(uid);
 }
 
 async function broadcastLobbyUpdate(lobbyId) {
