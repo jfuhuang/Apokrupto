@@ -257,6 +257,13 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
 
         {/* Player window */}
         <View style={styles.playerWindow}>
+          {__DEV__ && (
+            <View style={styles.devBar}>
+              <TouchableOpacity style={styles.devButton} onPress={handleAddDummy}>
+                <Text style={styles.devButtonText}>+ Dummy</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <ScrollView
             contentContainerStyle={styles.playerGrid}
             showsVerticalScrollIndicator={false}
@@ -321,12 +328,6 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
           <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveLobby}>
             <Text style={styles.leaveButtonText}>Leave Lobby</Text>
           </TouchableOpacity>
-
-          {__DEV__ && (
-            <TouchableOpacity style={styles.devButton} onPress={handleAddDummy}>
-              <Text style={styles.devButtonText}>[DEV] Add Dummy Player</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </SafeAreaView>
     </View>
@@ -541,16 +542,24 @@ const styles = StyleSheet.create({
     ...typography.button,
     color: colors.text.tertiary,
   },
+  devBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
+  },
   devButton: {
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: colors.accent.amber,
     borderStyle: 'dashed',
   },
   devButtonText: {
-    ...typography.small,
+    ...typography.tiny,
     color: colors.accent.amber,
   },
 });
