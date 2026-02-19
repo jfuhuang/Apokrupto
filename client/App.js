@@ -2,14 +2,47 @@ import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import {
+  useFonts,
+  Orbitron_400Regular,
+  Orbitron_500Medium,
+  Orbitron_700Bold,
+  Orbitron_900Black,
+} from '@expo-google-fonts/orbitron';
+import {
+  Exo2_400Regular,
+  Exo2_500Medium,
+  Exo2_600SemiBold,
+  Exo2_700Bold,
+} from '@expo-google-fonts/exo-2';
+import {
+  Rajdhani_600SemiBold,
+  Rajdhani_700Bold,
+} from '@expo-google-fonts/rajdhani';
 import WelcomeScreen from './screens/WelcomeScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegistrationScreen from './screens/RegistrationScreen';
 import LobbyScreen from './screens/LobbyScreen';
+import LobbyListScreen from './screens/LobbyListScreen';
+import { colors } from './theme/colors';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('loading');
   const [token, setToken] = useState(null);
+  const [currentLobbyId, setCurrentLobbyId] = useState(null);
+
+  const [fontsLoaded] = useFonts({
+    Orbitron_400Regular,
+    Orbitron_500Medium,
+    Orbitron_700Bold,
+    Orbitron_900Black,
+    Exo2_400Regular,
+    Exo2_500Medium,
+    Exo2_600SemiBold,
+    Exo2_700Bold,
+    Rajdhani_600SemiBold,
+    Rajdhani_700Bold,
+  });
 
   useEffect(() => {
     // Check for existing token on app start
@@ -21,7 +54,7 @@ export default function App() {
       const storedToken = await SecureStore.getItemAsync('jwtToken');
       if (storedToken) {
         setToken(storedToken);
-        setCurrentScreen('lobby');
+        setCurrentScreen('lobbyList');
       } else {
         setCurrentScreen('welcome');
       }
@@ -33,20 +66,39 @@ export default function App() {
 
   const handleLogin = (jwtToken) => {
     setToken(jwtToken);
-    setCurrentScreen('lobby');
+    setCurrentScreen('lobbyList');
   };
 
   const handleLogout = () => {
     setToken(null);
+    setCurrentLobbyId(null);
     setCurrentScreen('welcome');
   };
 
+  const handleJoinLobby = (lobbyId) => {
+    setCurrentLobbyId(lobbyId);
+    setCurrentScreen('lobby');
+  };
+
+  const handleLeaveLobby = () => {
+    setCurrentLobbyId(null);
+    setCurrentScreen('lobbyList');
+  };
+
   const renderScreen = () => {
+    if (!fontsLoaded) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary.electricBlue} />
+        </View>
+      );
+    }
+
     switch (currentScreen) {
       case 'loading':
         return (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#ffffff" />
+            <ActivityIndicator size="large" color={colors.primary.electricBlue} />
           </View>
         );
       case 'welcome':
@@ -70,8 +122,23 @@ export default function App() {
             onSuccess={handleLogin}
           />
         );
+      case 'lobbyList':
+        return (
+          <LobbyListScreen
+            token={token}
+            onLogout={handleLogout}
+            onJoinLobby={handleJoinLobby}
+          />
+        );
       case 'lobby':
-        return <LobbyScreen token={token} onLogout={handleLogout} />;
+        return (
+          <LobbyScreen
+            token={token}
+            lobbyId={currentLobbyId}
+            onLogout={handleLogout}
+            onLeaveLobby={handleLeaveLobby}
+          />
+        );
       default:
         return <WelcomeScreen />;
     }
@@ -88,7 +155,7 @@ export default function App() {
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.background.space,
     justifyContent: 'center',
     alignItems: 'center',
   },

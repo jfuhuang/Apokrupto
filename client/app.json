@@ -3,20 +3,22 @@
     "name": "Apokrupto",
     "slug": "apokrupto",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "landscape",
     "userInterfaceStyle": "light",
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.apokrupto"
     },
     "android": {
       "package": "com.anonymous.apokrupto"
     },
     "web": {},
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font"
     ]
   }
 }
