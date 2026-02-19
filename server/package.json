@@ -4,9 +4,10 @@
   "description": "Apokrupto - Node.js backend server",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
-    "docker:start": "docker-compose up --build",
+    "start": "NODE_ENV=production node app.js",
+    "dev": "NODE_ENV=development nodemon app.js",
+    "docker:prod": "NODE_ENV=production docker-compose up --build",
+    "docker:dev": "NODE_ENV=development docker-compose up --build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

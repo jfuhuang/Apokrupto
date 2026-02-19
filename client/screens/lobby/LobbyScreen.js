@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
-import { fetchLobbyPlayers, leaveLobby as apiLeaveLobby } from '../../utils/api';
+import { fetchLobbyPlayers, leaveLobby as apiLeaveLobby, addDummyPlayer } from '../../utils/api';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 
@@ -201,6 +201,15 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
     });
   };
 
+  const handleAddDummy = async () => {
+    try {
+      const { ok, data } = await addDummyPlayer(token, lobbyId);
+      if (!ok) Alert.alert('Dev', data?.error || 'Failed to add dummy');
+    } catch (err) {
+      Alert.alert('Dev', 'Network error: ' + err.message);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await SecureStore.deleteItemAsync('jwtToken');
@@ -252,6 +261,13 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
 
         {/* Player window */}
         <View style={styles.playerWindow}>
+          {__DEV__ && (
+            <View style={styles.devBar}>
+              <TouchableOpacity style={styles.devButton} onPress={handleAddDummy}>
+                <Text style={styles.devButtonText}>+ Dummy</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <ScrollView
             contentContainerStyle={styles.playerGrid}
             showsVerticalScrollIndicator={false}
@@ -529,5 +545,25 @@ const styles = StyleSheet.create({
   leaveButtonText: {
     ...typography.button,
     color: colors.text.tertiary,
+  },
+  devBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
+  },
+  devButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.accent.amber,
+    borderStyle: 'dashed',
+  },
+  devButtonText: {
+    ...typography.tiny,
+    color: colors.accent.amber,
   },
 });

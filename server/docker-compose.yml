@@ -13,29 +13,18 @@ services:
       - pgdata:/var/lib/postgresql
       - ./initdb:/docker-entrypoint-initdb.d
   
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes
-    volumes:
-      - redisdata:/data
-  
   app:
     build: .
     env_file:
       - .env
     environment:
+      - NODE_ENV=${NODE_ENV:-production}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
     ports:
       - "3000:3000"
     depends_on:
       - postgres
-      - redis
 
 volumes:
   pgdata:
-  redisdata:
