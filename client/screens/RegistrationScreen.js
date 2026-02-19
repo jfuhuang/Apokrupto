@@ -6,27 +6,32 @@ import {
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
-  Platform,
+  ScrollView,
   Alert,
   ActivityIndicator,
-  useWindowDimensions,
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import AnimatedBackground from '../components/AnimatedBackground';
 import { API_URL } from '../config';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 
 export default function RegistrationScreen({ onBack, onSuccess }) {
-  const { width, height } = useWindowDimensions();
-  const isLandscape = width > height;
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const floatAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+    };
+  }, []);
 
   useEffect(() => {
     Animated.loop(
@@ -125,79 +130,83 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
       <AnimatedBackground />
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={[styles.content, isLandscape && styles.contentLandscape]}
+          behavior="padding"
+          style={styles.keyboardView}
         >
-          <View style={[styles.header, isLandscape && styles.headerLandscape]}>
-            <TouchableOpacity style={styles.backButton} onPress={onBack}>
-              <Text style={styles.backButtonText}>← Back</Text>
-            </TouchableOpacity>
-            <Animated.Text
-              style={[
-                styles.title,
-                isLandscape && styles.titleLandscape,
-                { transform: [{ translateY: floatAnim }] }
-              ]}
-            >
-              CREATE ACCOUNT
-            </Animated.Text>
-          </View>
-
-          <View style={[styles.form, isLandscape && styles.formLandscape]}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Username</Text>
-              <TextInput
-                style={[styles.input, errors.username && styles.inputError]}
-                value={username}
-                onChangeText={setUsername}
-                placeholder="Enter username"
-                placeholderTextColor="#666666"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.header}>
+              <TouchableOpacity style={styles.backButton} onPress={onBack}>
+                <Text style={styles.backButtonText}>← Back</Text>
+              </TouchableOpacity>
+              <Animated.Text
+                style={[styles.title, { transform: [{ translateY: floatAnim }] }]}
+              >
+                CREATE ACCOUNT
+              </Animated.Text>
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Password</Text>
-              <TextInput
-                style={[styles.input, errors.password && styles.inputError]}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Enter password"
-                placeholderTextColor="#666666"
-                secureTextEntry
-                autoCapitalize="none"
-              />
-              {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-            </View>
+            <View style={styles.form}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Username</Text>
+                <TextInput
+                  style={[styles.input, errors.username && styles.inputError]}
+                  value={username}
+                  onChangeText={setUsername}
+                  placeholder="Enter username"
+                  placeholderTextColor="#666666"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
+              </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Confirm Password</Text>
-              <TextInput
-                style={[styles.input, errors.confirmPassword && styles.inputError]}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                placeholder="Confirm password"
-                placeholderTextColor="#666666"
-                secureTextEntry
-                autoCapitalize="none"
-              />
-              {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
-            </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Password</Text>
+                <TextInput
+                  style={[styles.input, errors.password && styles.inputError]}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Enter password"
+                  placeholderTextColor="#666666"
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+                {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+              </View>
 
-            <TouchableOpacity
-              style={[styles.button, isLoading && styles.buttonDisabled]}
-              onPress={handleRegister}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text style={styles.buttonText}>CREATE ACCOUNT</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Confirm Password</Text>
+                <TextInput
+                  style={[styles.input, errors.confirmPassword && styles.inputError]}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Confirm password"
+                  placeholderTextColor="#666666"
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+                {errors.confirmPassword && (
+                  <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+                )}
+              </View>
+
+              <TouchableOpacity
+                style={[styles.button, isLoading && styles.buttonDisabled]}
+                onPress={handleRegister}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.buttonText}>CREATE ACCOUNT</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -212,9 +221,13 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  content: {
+  keyboardView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 30,
+    paddingBottom: 40,
   },
   header: {
     marginTop: 20,
@@ -235,9 +248,7 @@ const styles = StyleSheet.create({
     textShadowColor: colors.shadow.neonRed,
     textShadowRadius: 10,
   },
-  form: {
-    flex: 1,
-  },
+  form: {},
   inputContainer: {
     marginBottom: 20,
   },
@@ -289,22 +300,5 @@ const styles = StyleSheet.create({
     color: colors.text.glow,
     textShadowColor: colors.shadow.white,
     textShadowRadius: 4,
-  },
-  /* Landscape-specific styles */
-  contentLandscape: {
-    flexDirection: 'row',
-    paddingHorizontal: 60,
-  },
-  headerLandscape: {
-    width: '35%',
-    marginRight: 40,
-    marginBottom: 0,
-  },
-  titleLandscape: {
-    fontSize: 32,
-  },
-  formLandscape: {
-    width: '65%',
-    maxWidth: 500,
   },
 });

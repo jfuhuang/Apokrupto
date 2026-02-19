@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Dimensions, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Dimensions, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const DOT_COUNT = 30;
@@ -48,7 +48,7 @@ class Dot {
 }
 
 export default function AnimatedBackground() {
-  const { width, height } = useWindowDimensions();
+  const { width, height } = Dimensions.get('screen');
   const dotsRef = useRef([]);
   const lastKillTimeRef = useRef(Date.now());
   const [updateCounter, setUpdateCounter] = useState(0);
@@ -101,7 +101,7 @@ export default function AnimatedBackground() {
     return () => {
       clearInterval(interval);
     };
-  }, [width, height]);
+  }, []);
 
   return (
     <View style={styles.container}>
