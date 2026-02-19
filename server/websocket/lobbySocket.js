@@ -48,6 +48,52 @@ async function getLobbyState(lobbyId) {
   };
 }
 
+/**
+ * Periodically close lobbies where all members have disconnected.
+ * Runs every 60 seconds. A 2-minute grace period on lobby age prevents
+ * immediately closing a lobby whose host hasn't connected via WebSocket yet.
+ */
+function startIdleLobbyCleaner(io) {
+  const INTERVAL_MS = 60_000;
+
+  setInterval(async () => {
+    try {
+      // Active lobbies with at least one DB player, past the grace period
+      const result = await pool.query(`
+        SELECT l.id
+        FROM lobbies l
+        JOIN lobby_players lp ON lp.lobby_id = l.id
+        WHERE l.status IN ('waiting', 'in_progress')
+          AND l.created_at < NOW() - INTERVAL '2 minutes'
+        GROUP BY l.id
+      `);
+
+      const toClose = result.rows
+        .filter(({ id }) => {
+          const connected = lobbyConnections.get(String(id));
+          return !connected || connected.size === 0;
+        })
+        .map(({ id }) => id);
+
+      if (toClose.length === 0) return;
+
+      await pool.query('DELETE FROM lobbies WHERE id = ANY($1::int[])', [toClose]);
+
+      for (const lobbyId of toClose) {
+        const roomKey = String(lobbyId);
+        lobbyConnections.delete(roomKey);
+        io.to(`lobby:${roomKey}`).emit('lobbyClosed', {
+          lobbyId,
+          reason: 'All players disconnected',
+        });
+        console.log(`[WS] Closed idle lobby ${lobbyId} — no connected players`);
+      }
+    } catch (err) {
+      console.error('[WS] Idle lobby cleaner error:', err);
+    }
+  }, INTERVAL_MS);
+}
+
 function setupLobbySocket(httpServer) {
   const io = new Server(httpServer, {
     cors: {
@@ -79,6 +125,8 @@ function setupLobbySocket(httpServer) {
       next(new Error('Invalid token'));
     }
   });
+
+  startIdleLobbyCleaner(io);
 
   io.on('connection', (socket) => {
     let currentLobbyId = null;
