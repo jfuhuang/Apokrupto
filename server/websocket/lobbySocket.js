@@ -97,6 +97,14 @@ function startIdleLobbyCleaner(io) {
   }, INTERVAL_MS);
 }
 
+function addFakeConnection(lobbyId, userId) {
+  const roomKey = String(lobbyId);
+  if (!lobbyConnections.has(roomKey)) {
+    lobbyConnections.set(roomKey, new Set());
+  }
+  lobbyConnections.get(roomKey).add(String(userId));
+}
+
 async function broadcastLobbyUpdate(lobbyId) {
   if (!_io) return;
   try {
@@ -237,4 +245,4 @@ function setupLobbySocket(httpServer) {
   return io;
 }
 
-module.exports = { setupLobbySocket, broadcastLobbyUpdate };
+module.exports = { setupLobbySocket, broadcastLobbyUpdate, addFakeConnection };

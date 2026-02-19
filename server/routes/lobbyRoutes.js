@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const authenticateToken = require('../middleware/auth');
-const { broadcastLobbyUpdate } = require('../websocket/lobbySocket');
+const { broadcastLobbyUpdate, addFakeConnection } = require('../websocket/lobbySocket');
 
 const router = express.Router();
 
@@ -313,6 +313,9 @@ if (process.env.NODE_ENV !== 'production') {
         'INSERT INTO lobby_players (lobby_id, user_id) VALUES ($1, $2)',
         [id, dummy.id]
       );
+
+      // Mark dummy as "connected" so they appear online in the lobby UI
+      addFakeConnection(id, dummy.id);
 
       // Push live update to anyone already in the room
       await broadcastLobbyUpdate(id);
