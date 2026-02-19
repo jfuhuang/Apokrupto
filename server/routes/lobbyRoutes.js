@@ -266,7 +266,7 @@ if (process.env.NODE_ENV !== 'production') {
       const { id } = req.params;
 
       const lobbyResult = await pool.query(
-        `SELECT id, max_players, status,
+        `SELECT l.id, l.max_players, l.status,
                 COUNT(lp.user_id) AS current_players
          FROM lobbies l
          LEFT JOIN lobby_players lp ON lp.lobby_id = l.id
