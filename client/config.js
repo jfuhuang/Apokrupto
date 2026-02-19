@@ -20,5 +20,6 @@ initializeApiUrl();
 
 // Export both the current URL and a function to get the latest URL
 export { API_URL };
+export { getApiUrl };
 export const getCurrentApiUrl = () => API_URL;
 export { initializeApiUrl };

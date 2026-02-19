@@ -138,14 +138,26 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
       });
 
       socket.on('connect_error', (err) => {
-        console.warn('[WS] Connection error:', err.message);
+        console.error('[WS] Connection error:', {
+          message: err.message,
+          data: err.data,
+          type: err.type,
+        });
+        setSocketConnected(false);
+      });
+
+      socket.on('error', (err) => {
+        console.error('[WS] Socket error:', err);
+        setSocketConnected(false);
       });
     };
 
     // Initial REST fetch so the screen shows something while socket connects
     fetchPlayers();
 
-    connect();
+    connect().catch((err) => {
+      console.error('[LobbyScreen] Socket connection failed:', err);
+    });
 
     // 10-second polling as the main authority for lobby membership
     pollRef.current = setInterval(fetchPlayers, 10000);
@@ -160,7 +172,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
         pollRef.current = null;
       }
     };
-  }, [lobbyId]);
+  }, [lobbyId, token]);
 
   const handleLeaveLobby = async () => {
     try {

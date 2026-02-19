@@ -57,6 +57,8 @@ function setupLobbySocket(httpServer) {
     transports: ['websocket', 'polling'],
   });
 
+  const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+
   // JWT authentication middleware
   io.use((socket, next) => {
     const token =
@@ -67,11 +69,13 @@ function setupLobbySocket(httpServer) {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, JWT_SECRET);
       socket.userId = String(decoded.sub);
       socket.username = decoded.username;
+      console.log(`[WS] Auth successful for user: ${socket.userId}`);
       next();
     } catch (err) {
+      console.error(`[WS] Auth failed:`, err.message);
       next(new Error('Invalid token'));
     }
   });
@@ -79,7 +83,7 @@ function setupLobbySocket(httpServer) {
   io.on('connection', (socket) => {
     let currentLobbyId = null;
 
-    console.log(`[WS] Connected: ${socket.id} (user: ${socket.userId})`);
+    console.log(`[WS] Socket Connected: ${socket.id} (user: ${socket.userId}, username: ${socket.username})`);
 
     // Client joins a lobby room
     socket.on('joinRoom', async ({ lobbyId }, callback) => {
@@ -93,8 +97,13 @@ function setupLobbySocket(httpServer) {
           lobbyConnections.set(roomKey, new Set());
         }
         lobbyConnections.get(roomKey).add(socket.userId);
+        console.log(`[WS] User ${socket.userId} joined room lobby:${roomKey}`);
 
         const state = await getLobbyState(lobbyId);
+        console.log(`[WS] Sending lobbyUpdate to lobby:${roomKey}`, {
+          playerCount: state?.players?.length,
+          roomKey,
+        });
         io.to(`lobby:${roomKey}`).emit('lobbyUpdate', state);
 
         if (callback) callback({ ok: true });
