@@ -34,7 +34,6 @@
     "bcrypt": "^6.0.0",
     "dotenv": "^17.2.3",
     "express": "^4.22.1",
-    "ioredis": "^5.9.3",
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^8.0.0",
     "pg": "^8.16.3",
