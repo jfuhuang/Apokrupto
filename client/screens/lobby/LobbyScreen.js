@@ -202,8 +202,12 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
   };
 
   const handleAddDummy = async () => {
-    const { ok, data } = await addDummyPlayer(token, lobbyId);
-    if (!ok) Alert.alert('Dev', data?.error || 'Failed to add dummy');
+    try {
+      const { ok, data } = await addDummyPlayer(token, lobbyId);
+      if (!ok) Alert.alert('Dev', data?.error || 'Failed to add dummy');
+    } catch (err) {
+      Alert.alert('Dev', 'Network error: ' + err.message);
+    }
   };
 
   const handleLogout = async () => {

@@ -296,7 +296,9 @@ if (process.env.NODE_ENV !== 'production') {
       const taken = new Set(takenResult.rows.map((r) => r.username));
       const suffix = Date.now().toString(36).slice(-4).toUpperCase();
       const base = BOT_NAMES.find((n) => !taken.has(`Bot_${n}`)) ?? suffix;
-      const username = `Bot_${base}`;
+      // Append a unique suffix so the global users.username unique constraint
+      // is never violated by leftover rows from previous lobbies
+      const username = `Bot_${base}_${suffix}`;
 
       // Create the throwaway user (null password — can never log in)
       const userResult = await pool.query(
@@ -314,6 +316,7 @@ if (process.env.NODE_ENV !== 'production') {
 
       // Push live update to anyone already in the room
       await broadcastLobbyUpdate(id);
+      console.log(`[DEV] Added dummy player ${username} to lobby ${id}`);
 
       res.json({ player: dummy });
     } catch (err) {
