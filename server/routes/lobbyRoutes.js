@@ -161,6 +161,52 @@ router.post('/:id/join', async (req, res) => {
   }
 });
 
+// Get players in a lobby
+router.get('/:id/players', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `SELECT u.id, u.username, (l.created_by = u.id) AS is_host
+       FROM lobby_players lp
+       JOIN users u ON lp.user_id = u.id
+       JOIN lobbies l ON l.id = lp.lobby_id
+       WHERE lp.lobby_id = $1
+       ORDER BY lp.joined_at ASC`,
+      [id]
+    );
+
+    const lobbyResult = await pool.query(
+      'SELECT id, name, max_players, status, created_by FROM lobbies WHERE id = $1',
+      [id]
+    );
+
+    if (lobbyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Lobby not found' });
+    }
+
+    const lobby = lobbyResult.rows[0];
+
+    res.json({
+      players: result.rows.map((p) => ({
+        id: p.id,
+        username: p.username,
+        isHost: p.is_host,
+      })),
+      hostId: lobby.created_by,
+      lobbyInfo: {
+        id: lobby.id,
+        name: lobby.name,
+        maxPlayers: lobby.max_players,
+        status: lobby.status,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Leave a lobby
 router.post('/:id/leave', async (req, res) => {
   try {
