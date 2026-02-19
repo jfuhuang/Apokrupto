@@ -1,26 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Alert,
   ActivityIndicator,
+  useWindowDimensions,
+  Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedBackground from '../components/AnimatedBackground';
 import { API_URL } from '../config';
+import { colors } from '../theme/colors';
+import { typography } from '../theme/typography';
 
 export default function RegistrationScreen({ onBack, onSuccess }) {
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const floatAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -8,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
 
   const validateForm = () => {
     const newErrors = {};
@@ -34,13 +57,6 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
       newErrors.username = 'Username must be less than 50 characters';
     } else if (!/^[a-zA-Z0-9_]+$/.test(username)) {
       newErrors.username = 'Username can only contain letters, numbers, and underscores';
-    }
-
-    // Email validation
-    if (!email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = 'Invalid email format';
     }
 
     // Password validation
@@ -77,7 +93,6 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
         },
         body: JSON.stringify({
           username: username.trim(),
-          email: email.trim(),
           password,
         }),
       });
@@ -86,7 +101,7 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
 
       if (!response.ok) {
         if (response.status === 409) {
-          Alert.alert('Error', 'Username or email already exists. Please choose different credentials.');
+          Alert.alert('Error', 'Username already exists. Please choose a different username.');
         } else {
           Alert.alert('Error', data.error || 'Failed to create account. Please try again.');
         }
@@ -111,16 +126,24 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.content}
+          style={[styles.content, isLandscape && styles.contentLandscape]}
         >
-          <View style={styles.header}>
+          <View style={[styles.header, isLandscape && styles.headerLandscape]}>
             <TouchableOpacity style={styles.backButton} onPress={onBack}>
               <Text style={styles.backButtonText}>← Back</Text>
             </TouchableOpacity>
-            <Text style={styles.title}>CREATE ACCOUNT</Text>
+            <Animated.Text 
+              style={[
+                styles.title, 
+                isLandscape && styles.titleLandscape,
+                { transform: [{ translateY: floatAnim }] }
+              ]}
+            >
+              CREATE ACCOUNT
+            </Animated.Text>
           </View>
 
-          <View style={styles.form}>
+          <View style={[styles.form, isLandscape && styles.formLandscape]}>
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Username</Text>
               <TextInput
@@ -133,21 +156,6 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
                 autoCorrect={false}
               />
               {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={[styles.input, errors.email && styles.inputError]}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="Enter email"
-                placeholderTextColor="#666666"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
             </View>
 
             <View style={styles.inputContainer}>
@@ -199,7 +207,7 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.background.space,
   },
   safeArea: {
     flex: 1,
@@ -216,14 +224,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   backButtonText: {
-    color: '#00aaff',
-    fontSize: 16,
+    ...typography.label,
+    color: colors.primary.electricBlue,
+    textShadowColor: colors.glow.blue.soft,
+    textShadowRadius: 6,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    letterSpacing: 2,
+    ...typography.screenTitle,
+    color: colors.text.glow,
+    textShadowColor: colors.shadow.neonRed,
+    textShadowRadius: 10,
   },
   form: {
     flex: 1,
@@ -232,48 +242,69 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
-    color: '#ffffff',
-    fontSize: 14,
+    ...typography.label,
+    color: colors.text.secondary,
     marginBottom: 8,
-    fontWeight: '600',
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 8,
+    ...typography.body,
+    backgroundColor: colors.input.background,
+    borderWidth: 2,
+    borderColor: colors.input.border,
+    borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: '#ffffff',
-    fontSize: 16,
+    paddingVertical: 14,
+    color: colors.text.primary,
   },
   inputError: {
-    borderColor: '#ff0000',
+    borderColor: colors.input.borderError,
+    shadowColor: colors.glow.red.soft,
+    shadowRadius: 8,
+    shadowOpacity: 1,
   },
   errorText: {
-    color: '#ff0000',
-    fontSize: 12,
+    ...typography.small,
+    color: colors.state.error,
     marginTop: 4,
   },
   button: {
-    backgroundColor: '#ff0000',
-    paddingVertical: 16,
-    borderRadius: 8,
+    backgroundColor: colors.primary.neonRed,
+    paddingVertical: 18,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.border.neon,
     alignItems: 'center',
     marginTop: 20,
-    shadowColor: '#ff0000',
+    shadowColor: colors.shadow.neonRed,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    elevation: 8,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   buttonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    letterSpacing: 1,
+    ...typography.button,
+    color: colors.text.glow,
+    textShadowColor: colors.shadow.white,
+    textShadowRadius: 4,
+  },
+  /* Landscape-specific styles */
+  contentLandscape: {
+    flexDirection: 'row',
+    paddingHorizontal: 60,
+  },
+  headerLandscape: {
+    width: '35%',
+    marginRight: 40,
+    marginBottom: 0,
+  },
+  titleLandscape: {
+    fontSize: 32,
+  },
+  formLandscape: {
+    width: '65%',
+    maxWidth: 500,
   },
 });

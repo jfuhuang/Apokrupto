@@ -1,32 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Alert,
   ActivityIndicator,
+  useWindowDimensions,
+  Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import AnimatedBackground from '../components/AnimatedBackground';
 import { API_URL } from '../config';
+import { colors } from '../theme/colors';
+import { typography } from '../theme/typography';
 
 export default function LoginScreen({ onBack, onSuccess }) {
-  const [usernameOrEmail, setUsernameOrEmail] = useState('');
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const floatAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -8,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
 
   const validateForm = () => {
     const newErrors = {};
 
-    // Username/Email validation
-    if (!usernameOrEmail.trim()) {
-      newErrors.usernameOrEmail = 'Username or email is required';
+    // Username validation
+    if (!username.trim()) {
+      newErrors.username = 'Username is required';
     }
 
     // Password validation
@@ -53,7 +77,7 @@ export default function LoginScreen({ onBack, onSuccess }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          usernameOrEmail: usernameOrEmail.trim(),
+          username: username.trim(),
           password,
         }),
       });
@@ -63,7 +87,7 @@ export default function LoginScreen({ onBack, onSuccess }) {
       if (!response.ok) {
         setIsLoading(false);
         if (response.status === 401) {
-          Alert.alert('Error', 'Invalid username/email or password. Please try again.');
+          Alert.alert('Error', 'Invalid username or password. Please try again.');
         } else {
           Alert.alert('Error', data.error || 'Login failed. Please try again.');
         }
@@ -95,28 +119,36 @@ export default function LoginScreen({ onBack, onSuccess }) {
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.content}
+          style={[styles.content, isLandscape && styles.contentLandscape]}
         >
-          <View style={styles.header}>
+          <View style={[styles.header, isLandscape && styles.headerLandscape]}>
             <TouchableOpacity style={styles.backButton} onPress={onBack}>
               <Text style={styles.backButtonText}>← Back</Text>
             </TouchableOpacity>
-            <Text style={styles.title}>LOGIN</Text>
+            <Animated.Text 
+              style={[
+                styles.title, 
+                isLandscape && styles.titleLandscape,
+                { transform: [{ translateY: floatAnim }] }
+              ]}
+            >
+              LOGIN
+            </Animated.Text>
           </View>
 
-          <View style={styles.form}>
+          <View style={[styles.form, isLandscape && styles.formLandscape]}>
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Username or Email</Text>
+              <Text style={styles.label}>Username</Text>
               <TextInput
-                style={[styles.input, errors.usernameOrEmail && styles.inputError]}
-                value={usernameOrEmail}
-                onChangeText={setUsernameOrEmail}
-                placeholder="Enter username or email"
+                style={[styles.input, errors.username && styles.inputError]}
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Enter username"
                 placeholderTextColor="#666666"
                 autoCapitalize="none"
                 autoCorrect={false}
               />
-              {errors.usernameOrEmail && <Text style={styles.errorText}>{errors.usernameOrEmail}</Text>}
+              {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
             </View>
 
             <View style={styles.inputContainer}>
@@ -154,7 +186,7 @@ export default function LoginScreen({ onBack, onSuccess }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.background.space,
   },
   safeArea: {
     flex: 1,
@@ -171,14 +203,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   backButtonText: {
-    color: '#00aaff',
-    fontSize: 16,
+    ...typography.label,
+    color: colors.primary.electricBlue,
+    textShadowColor: colors.glow.blue.soft,
+    textShadowRadius: 6,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    letterSpacing: 2,
+    ...typography.screenTitle,
+    color: colors.text.glow,
+    textShadowColor: colors.shadow.electricBlue,
+    textShadowRadius: 10,
   },
   form: {
     flex: 1,
@@ -187,48 +221,69 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
-    color: '#ffffff',
-    fontSize: 14,
+    ...typography.label,
+    color: colors.text.secondary,
     marginBottom: 8,
-    fontWeight: '600',
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 8,
+    ...typography.body,
+    backgroundColor: colors.input.background,
+    borderWidth: 2,
+    borderColor: colors.input.border,
+    borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: '#ffffff',
-    fontSize: 16,
+    paddingVertical: 14,
+    color: colors.text.primary,
   },
   inputError: {
-    borderColor: '#ff0000',
+    borderColor: colors.input.borderError,
+    shadowColor: colors.glow.red.soft,
+    shadowRadius: 8,
+    shadowOpacity: 1,
   },
   errorText: {
-    color: '#ff0000',
-    fontSize: 12,
+    ...typography.small,
+    color: colors.state.error,
     marginTop: 4,
   },
   button: {
-    backgroundColor: '#00aaff',
-    paddingVertical: 16,
-    borderRadius: 8,
+    backgroundColor: colors.primary.electricBlue,
+    paddingVertical: 18,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.border.glow,
     alignItems: 'center',
     marginTop: 20,
-    shadowColor: '#00aaff',
+    shadowColor: colors.shadow.electricBlue,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    elevation: 8,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   buttonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    letterSpacing: 1,
+    ...typography.button,
+    color: colors.text.glow,
+    textShadowColor: colors.shadow.white,
+    textShadowRadius: 4,
+  },
+  /* Landscape-specific styles */
+  contentLandscape: {
+    flexDirection: 'row',
+    paddingHorizontal: 60,
+  },
+  headerLandscape: {
+    width: '35%',
+    marginRight: 40,
+    marginBottom: 0,
+  },
+  titleLandscape: {
+    fontSize: 32,
+  },
+  formLandscape: {
+    width: '65%',
+    maxWidth: 500,
   },
 });
