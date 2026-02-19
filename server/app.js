@@ -4,8 +4,7 @@ const app = express(); // Create an Express application instance
 const port = process.env.PORT || 3000; // Define the port number
 const userRoutes = require('./routes/userRoutes');
 const lobbyRoutes = require('./routes/lobbyRoutes');
-const { connectRedis } = require('./redis');
-const WebSocketServer = require('./websocket/WebSocketServer');
+const { setupLobbySocket } = require('./websocket/lobbySocket');
 
 app.use(express.json());
 app.use('/api/users', userRoutes);
@@ -25,15 +24,9 @@ async function start() {
     await require('./dbInit')();
     console.log('[Startup] PostgreSQL initialized');
 
-    // Initialize Redis
-    await connectRedis();
-    console.log('[Startup] Redis connected');
-
-    // Create HTTP server
+    // Create HTTP server and wire up Socket.IO lobby handlers
     const httpServer = http.createServer(app);
-
-    // Initialize WebSocket server
-    const wsServer = new WebSocketServer(httpServer);
+    setupLobbySocket(httpServer);
     console.log('[Startup] WebSocket server initialized');
 
     // Start listening
