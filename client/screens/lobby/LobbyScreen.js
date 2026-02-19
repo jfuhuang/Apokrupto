@@ -213,18 +213,23 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
+        {/* Compact single-row header */}
         <View style={[styles.header, isLandscape && styles.headerLandscape]}>
-          <View>
-            <Animated.Text
-              style={[styles.title, { transform: [{ translateY: floatAnim }] }]}
-            >
-              LOBBY
-            </Animated.Text>
+          <Animated.Text
+            style={[styles.title, { transform: [{ translateY: floatAnim }] }]}
+          >
+            LOBBY
+          </Animated.Text>
+
+          <View style={styles.headerCenter}>
             {lobbyInfo && (
-              <Text style={styles.subtitle} numberOfLines={1}>{lobbyInfo.name}</Text>
+              <Text style={styles.lobbyName} numberOfLines={1}>{lobbyInfo.name}</Text>
             )}
+            <Text style={styles.playerCountHeader}>
+              {players.length}/{lobbyInfo?.maxPlayers ?? '?'} players
+            </Text>
           </View>
+
           <View style={styles.headerRight}>
             <View style={[styles.connectionDot, socketConnected ? styles.dotConnected : styles.dotDisconnected]} />
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -234,61 +239,48 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
         </View>
 
         {/* Player window */}
-        <View style={[styles.playerWindow, isLandscape && styles.playerWindowLandscape]}>
-          <View style={styles.playerWindowHeader}>
-            <Text style={styles.playerWindowTitle}>PLAYERS</Text>
-            <Text style={styles.playerCount}>
-              {players.length}/{lobbyInfo?.maxPlayers ?? '?'}
-            </Text>
-          </View>
-
+        <View style={styles.playerWindow}>
           <ScrollView
-            style={styles.playerList}
+            contentContainerStyle={styles.playerGrid}
             showsVerticalScrollIndicator={false}
           >
             {players.map((player, index) => (
-              <View
-                key={player.id}
-                style={[
+              <View key={player.id} style={styles.playerCardWrapper}>
+                <View style={[
                   styles.playerCard,
                   !player.isConnected && styles.playerCardDisconnected,
-                ]}
-              >
-                {/* Color indicator */}
-                <View
-                  style={[
-                    styles.colorDot,
-                    {
-                      backgroundColor: PLAYER_COLORS[index % PLAYER_COLORS.length],
-                      opacity: player.isConnected ? 1 : 0.3,
-                    },
-                  ]}
-                />
+                ]}>
+                  {/* Color strip */}
+                  <View style={[styles.colorStrip, { backgroundColor: PLAYER_COLORS[index % PLAYER_COLORS.length] }]} />
 
-                {/* Crown for host */}
-                {player.isHost && (
-                  <Text style={styles.crown}>👑</Text>
-                )}
+                  {/* Crown for host */}
+                  {player.isHost && (
+                    <Text style={styles.crown}>👑</Text>
+                  )}
 
-                {/* Username */}
-                <Text
-                  style={[
-                    styles.playerName,
-                    !player.isConnected && styles.playerNameDisconnected,
-                    String(player.id) === myUserId.current && styles.playerNameSelf,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {player.username}
-                  {String(player.id) === myUserId.current ? ' (you)' : ''}
-                </Text>
+                  {/* Username */}
+                  <Text
+                    style={[
+                      styles.playerName,
+                      !player.isConnected && styles.playerNameDisconnected,
+                      String(player.id) === myUserId.current && styles.playerNameSelf,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {player.username}
+                  </Text>
 
-                {/* Offline badge */}
-                {!player.isConnected && (
-                  <View style={styles.offlineBadge}>
-                    <Text style={styles.offlineBadgeText}>OFFLINE</Text>
-                  </View>
-                )}
+                  {String(player.id) === myUserId.current && (
+                    <Text style={styles.youLabel}>you</Text>
+                  )}
+
+                  {/* Offline badge */}
+                  {!player.isConnected && (
+                    <View style={styles.offlineBadge}>
+                      <Text style={styles.offlineBadgeText}>OFFLINE</Text>
+                    </View>
+                  )}
+                </View>
               </View>
             ))}
 
@@ -341,22 +333,17 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
 
-  // Header
+  // Header — compact single row
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.subtle,
   },
   headerLandscape: {
     paddingHorizontal: 40,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
   },
   title: {
     ...typography.screenTitle,
@@ -365,10 +352,24 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 15,
   },
-  subtitle: {
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  lobbyName: {
     ...typography.label,
+    color: colors.text.primary,
+  },
+  playerCountHeader: {
+    ...typography.tiny,
     color: colors.text.tertiary,
-    marginTop: 2,
+    marginTop: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   connectionDot: {
     width: 8,
@@ -383,78 +384,66 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     backgroundColor: colors.primary.neonRed,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.accent.neonPink,
   },
   logoutButtonText: {
-    ...typography.label,
+    ...typography.tiny,
     color: colors.text.primary,
+    letterSpacing: 0.5,
   },
 
-  // Player window
+  // Player window — takes all remaining space
   playerWindow: {
     flex: 1,
-    margin: 16,
+    margin: 12,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border.focus,
     backgroundColor: colors.background.void,
     overflow: 'hidden',
   },
-  playerWindowLandscape: {
-    marginHorizontal: 40,
-  },
-  playerWindowHeader: {
+
+  // 3-column grid
+  playerGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
-    backgroundColor: colors.background.panel,
+    flexWrap: 'wrap',
+    padding: 6,
   },
-  playerWindowTitle: {
-    ...typography.label,
-    color: colors.primary.electricBlue,
-    letterSpacing: 2,
-  },
-  playerCount: {
-    ...typography.label,
-    color: colors.text.tertiary,
-  },
-  playerList: {
-    flex: 1,
-    padding: 8,
+  playerCardWrapper: {
+    width: '33.33%',
+    padding: 4,
   },
   playerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginVertical: 4,
     borderRadius: 8,
     backgroundColor: colors.background.panel,
     borderWidth: 1,
     borderColor: colors.border.default,
-    gap: 10,
+    alignItems: 'center',
+    overflow: 'hidden',
+    paddingBottom: 10,
+    minHeight: 90,
   },
   playerCardDisconnected: {
     opacity: 0.4,
   },
-  colorDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+  colorStrip: {
+    width: '100%',
+    height: 5,
+    marginBottom: 6,
   },
   crown: {
-    fontSize: 16,
+    fontSize: 14,
+    marginBottom: 2,
   },
   playerName: {
-    ...typography.body,
+    ...typography.small,
     color: colors.text.primary,
-    flex: 1,
+    textAlign: 'center',
+    paddingHorizontal: 4,
   },
   playerNameSelf: {
     color: colors.primary.cyan,
@@ -462,22 +451,29 @@ const styles = StyleSheet.create({
   playerNameDisconnected: {
     color: colors.text.disabled,
   },
+  youLabel: {
+    ...typography.tiny,
+    color: colors.text.tertiary,
+    marginTop: 1,
+  },
   offlineBadge: {
     backgroundColor: colors.background.frost,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
+    marginTop: 4,
   },
   offlineBadgeText: {
     ...typography.tiny,
     color: colors.text.disabled,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   emptyText: {
     ...typography.body,
     color: colors.text.muted,
     textAlign: 'center',
     marginTop: 24,
+    width: '100%',
   },
   waitingText: {
     ...typography.small,
