@@ -39,6 +39,12 @@ export async function fetchLobbies(token) {
   });
 }
 
+export async function fetchCurrentLobby(token) {
+  return request('/api/lobbies/current', {
+    headers: authHeader(token),
+  });
+}
+
 export async function createLobby(token, name, maxPlayers) {
   return request('/api/lobbies', {
     method: 'POST',
