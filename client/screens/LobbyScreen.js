@@ -187,7 +187,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.dark,
+    backgroundColor: colors.background.space,
   },
   safeArea: {
     flex: 1,
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background.dark,
+    backgroundColor: colors.background.space,
   },
   loadingText: {
     ...typography.body,
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   title: {
     ...typography.screenTitle,
     color: colors.primary.electricBlue,
-    textShadowColor: colors.effects.glow.blue,
+    textShadowColor: colors.shadow.electricBlue,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 15,
     marginBottom: 5,
@@ -244,10 +244,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 2,
     borderColor: colors.accent.neonPink,
-    shadowColor: colors.effects.glow.red,
+    shadowColor: colors.shadow.neonRed,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 10,
+    elevation: 8,
   },
   headerLogoutButtonText: {
     ...typography.button,
@@ -261,7 +262,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   infoCard: {
-    backgroundColor: colors.surface.elevated,
+    backgroundColor: colors.background.elevated,
     borderRadius: 12,
     padding: 20,
     borderWidth: 1,
@@ -310,16 +311,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.accent.cyan,
-    shadowColor: colors.effects.glow.blue,
+    borderColor: colors.primary.cyan,
+    shadowColor: colors.shadow.electricBlue,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 10,
+    elevation: 8,
   },
   leaveButton: {
     backgroundColor: colors.primary.neonRed,
     borderColor: colors.accent.neonPink,
-    shadowColor: colors.effects.glow.red,
+    shadowColor: colors.shadow.neonRed,
   },
   logoutButtonLandscape: {
     marginHorizontal: 40,
