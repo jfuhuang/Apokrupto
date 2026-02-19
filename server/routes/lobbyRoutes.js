@@ -34,6 +34,26 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Get current user's active lobby membership
+router.get('/current', async (req, res) => {
+  try {
+    const userId = req.user.sub;
+
+    const result = await pool.query(`
+      SELECT lp.lobby_id as id, l.name, l.status
+      FROM lobby_players lp
+      JOIN lobbies l ON l.id = lp.lobby_id
+      WHERE lp.user_id = $1 AND l.status IN ('waiting', 'in_progress')
+      LIMIT 1
+    `, [userId]);
+
+    res.json({ lobby: result.rows[0] || null });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Get lobby by ID
 router.get('/:id', async (req, res) => {
   try {

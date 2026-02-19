@@ -19,6 +19,7 @@ import {
   fetchLobbies as apiFetchLobbies,
   createLobby as apiCreateLobby,
   joinLobby as apiJoinLobby,
+  fetchCurrentLobby as apiFetchCurrentLobby,
 } from '../../utils/api';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
@@ -41,19 +42,37 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
   const appState = useRef(AppState.currentState);
 
   useEffect(() => {
-    fetchLobbies();
-    
-    // Start auto-refresh
-    startAutoRefresh();
-    
+    init();
+
     // Listen for app state changes
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-    
+
     return () => {
       stopAutoRefresh();
       subscription.remove();
     };
   }, []);
+
+  const init = async () => {
+    try {
+      const { ok, status, data } = await apiFetchCurrentLobby(token);
+
+      if (status === 401 || status === 403) {
+        handleLogout();
+        return;
+      }
+
+      if (ok && data.lobby) {
+        onJoinLobby(data.lobby.id);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking current lobby:', error);
+    }
+
+    await fetchLobbies();
+    startAutoRefresh();
+  };
 
   const handleAppStateChange = (nextAppState) => {
     if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
