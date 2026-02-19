@@ -40,8 +40,8 @@ export const typography = {
   // App title - "APOKRUPTO"
   appTitle: {
     fontFamily: fonts.display.black,
-    fontSize: 42,
-    letterSpacing: 4,
+    fontSize: 36,
+    letterSpacing: 2,
     textTransform: 'uppercase',
   },
   

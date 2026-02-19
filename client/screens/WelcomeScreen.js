@@ -38,7 +38,7 @@ export default function WelcomeScreen({ onCreateAccount, onLogin }) {
             { transform: [{ translateY: floatAnim }] }
           ]}
         >
-          <Text style={[styles.title, isLandscape && styles.titleLandscape]}>APOKRUPTO</Text>
+          <Text style={[styles.title, isLandscape && styles.titleLandscape]} numberOfLines={1} adjustsFontSizeToFit>APOKRUPTO</Text>
           <Text style={[styles.subtitle, isLandscape && styles.subtitleLandscape]}>Real World Deception</Text>
         </Animated.View>
 
@@ -66,11 +66,11 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingVertical: 60,
+    paddingVertical: 40,
   },
   titleContainer: {
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 20,
   },
   title: {
     ...typography.appTitle,
@@ -87,8 +87,8 @@ const styles = StyleSheet.create({
     textShadowRadius: 8,
   },
   buttonContainer: {
-    paddingHorizontal: 40,
-    gap: 20,
+    paddingHorizontal: 24,
+    gap: 16,
   },
   buttonContainerLandscape: {
     flex: 1,
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: colors.primary.neonRed,
-    paddingVertical: 18,
+    paddingVertical: 14,
     paddingHorizontal: 40,
     borderRadius: 12,
     borderWidth: 2,
