@@ -253,10 +253,8 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
                   {/* Color strip */}
                   <View style={[styles.colorStrip, { backgroundColor: PLAYER_COLORS[index % PLAYER_COLORS.length] }]} />
 
-                  {/* Crown for host */}
-                  {player.isHost && (
-                    <Text style={styles.crown}>👑</Text>
-                  )}
+                  {/* Crown for host — always rendered to reserve space */}
+                  <Text style={[styles.crown, !player.isHost && styles.hidden]}>👑</Text>
 
                   {/* Username */}
                   <Text
@@ -270,9 +268,8 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
                     {player.username}
                   </Text>
 
-                  {String(player.id) === myUserId.current && (
-                    <Text style={styles.youLabel}>you</Text>
-                  )}
+                  {/* "you" label — always rendered to reserve space */}
+                  <Text style={[styles.youLabel, String(player.id) !== myUserId.current && styles.hidden]}>you</Text>
 
                   {/* Offline badge */}
                   {!player.isConnected && (
@@ -455,6 +452,9 @@ const styles = StyleSheet.create({
     ...typography.tiny,
     color: colors.text.tertiary,
     marginTop: 1,
+  },
+  hidden: {
+    opacity: 0,
   },
   offlineBadge: {
     backgroundColor: colors.background.frost,
