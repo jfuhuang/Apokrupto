@@ -19,11 +19,11 @@ import {
   Rajdhani_600SemiBold,
   Rajdhani_700Bold,
 } from '@expo-google-fonts/rajdhani';
-import WelcomeScreen from './screens/WelcomeScreen';
-import LoginScreen from './screens/LoginScreen';
-import RegistrationScreen from './screens/RegistrationScreen';
-import LobbyScreen from './screens/LobbyScreen';
-import LobbyListScreen from './screens/LobbyListScreen';
+import WelcomeScreen from './screens/welcome/WelcomeScreen';
+import LoginScreen from './screens/auth/LoginScreen';
+import RegistrationScreen from './screens/auth/RegistrationScreen';
+import LobbyListScreen from './screens/lobby/LobbyListScreen';
+import LobbyScreen from './screens/lobby/LobbyScreen';
 import { colors } from './theme/colors';
 
 export default function App() {

@@ -1,9 +1,9 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AnimatedBackground from '../components/AnimatedBackground';
-import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
+import AnimatedBackground from '../../components/AnimatedBackground';
+import { colors } from '../../theme/colors';
+import { typography } from '../../theme/typography';
 
 export default function WelcomeScreen({ onCreateAccount, onLogin }) {
   const { width, height } = useWindowDimensions();

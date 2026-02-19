@@ -14,10 +14,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import AnimatedBackground from '../components/AnimatedBackground';
-import { API_URL } from '../config';
-import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
+import AnimatedBackground from '../../components/AnimatedBackground';
+import { login } from '../../utils/api';
+import { colors } from '../../theme/colors';
+import { typography } from '../../theme/typography';
 
 export default function LoginScreen({ onBack, onSuccess }) {
   const [username, setUsername] = useState('');
@@ -53,12 +53,10 @@ export default function LoginScreen({ onBack, onSuccess }) {
   const validateForm = () => {
     const newErrors = {};
 
-    // Username validation
     if (!username.trim()) {
       newErrors.username = 'Username is required';
     }
 
-    // Password validation
     if (!password) {
       newErrors.password = 'Password is required';
     }
@@ -68,30 +66,16 @@ export default function LoginScreen({ onBack, onSuccess }) {
   };
 
   const handleLogin = async () => {
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsLoading(true);
     setErrors({});
 
     try {
-      const response = await fetch(`${API_URL}/api/users/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: username.trim(),
-          password,
-        }),
-      });
+      const { ok, status, data } = await login(username.trim(), password);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setIsLoading(false);
-        if (response.status === 401) {
+      if (!ok) {
+        if (status === 401) {
           Alert.alert('Error', 'Invalid username or password. Please try again.');
         } else {
           Alert.alert('Error', data.error || 'Login failed. Please try again.');
@@ -99,22 +83,15 @@ export default function LoginScreen({ onBack, onSuccess }) {
         return;
       }
 
-      // Store JWT token securely
       if (data.token) {
-        try {
-          await SecureStore.setItemAsync('jwtToken', data.token);
-          setIsLoading(false);
-          onSuccess(data.token);
-        } catch (storageError) {
-          console.error('Error storing token:', storageError);
-          setIsLoading(false);
-          Alert.alert('Error', 'Failed to save login credentials.');
-        }
+        await SecureStore.setItemAsync('jwtToken', data.token);
+        onSuccess(data.token);
       }
     } catch (error) {
       console.error('Login error:', error);
-      setIsLoading(false);
       Alert.alert('Error', 'Network error. Please check your connection and try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -122,10 +99,7 @@ export default function LoginScreen({ onBack, onSuccess }) {
     <View style={styles.container}>
       <AnimatedBackground />
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior="padding"
-          style={styles.keyboardView}
-        >
+        <KeyboardAvoidingView behavior="padding" style={styles.keyboardView}>
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"

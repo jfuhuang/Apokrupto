@@ -14,8 +14,12 @@ import {
   AppState,
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import LobbyCard from '../components/LobbyCard';
-import { API_URL } from '../config';
+import LobbyCard from '../../components/LobbyCard';
+import {
+  fetchLobbies as apiFetchLobbies,
+  createLobby as apiCreateLobby,
+  joinLobby as apiJoinLobby,
+} from '../../utils/api';
 
 export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
   const [lobbies, setLobbies] = useState([]);
@@ -92,26 +96,17 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
 
   const fetchLobbies = async (background = false) => {
     try {
-      if (!background) {
-        setIsLoading(true);
-      }
-      
-      const response = await fetch(`${API_URL}/api/lobbies`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      if (!background) setIsLoading(true);
 
-      if (response.status === 401 || response.status === 403) {
-        // Token is invalid, logout
+      const { ok, status, data } = await apiFetchLobbies(token);
+
+      if (status === 401 || status === 403) {
         Alert.alert('Session Expired', 'Please login again.');
         handleLogout();
         return;
       }
 
-      const data = await response.json();
-      
-      if (response.ok) {
+      if (ok) {
         setLobbies(data.lobbies);
       } else {
         console.error('Failed to fetch lobbies:', data.error);
@@ -146,21 +141,9 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
 
     setIsCreating(true);
     try {
-      const response = await fetch(`${API_URL}/api/lobbies`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: newLobbyName.trim(),
-          max_players: players,
-        }),
-      });
+      const { ok, data } = await apiCreateLobby(token, newLobbyName.trim(), players);
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (ok) {
         setShowCreateModal(false);
         setNewLobbyName('');
         setMaxPlayers('10');
@@ -197,16 +180,9 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
   const joinLobby = async (lobbyId) => {
     setIsJoining(true);
     try {
-      const response = await fetch(`${API_URL}/api/lobbies/${lobbyId}/join`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const { ok, data } = await apiJoinLobby(token, lobbyId);
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (ok) {
         setShowJoinModal(false);
         setJoinLobbyId('');
         onJoinLobby(lobbyId);
