@@ -12,14 +12,9 @@ import * as SecureStore from 'expo-secure-store';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
 
-// Placeholder tasks — will be replaced with server-driven data
-const PLACEHOLDER_TASKS = [
-  { id: 1, label: 'Calibrate Reactor', done: true },
-  { id: 2, label: 'Fix Wiring', done: true },
-  { id: 3, label: 'Download Data', done: false },
-  { id: 4, label: 'Clear Asteroids', done: false },
-  { id: 5, label: 'Empty Garbage', done: false },
-];
+// Placeholder points — will be replaced with server-driven data
+const PLACEHOLDER_POINTS = 0;
+const POINTS_TARGET = 1000;
 
 const SABOTAGES = [
   { id: 'lights',   symbol: '⚡', label: 'LIGHTS' },
@@ -33,8 +28,8 @@ export default function GameScreen({ role, onLogout, onDevExit }) {
   // TODO: replace with real proximity check
   const canKill = true;
 
-  const completed = PLACEHOLDER_TASKS.filter((t) => t.done).length;
-  const total = PLACEHOLDER_TASKS.length;
+  const points = PLACEHOLDER_POINTS;
+  const progress = Math.min(points / POINTS_TARGET, 1);
 
   const handleLogout = async () => {
     try {
@@ -63,35 +58,14 @@ export default function GameScreen({ role, onLogout, onDevExit }) {
           </TouchableOpacity>
         )}
 
-        {/* ── Task panel — top-left HUD overlay ── */}
-        <View style={styles.taskPanel}>
-          <View style={styles.taskBarRow}>
-            <Text style={styles.taskBarLabel}>TASKS</Text>
-            <Text style={styles.taskBarCount}>{completed}/{total}</Text>
+        {/* ── Points panel — top-left HUD overlay ── */}
+        <View style={styles.pointsPanel}>
+          <Text style={styles.pointsLabel}>POINTS</Text>
+          <Text style={styles.pointsValue}>{points.toLocaleString()}</Text>
+          <View style={styles.pointsBarTrack}>
+            <View style={[styles.pointsBarFill, { width: `${progress * 100}%` }]} />
           </View>
-          <View style={styles.taskBarTrack}>
-            <View
-              style={[
-                styles.taskBarFill,
-                { width: `${(completed / total) * 100}%` },
-              ]}
-            />
-          </View>
-          <View style={styles.taskList}>
-            {PLACEHOLDER_TASKS.map((task) => (
-              <View key={task.id} style={styles.taskRow}>
-                <View style={[styles.taskTick, task.done && styles.taskTickDone]}>
-                  {task.done && <Text style={styles.taskTickMark}>✓</Text>}
-                </View>
-                <Text
-                  style={[styles.taskName, task.done && styles.taskNameDone]}
-                  numberOfLines={1}
-                >
-                  {task.label}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <Text style={styles.pointsTarget}>/ {POINTS_TARGET.toLocaleString()} to win</Text>
         </View>
 
         {/* ── Bottom action bar ── */}
@@ -214,85 +188,56 @@ const styles = StyleSheet.create({
     color: colors.accent.amber,
   },
 
-  // ── Task panel (absolute, top-left) ──────────────────────────────────────
-  taskPanel: {
+  // ── Points panel (absolute, top-left) ────────────────────────────────────
+  pointsPanel: {
     position: 'absolute',
     top: 12,
     left: 12,
-    width: 176,
+    width: 152,
     backgroundColor: colors.overlay.dark,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.border.default,
-    padding: 10,
-  },
-  taskBarRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     alignItems: 'center',
-    marginBottom: 5,
   },
-  taskBarLabel: {
-    ...typography.tiny,
-    color: colors.text.tertiary,
-    letterSpacing: 2,
+  pointsLabel: {
     fontFamily: fonts.display.bold,
     fontSize: 9,
-  },
-  taskBarCount: {
-    fontFamily: fonts.accent.bold,
-    fontSize: 11,
+    letterSpacing: 3,
     color: colors.text.tertiary,
+    marginBottom: 4,
+    alignSelf: 'flex-start',
   },
-  taskBarTrack: {
+  pointsValue: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 36,
+    color: colors.accent.neonGreen,
+    textShadowColor: colors.accent.neonGreen,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+    lineHeight: 42,
+  },
+  pointsBarTrack: {
     width: '100%',
-    height: 5,
+    height: 4,
     backgroundColor: colors.background.frost,
-    borderRadius: 3,
-    marginBottom: 9,
+    borderRadius: 2,
+    marginTop: 6,
     overflow: 'hidden',
   },
-  taskBarFill: {
+  pointsBarFill: {
     height: '100%',
     backgroundColor: colors.accent.neonGreen,
-    borderRadius: 3,
+    borderRadius: 2,
   },
-  taskList: {
-    gap: 5,
-  },
-  taskRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  taskTick: {
-    width: 13,
-    height: 13,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: colors.text.disabled,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  taskTickDone: {
-    backgroundColor: colors.accent.neonGreen,
-    borderColor: colors.accent.neonGreen,
-  },
-  taskTickMark: {
-    fontSize: 8,
-    color: colors.background.space,
-    fontFamily: fonts.ui.bold,
-    lineHeight: 10,
-  },
-  taskName: {
-    ...typography.tiny,
-    color: colors.text.tertiary,
-    flex: 1,
-  },
-  taskNameDone: {
+  pointsTarget: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 11,
     color: colors.text.disabled,
-    textDecorationLine: 'line-through',
+    marginTop: 5,
+    letterSpacing: 0.5,
   },
 
   // ── Action bar ───────────────────────────────────────────────────────────
