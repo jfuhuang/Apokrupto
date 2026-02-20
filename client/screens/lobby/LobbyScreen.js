@@ -125,6 +125,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
           name: state.name,
           maxPlayers: state.maxPlayers,
           status: state.status,
+          hostId: state.hostId,
         });
         setIsLoading(false);
       });
@@ -323,7 +324,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
 
         {/* Bottom actions */}
         <View style={styles.buttonContainer}>
-          {(
+          {canStart && (
             <TouchableOpacity style={styles.startButton} onPress={handleStartGame}>
               <Text style={styles.startButtonText}>START GAME</Text>
             </TouchableOpacity>
