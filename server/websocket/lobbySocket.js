@@ -126,6 +126,11 @@ async function broadcastLobbyUpdate(lobbyId) {
   }
 }
 
+function broadcastPointsUpdate(lobbyId, payload) {
+  if (!_io) return;
+  _io.to(`lobby:${String(lobbyId)}`).emit('pointsUpdate', payload);
+}
+
 function getDeceiverCount(n) {
   if (n <= 4) return 1;
   if (n <= 7) return 2;
@@ -320,4 +325,4 @@ function setupLobbySocket(httpServer) {
   return io;
 }
 
-module.exports = { setupLobbySocket, broadcastLobbyUpdate, addFakeConnection };
+module.exports = { setupLobbySocket, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate };

@@ -44,8 +44,9 @@ const SCREEN_GROUPS = [
   {
     category: 'GAME',
     items: [
-      { label: 'Game — Deceiver', screen: 'game', params: { role: 'deceiver' } },
-      { label: 'Game — Innocent', screen: 'game', params: { role: 'innocent' } },
+      { label: 'Game — Deceiver', screen: 'game', params: { role: 'deceiver', isAlive: true } },
+      { label: 'Game — Innocent (alive)', screen: 'game', params: { role: 'innocent', isAlive: true } },
+      { label: 'Game — Innocent (dead)', screen: 'game', params: { role: 'innocent', isAlive: false } },
     ],
   },
 ];

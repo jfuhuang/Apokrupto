@@ -79,3 +79,11 @@ export async function addDummyPlayer(token, lobbyId) {
     headers: authHeader(token),
   });
 }
+
+export async function submitTaskCompletion(token, lobbyId, taskId) {
+  return request(`/api/lobbies/${lobbyId}/tasks/complete`, {
+    method: 'POST',
+    headers: { ...jsonHeaders, ...authHeader(token) },
+    body: JSON.stringify({ taskId }),
+  });
+}

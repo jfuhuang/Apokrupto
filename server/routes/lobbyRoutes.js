@@ -1,7 +1,8 @@
 const express = require('express');
 const pool = require('../db');
 const authenticateToken = require('../middleware/auth');
-const { broadcastLobbyUpdate, addFakeConnection } = require('../websocket/lobbySocket');
+const { broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate } = require('../websocket/lobbySocket');
+const { getTask } = require('../data/tasks');
 
 const router = express.Router();
 
@@ -271,6 +272,106 @@ router.post('/:id/leave', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Complete a task
+router.post('/:id/tasks/complete', async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.sub;
+  const { taskId } = req.body;
+
+  if (!taskId) return res.status(400).json({ error: 'taskId is required' });
+
+  const taskDef = getTask(taskId);
+  if (!taskDef) return res.status(400).json({ error: 'Unknown task' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Verify game is in progress
+    const lobbyResult = await client.query(
+      'SELECT status FROM lobbies WHERE id = $1',
+      [id]
+    );
+    if (lobbyResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Lobby not found' });
+    }
+    if (lobbyResult.rows[0].status !== 'in_progress') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Game is not in progress' });
+    }
+
+    // 2. Verify player is in lobby and get is_alive
+    const playerResult = await client.query(
+      'SELECT is_alive FROM lobby_players WHERE lobby_id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    if (playerResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Not in this lobby' });
+    }
+    const isAlive = playerResult.rows[0].is_alive;
+
+    // 3. Calculate points
+    const pointsEarned = isAlive ? taskDef.points.alive : taskDef.points.dead;
+
+    // 4. Insert completion record (unique constraint catches duplicates)
+    try {
+      await client.query(
+        `INSERT INTO player_task_completions (lobby_id, user_id, task_id, points_earned)
+         VALUES ($1, $2, $3, $4)`,
+        [id, userId, taskId, pointsEarned]
+      );
+    } catch (err) {
+      if (err.code === '23505') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Task already completed' });
+      }
+      throw err;
+    }
+
+    // 5. Update player points
+    const updateResult = await client.query(
+      `UPDATE lobby_players SET points = points + $1
+       WHERE lobby_id = $2 AND user_id = $3
+       RETURNING points`,
+      [pointsEarned, id, userId]
+    );
+    const totalPoints = updateResult.rows[0].points;
+
+    // 6. Build leaderboard for the socket event
+    const leaderboardResult = await client.query(
+      `SELECT u.id AS user_id, u.username, lp.points
+       FROM lobby_players lp
+       JOIN users u ON u.id = lp.user_id
+       WHERE lp.lobby_id = $1
+       ORDER BY lp.points DESC`,
+      [id]
+    );
+    const leaderboard = leaderboardResult.rows;
+
+    await client.query('COMMIT');
+
+    // 7. Broadcast via socket
+    broadcastPointsUpdate(id, {
+      userId,
+      username: req.user.username,
+      taskId,
+      pointsEarned,
+      totalPoints,
+      leaderboard,
+    });
+
+    res.json({ pointsEarned, totalPoints, taskId });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[tasks/complete] error:', err);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 });
 

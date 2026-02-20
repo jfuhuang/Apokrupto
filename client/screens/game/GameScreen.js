@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,14 +6,15 @@ import {
   TouchableOpacity,
   Modal,
   Pressable,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
+import { getTasksForRole } from '../../data/tasks';
+import { getApiUrl } from '../../utils/networkUtils';
 
-// Placeholder points — will be replaced with server-driven data
-const PLACEHOLDER_POINTS = 0;
 const POINTS_TARGET = 1000;
 
 const SABOTAGES = [
@@ -22,14 +23,68 @@ const SABOTAGES = [
   { id: 'comms',    symbol: '◈',  label: 'COMMS' },
 ];
 
-export default function GameScreen({ role, onLogout, onDevExit }) {
+const DIFFICULTY_COLOR = {
+  easy: colors.accent.neonGreen,
+  medium: colors.accent.amber,
+  hard: colors.state.error,
+};
+
+export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, token, onStartTask, onLogout, onDevExit }) {
   const [sabotageVisible, setSabotageVisible] = useState(false);
+  const [tasksVisible, setTasksVisible] = useState(false);
+  const [livePoints, setLivePoints] = useState(points);
+  const socketRef = useRef(null);
 
   // TODO: replace with real proximity check
   const canKill = true;
 
-  const points = PLACEHOLDER_POINTS;
-  const progress = Math.min(points / POINTS_TARGET, 1);
+  const progress = Math.min(livePoints / POINTS_TARGET, 1);
+
+  // Keep livePoints in sync with prop (when TaskScreen calls onComplete → App updates points → re-render)
+  useEffect(() => {
+    setLivePoints(points);
+  }, [points]);
+
+  // Socket: subscribe to pointsUpdate events while in-game
+  useEffect(() => {
+    if (!token || !lobbyId) return;
+
+    let socket = null;
+
+    const connectSocket = async () => {
+      try {
+        const { io } = await import('socket.io-client');
+        const baseUrl = await getApiUrl();
+        socket = io(baseUrl, {
+          auth: { token },
+          transports: ['websocket', 'polling'],
+        });
+        socketRef.current = socket;
+
+        socket.on('connect', () => {
+          socket.emit('joinRoom', { lobbyId });
+        });
+
+        socket.on('pointsUpdate', (payload) => {
+          // Update our own points from the authoritative server value
+          if (String(payload.userId) === String(socket.userId)) {
+            setLivePoints(payload.totalPoints);
+          }
+        });
+      } catch (_) {
+        // Socket.IO not available or connection failed — silent
+      }
+    };
+
+    connectSocket();
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, [token, lobbyId]);
 
   const handleLogout = async () => {
     try {
@@ -41,6 +96,7 @@ export default function GameScreen({ role, onLogout, onDevExit }) {
   };
 
   const isDeceiver = role === 'deceiver';
+  const availableTasks = getTasksForRole(role, isAlive);
 
   return (
     <View style={styles.container}>
@@ -61,7 +117,7 @@ export default function GameScreen({ role, onLogout, onDevExit }) {
         {/* ── Points panel — top-left HUD overlay ── */}
         <View style={styles.pointsPanel}>
           <Text style={styles.pointsLabel}>POINTS</Text>
-          <Text style={styles.pointsValue}>{points.toLocaleString()}</Text>
+          <Text style={styles.pointsValue}>{livePoints.toLocaleString()}</Text>
           <View style={styles.pointsBarTrack}>
             <View style={[styles.pointsBarFill, { width: `${progress * 100}%` }]} />
           </View>
@@ -80,6 +136,23 @@ export default function GameScreen({ role, onLogout, onDevExit }) {
             >
               <Text style={styles.sabotageBtnSymbol}>⚠</Text>
               <Text style={styles.sabotageBtnLabel}>SABOTAGE</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Tasks button — innocent/dead only */}
+          {!isDeceiver && (
+            <TouchableOpacity
+              style={styles.tasksBtn}
+              onPress={() => setTasksVisible(true)}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.tasksBtnSymbol}>📋</Text>
+              <Text style={styles.tasksBtnLabel}>TASKS</Text>
+              {availableTasks.length > 0 && (
+                <View style={styles.tasksBadge}>
+                  <Text style={styles.tasksBadgeText}>{availableTasks.length}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
 
@@ -114,7 +187,6 @@ export default function GameScreen({ role, onLogout, onDevExit }) {
           onRequestClose={() => setSabotageVisible(false)}
         >
           <Pressable style={styles.modalBackdrop} onPress={() => setSabotageVisible(false)}>
-            {/* Inner Pressable stops backdrop tap from closing when tapping card */}
             <Pressable style={styles.modalCard}>
               <Text style={styles.modalTitle}>SABOTAGE</Text>
               <View style={styles.modalDivider} />
@@ -136,6 +208,67 @@ export default function GameScreen({ role, onLogout, onDevExit }) {
                 onPress={() => setSabotageVisible(false)}
               >
                 <Text style={styles.modalCancelText}>CANCEL</Text>
+              </TouchableOpacity>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* ── Tasks modal ── */}
+        <Modal
+          visible={tasksVisible}
+          transparent
+          animationType="slide"
+          statusBarTranslucent
+          onRequestClose={() => setTasksVisible(false)}
+        >
+          <Pressable style={styles.modalBackdrop} onPress={() => setTasksVisible(false)}>
+            <Pressable style={styles.tasksModalCard}>
+              <Text style={styles.tasksModalTitle}>TASKS</Text>
+              {!isAlive && (
+                <Text style={styles.deadNote}>
+                  Dead — only free-roam tasks available (60% points)
+                </Text>
+              )}
+              <View style={styles.modalDivider} />
+              <ScrollView
+                style={styles.taskList}
+                contentContainerStyle={styles.taskListContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {availableTasks.length === 0 ? (
+                  <Text style={styles.noTasksText}>No tasks available.</Text>
+                ) : (
+                  availableTasks.map((task) => (
+                    <TouchableOpacity
+                      key={task.id}
+                      style={styles.taskRow}
+                      onPress={() => {
+                        setTasksVisible(false);
+                        onStartTask && onStartTask(task);
+                      }}
+                      activeOpacity={0.75}
+                    >
+                      <View style={styles.taskRowLeft}>
+                        <Text style={styles.taskRowTitle}>{task.title}</Text>
+                        <Text style={styles.taskRowRef}>{task.reference}</Text>
+                      </View>
+                      <View style={styles.taskRowRight}>
+                        <Text style={styles.taskRowPoints}>
+                          {isAlive ? task.points.alive : task.points.dead} pts
+                        </Text>
+                        <Text style={[styles.taskRowDiff, { color: DIFFICULTY_COLOR[task.difficulty] }]}>
+                          {task.difficulty}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setTasksVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>CLOSE</Text>
               </TouchableOpacity>
             </Pressable>
           </Pressable>
@@ -280,6 +413,50 @@ const styles = StyleSheet.create({
     color: colors.primary.neonRed,
   },
 
+  // Tasks button
+  tasksBtn: {
+    width: 96,
+    height: 96,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 212, 255, 0.10)',
+    borderWidth: 2,
+    borderColor: colors.primary.electricBlue,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.shadow.electricBlue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  tasksBtnSymbol: {
+    fontSize: 28,
+    marginBottom: 4,
+  },
+  tasksBtnLabel: {
+    fontFamily: fonts.display.bold,
+    fontSize: 9,
+    letterSpacing: 1.5,
+    color: colors.primary.electricBlue,
+  },
+  tasksBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: colors.primary.electricBlue,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  tasksBadgeText: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 10,
+    color: colors.background.space,
+  },
+
   // Right button column
   rightBtnCol: {
     gap: 8,
@@ -350,7 +527,7 @@ const styles = StyleSheet.create({
     color: colors.text.disabled,
   },
 
-  // ── Sabotage modal ───────────────────────────────────────────────────────
+  // ── Shared modal styles ──────────────────────────────────────────────────
   modalBackdrop: {
     flex: 1,
     backgroundColor: colors.overlay.dark,
@@ -358,6 +535,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
   },
+  modalCancel: {
+    paddingVertical: 10,
+    paddingHorizontal: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    marginTop: 8,
+  },
+  modalCancelText: {
+    ...typography.tiny,
+    color: colors.text.tertiary,
+    letterSpacing: 2,
+  },
+  modalDivider: {
+    width: '75%',
+    height: 1,
+    backgroundColor: colors.border.default,
+    opacity: 0.5,
+    marginBottom: 20,
+  },
+
+  // ── Sabotage modal ───────────────────────────────────────────────────────
   modalCard: {
     width: '100%',
     maxWidth: 360,
@@ -381,13 +580,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 10,
     marginBottom: 14,
-  },
-  modalDivider: {
-    width: '75%',
-    height: 1,
-    backgroundColor: colors.border.error,
-    opacity: 0.4,
-    marginBottom: 24,
   },
   sabotageGrid: {
     flexDirection: 'row',
@@ -418,16 +610,95 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     textAlign: 'center',
   },
-  modalCancel: {
-    paddingVertical: 10,
-    paddingHorizontal: 36,
-    borderRadius: 8,
+
+  // ── Tasks modal ──────────────────────────────────────────────────────────
+  tasksModalCard: {
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
+    backgroundColor: colors.background.void,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border.focus,
+    padding: 24,
+    paddingBottom: 16,
+    alignItems: 'center',
+    shadowColor: colors.shadow.electricBlue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  tasksModalTitle: {
+    fontFamily: fonts.display.bold,
+    fontSize: 20,
+    letterSpacing: 5,
+    color: colors.primary.electricBlue,
+    textShadowColor: colors.shadow.electricBlue,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+    marginBottom: 6,
+  },
+  deadNote: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 11,
+    color: colors.text.disabled,
+    textAlign: 'center',
+    marginBottom: 10,
+    fontStyle: 'italic',
+  },
+  taskList: {
+    width: '100%',
+  },
+  taskListContent: {
+    gap: 8,
+    paddingBottom: 4,
+  },
+  noTasksText: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 14,
+    color: colors.text.disabled,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  taskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.background.panel,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.border.default,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
-  modalCancelText: {
-    ...typography.tiny,
-    color: colors.text.tertiary,
-    letterSpacing: 2,
+  taskRowLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  taskRowTitle: {
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 14,
+    color: colors.text.primary,
+  },
+  taskRowRef: {
+    fontFamily: fonts.accent.semiBold,
+    fontSize: 11,
+    color: colors.accent.amber,
+    marginTop: 2,
+  },
+  taskRowRight: {
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  taskRowPoints: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 15,
+    color: colors.accent.neonGreen,
+  },
+  taskRowDiff: {
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 11,
+    textTransform: 'capitalize',
   },
 });

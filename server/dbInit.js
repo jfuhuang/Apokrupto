@@ -48,7 +48,22 @@ async function init() {
 
   // Incremental migrations — safe to run on every startup
   await pool.query(`
-    ALTER TABLE lobby_players ADD COLUMN IF NOT EXISTS role VARCHAR(20);
+    ALTER TABLE lobby_players ADD COLUMN IF NOT EXISTS role    VARCHAR(20);
+    ALTER TABLE lobby_players ADD COLUMN IF NOT EXISTS points  INT     NOT NULL DEFAULT 0;
+    ALTER TABLE lobby_players ADD COLUMN IF NOT EXISTS is_alive BOOLEAN NOT NULL DEFAULT TRUE;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS player_task_completions (
+      id            SERIAL PRIMARY KEY,
+      lobby_id      INT NOT NULL REFERENCES lobbies(id)  ON DELETE CASCADE,
+      user_id       INT NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
+      task_id       VARCHAR(60) NOT NULL,
+      points_earned INT NOT NULL DEFAULT 0,
+      completed_at  TIMESTAMPTZ DEFAULT now(),
+      UNIQUE (lobby_id, user_id, task_id)
+    );
+    CREATE INDEX IF NOT EXISTS ix_ptc_lobby_user ON player_task_completions (lobby_id, user_id);
   `);
 
 }

@@ -28,6 +28,7 @@ import CountdownScreen from './screens/game/CountdownScreen';
 import RoleRevealScreen from './screens/game/RoleRevealScreen';
 import GameScreen from './screens/game/GameScreen';
 import DevMenuScreen from './screens/dev/DevMenuScreen';
+import TaskScreen from './screens/tasks/TaskScreen';
 import { colors } from './theme/colors';
 import { fetchCurrentLobby } from './utils/api';
 
@@ -37,6 +38,9 @@ export default function App() {
   const [currentLobbyId, setCurrentLobbyId] = useState(null);
   const [currentRole, setCurrentRole] = useState(null);
   const [currentFellowDeceivers, setCurrentFellowDeceivers] = useState([]);
+  const [currentTask, setCurrentTask] = useState(null);
+  const [currentPoints, setCurrentPoints] = useState(0);
+  const [isAlive, setIsAlive] = useState(true);
 
   const [fontsLoaded] = useFonts({
     Orbitron_400Regular,
@@ -131,12 +135,28 @@ export default function App() {
     setCurrentScreen('game');
   };
 
+  const handleStartTask = (task) => {
+    setCurrentTask(task);
+    setCurrentScreen('task');
+  };
+
+  const handleTaskComplete = (taskId, pts) => {
+    setCurrentPoints((prev) => prev + pts);
+    setCurrentScreen('game');
+  };
+
   // Dev menu
   const handleOpenDevMenu = () => setCurrentScreen('devMenu');
 
   const handleDevNavigate = (screen, params = {}) => {
     if (params.role !== undefined) setCurrentRole(params.role);
     if (params.fellowDeceivers !== undefined) setCurrentFellowDeceivers(params.fellowDeceivers);
+    if (params.isAlive !== undefined) setIsAlive(params.isAlive);
+    // Reset game state when navigating to a game screen from dev menu
+    if (screen === 'game') {
+      setCurrentPoints(0);
+      setIsAlive(params.isAlive !== undefined ? params.isAlive : true);
+    }
     setCurrentScreen(screen);
   };
 
@@ -216,8 +236,25 @@ export default function App() {
         return (
           <GameScreen
             role={currentRole}
+            isAlive={isAlive}
+            points={currentPoints}
+            lobbyId={currentLobbyId}
+            token={token}
+            onStartTask={handleStartTask}
             onLogout={handleLogout}
             onDevExit={__DEV__ ? () => setCurrentScreen('devMenu') : undefined}
+          />
+        );
+      case 'task':
+        return (
+          <TaskScreen
+            task={currentTask}
+            role={currentRole}
+            isAlive={isAlive}
+            token={token}
+            lobbyId={currentLobbyId}
+            onComplete={handleTaskComplete}
+            onCancel={() => setCurrentScreen('game')}
           />
         );
       case 'devMenu':
