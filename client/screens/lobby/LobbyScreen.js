@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
-import { fetchLobbyPlayers, leaveLobby as apiLeaveLobby, addDummyPlayer } from '../../utils/api';
+import { fetchLobbyPlayers, fetchCurrentLobby, leaveLobby as apiLeaveLobby, addDummyPlayer } from '../../utils/api';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 
@@ -34,7 +34,7 @@ function parseJwt(token) {
   }
 }
 
-export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, onRoleAssigned, onGameStarted }) {
+export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, onRoleAssigned, onGameStarted, onRejoinGame }) {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
 
@@ -46,6 +46,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
   const myUserId = useRef(String(parseJwt(token).sub));
   const socketRef = useRef(null);
   const pollRef = useRef(null);
+  const hasRejoinedRef = useRef(false);
   const floatAnim = useRef(new Animated.Value(0)).current;
 
   // Floating animation for the title
@@ -58,6 +59,20 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
     ).start();
   }, []);
 
+  // Fetch the player's own role from the server and jump directly into game
+  const rejoinGame = async () => {
+    if (hasRejoinedRef.current) return;
+    hasRejoinedRef.current = true;
+    try {
+      const { ok, data } = await fetchCurrentLobby(token);
+      if (ok && data.lobby) {
+        onRejoinGame(data.lobby.role);
+      }
+    } catch (err) {
+      console.error('[LobbyScreen] rejoin error:', err);
+    }
+  };
+
   // REST poll — merges player list from server; socket isConnected state takes precedence
   const fetchPlayers = async () => {
     try {
@@ -69,6 +84,12 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
       }
 
       if (!ok) return;
+
+      // If the game has already started, skip straight to the game screen
+      if (data.lobbyInfo?.status === 'in_progress') {
+        rejoinGame();
+        return;
+      }
 
       // Only update from REST if socket isn't supplying live data, or to
       // catch players who joined without a socket event reaching us.
@@ -119,6 +140,14 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
 
       socket.on('lobbyUpdate', (state) => {
         if (!state) return;
+
+        // If the game is already in progress (e.g. socket reconnected mid-game),
+        // skip straight to the game screen instead of rendering the lobby UI.
+        if (state.status === 'in_progress') {
+          rejoinGame();
+          return;
+        }
+
         setPlayers(state.players || []);
         setLobbyInfo({
           id: state.lobbyId,

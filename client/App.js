@@ -28,6 +28,7 @@ import CountdownScreen from './screens/game/CountdownScreen';
 import RoleRevealScreen from './screens/game/RoleRevealScreen';
 import GameScreen from './screens/game/GameScreen';
 import { colors } from './theme/colors';
+import { fetchCurrentLobby } from './utils/api';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('loading');
@@ -57,12 +58,28 @@ export default function App() {
   const checkExistingToken = async () => {
     try {
       const storedToken = await SecureStore.getItemAsync('jwtToken');
-      if (storedToken) {
-        setToken(storedToken);
-        setCurrentScreen('lobbyList');
-      } else {
+      if (!storedToken) {
         setCurrentScreen('welcome');
+        return;
       }
+
+      setToken(storedToken);
+
+      // Restore in-progress session from server state
+      const { ok, data } = await fetchCurrentLobby(storedToken);
+      if (ok && data.lobby) {
+        setCurrentLobbyId(data.lobby.id);
+        if (data.lobby.status === 'in_progress') {
+          setCurrentRole(data.lobby.role);
+          setCurrentScreen('game');
+          return;
+        }
+        // Lobby is still 'waiting' — drop back into the lobby screen
+        setCurrentScreen('lobby');
+        return;
+      }
+
+      setCurrentScreen('lobbyList');
     } catch (error) {
       console.error('Error checking token:', error);
       setCurrentScreen('welcome');
@@ -104,6 +121,12 @@ export default function App() {
   };
 
   const handleRoleRevealComplete = () => {
+    setCurrentScreen('game');
+  };
+
+  // Rejoin an in-progress game (skips countdown + role reveal)
+  const handleRejoinGame = (role) => {
+    setCurrentRole(role);
     setCurrentScreen('game');
   };
 
@@ -161,6 +184,7 @@ export default function App() {
             onLeaveLobby={handleLeaveLobby}
             onRoleAssigned={handleRoleAssigned}
             onGameStarted={handleGameStarted}
+            onRejoinGame={handleRejoinGame}
           />
         );
       case 'countdown':
@@ -180,6 +204,7 @@ export default function App() {
       case 'game':
         return (
           <GameScreen
+            role={currentRole}
             onLogout={handleLogout}
           />
         );

@@ -41,7 +41,7 @@ router.get('/current', async (req, res) => {
     const userId = req.user.sub;
 
     const result = await pool.query(`
-      SELECT lp.lobby_id as id, l.name, l.status
+      SELECT lp.lobby_id as id, l.name, l.status, lp.role
       FROM lobby_players lp
       JOIN lobbies l ON l.id = lp.lobby_id
       WHERE lp.user_id = $1 AND l.status IN ('waiting', 'in_progress')
