@@ -4,24 +4,28 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 
+// All roles share the same visual style so onlookers can't identify a
+// player's role from the colour of their screen.
+const SHARED_STYLE = {
+  accentColor: colors.accent.ultraviolet,
+  glowColor: colors.shadow.ultraviolet,
+  borderColor: 'rgba(139, 92, 246, 0.6)',
+};
+
 const ROLE_CONFIG = {
   deceiver: {
     label: 'DECEIVER',
     description: 'Eliminate innocents before they complete their tasks.',
-    accentColor: colors.game.impostor,
-    glowColor: colors.shadow.neonRed,
-    borderColor: colors.border.error,
+    ...SHARED_STYLE,
   },
   innocent: {
     label: 'INNOCENT',
     description: 'Complete your tasks and expose the deceivers.',
-    accentColor: colors.game.crewmate,
-    glowColor: colors.shadow.electricBlue,
-    borderColor: colors.border.focus,
+    ...SHARED_STYLE,
   },
 };
 
-const AUTO_ADVANCE_MS = 3000;
+const AUTO_ADVANCE_MS = 6000;
 
 export default function RoleRevealScreen({ role, fellowDeceivers = [], onRevealComplete }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;

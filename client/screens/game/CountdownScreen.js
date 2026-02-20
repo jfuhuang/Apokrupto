@@ -1,14 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Audio } from 'expo-av';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 
 const COUNTDOWN_FROM = 5;
 
+// Replace these files with real audio assets:
+//   assets/sounds/tick.mp3  — short beep/click played on each number
+//   assets/sounds/go.mp3    — distinct sound played when countdown hits 0
+const TICK_FILE = require('../../assets/sounds/tick.mp3');
+const GO_FILE   = require('../../assets/sounds/go.mp3');
+
 export default function CountdownScreen({ onCountdownComplete }) {
   const [count, setCount] = useState(COUNTDOWN_FROM);
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const tickRef = useRef(null);
+  const goRef   = useRef(null);
 
   const pulse = () => {
     scaleAnim.setValue(1.6);
@@ -20,8 +29,41 @@ export default function CountdownScreen({ onCountdownComplete }) {
     }).start();
   };
 
+  // Load both sounds once on mount; unload on unmount
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const [{ sound: tick }, { sound: go }] = await Promise.all([
+          Audio.Sound.createAsync(TICK_FILE),
+          Audio.Sound.createAsync(GO_FILE),
+        ]);
+        if (mounted) {
+          tickRef.current = tick;
+          goRef.current   = go;
+        } else {
+          // Component unmounted before load finished — release immediately
+          tick.unloadAsync();
+          go.unloadAsync();
+        }
+      } catch (err) {
+        // Sound files are placeholders — countdown runs silently until replaced
+        console.warn('[CountdownScreen] Sound unavailable:', err.message);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      tickRef.current?.unloadAsync();
+      goRef.current?.unloadAsync();
+    };
+  }, []);
+
+  // Start the countdown interval
   useEffect(() => {
     pulse();
+
     const interval = setInterval(() => {
       setCount((prev) => {
         const next = prev - 1;
@@ -37,8 +79,11 @@ export default function CountdownScreen({ onCountdownComplete }) {
     return () => clearInterval(interval);
   }, []);
 
+  // Pulse + sound on every tick
   useEffect(() => {
     pulse();
+    const sound = count === 0 ? goRef.current : tickRef.current;
+    sound?.replayAsync().catch(() => {});
   }, [count]);
 
   return (
