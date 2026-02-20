@@ -37,12 +37,16 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
   const [joinLobbyId, setJoinLobbyId] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
-  
+
   const refreshInterval = useRef(null);
   const appState = useRef(AppState.currentState);
 
   useEffect(() => {
     init();
+    fetchLobbies();
+
+    // Start auto-refresh
+    startAutoRefresh();
 
     // Listen for app state changes
     const subscription = AppState.addEventListener('change', handleAppStateChange);
@@ -106,7 +110,7 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
     if (searchQuery.trim() === '') {
       setFilteredLobbies(lobbies);
     } else {
-      const filtered = lobbies.filter(lobby => 
+      const filtered = lobbies.filter(lobby =>
         lobby.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         lobby.host_username.toLowerCase().includes(searchQuery.toLowerCase()) ||
         lobby.id.toString().includes(searchQuery)
@@ -169,9 +173,7 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
         setNewLobbyName('');
         setMaxPlayers('10');
         fetchLobbies();
-        Alert.alert('Success', 'Lobby created successfully!', [
-          { text: 'OK', onPress: () => onJoinLobby(data.lobby.id) }
-        ]);
+        onJoinLobby(data.lobby.id);
       } else {
         Alert.alert('Error', data.error || 'Failed to create lobby');
       }
@@ -327,7 +329,7 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Create Lobby</Text>
-            
+
             <View style={styles.modalInputContainer}>
               <Text style={styles.modalLabel}>Lobby Name</Text>
               <TextInput
@@ -391,7 +393,7 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Join Lobby by ID</Text>
-            
+
             <View style={styles.modalInputContainer}>
               <Text style={styles.modalLabel}>Lobby ID</Text>
               <TextInput

@@ -37,6 +37,7 @@ async function init() {
         lobby_id INT NOT NULL REFERENCES lobbies(id) ON DELETE CASCADE,
         user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         joined_at TIMESTAMPTZ DEFAULT now(),
+        role VARCHAR(20),
         UNIQUE (lobby_id, user_id)
         );
 
@@ -44,6 +45,7 @@ async function init() {
         CREATE INDEX IF NOT EXISTS ix_lobby_players_lobby_id ON lobby_players (lobby_id);
         CREATE INDEX IF NOT EXISTS ix_lobby_players_user_id ON lobby_players (user_id);
   `);
+
 }
 
 module.exports = init;

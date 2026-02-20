@@ -34,7 +34,7 @@ function parseJwt(token) {
   }
 }
 
-export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) {
+export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, onRoleAssigned, onGameStarted }) {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
 
@@ -129,12 +129,12 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
         setIsLoading(false);
       });
 
-      socket.on('gameStarted', (state) => {
-        Alert.alert(
-          'Game Started!',
-          `${state?.name || 'The game'} has begun. Good luck!`,
-          [{ text: 'OK' }]
-        );
+      socket.on('roleAssigned', ({ role }) => {
+        if (onRoleAssigned) onRoleAssigned(role);
+      });
+
+      socket.on('gameStarted', () => {
+        if (onGameStarted) onGameStarted();
       });
 
       socket.on('connect_error', (err) => {
@@ -323,7 +323,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby }) 
 
         {/* Bottom actions */}
         <View style={styles.buttonContainer}>
-          {canStart && (
+          {(
             <TouchableOpacity style={styles.startButton} onPress={handleStartGame}>
               <Text style={styles.startButtonText}>START GAME</Text>
             </TouchableOpacity>

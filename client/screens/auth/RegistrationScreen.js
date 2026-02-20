@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import AnimatedBackground from '../../components/AnimatedBackground';
+import * as SecureStore from 'expo-secure-store';
 import { register } from '../../utils/api';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
@@ -93,9 +94,8 @@ export default function RegistrationScreen({ onBack, onSuccess }) {
         return;
       }
 
-      Alert.alert('Success', 'Account created successfully! Please log in.', [
-        { text: 'OK', onPress: onSuccess },
-      ]);
+      await SecureStore.setItemAsync('jwtToken', data.token);
+      onSuccess(data.token);
     } catch (error) {
       console.error('Registration error:', error);
       Alert.alert('Error', 'Network error. Please check your connection and try again.');
