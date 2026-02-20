@@ -87,3 +87,10 @@ export async function submitTaskCompletion(token, lobbyId, taskId) {
     body: JSON.stringify({ taskId }),
   });
 }
+
+export async function submitSabotagefix(token, lobbyId) {
+  return request(`/api/lobbies/${lobbyId}/sabotage/fix`, {
+    method: 'POST',
+    headers: { ...jsonHeaders, ...authHeader(token) },
+  });
+}

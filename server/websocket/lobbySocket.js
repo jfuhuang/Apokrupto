@@ -1,9 +1,13 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
+const { getSabotage } = require('../data/sabotages');
 
 // In-memory map of lobbyId -> Set of connected userIds (as strings)
 const lobbyConnections = new Map();
+
+// In-memory map of lobbyId -> { type, isCritical, timerId, expiresAt, label }
+const activeSabotages = new Map();
 
 // Tracks which entries in lobbyConnections are fake (bot) connections
 const fakeConnections = new Map();
@@ -129,6 +133,24 @@ async function broadcastLobbyUpdate(lobbyId) {
 function broadcastPointsUpdate(lobbyId, payload) {
   if (!_io) return;
   _io.to(`lobby:${String(lobbyId)}`).emit('pointsUpdate', payload);
+}
+
+/**
+ * Clear an active sabotage (called from lobbyRoutes after a successful fix).
+ * Returns the cleared sabotage object, or null if none was active.
+ */
+function clearSabotage(lobbyId) {
+  const roomKey = String(lobbyId);
+  const entry = activeSabotages.get(roomKey);
+  if (!entry) return null;
+  if (entry.timerId) clearTimeout(entry.timerId);
+  activeSabotages.delete(roomKey);
+  return entry;
+}
+
+function broadcastSabotageFixed(lobbyId, type) {
+  if (!_io) return;
+  _io.to(`lobby:${String(lobbyId)}`).emit('sabotageFixed', { type });
 }
 
 function getDeceiverCount(n) {
@@ -300,6 +322,81 @@ function setupLobbySocket(httpServer) {
       }
     });
 
+    // Deceiver activates a sabotage
+    socket.on('activateSabotage', async ({ lobbyId, sabotageType } = {}, callback) => {
+      try {
+        const roomKey = String(lobbyId);
+
+        // 1. Validate lobby is in_progress
+        const lobbyResult = await pool.query(
+          'SELECT status FROM lobbies WHERE id = $1',
+          [lobbyId]
+        );
+        if (lobbyResult.rows.length === 0) {
+          return callback && callback({ error: 'Lobby not found' });
+        }
+        if (lobbyResult.rows[0].status !== 'in_progress') {
+          return callback && callback({ error: 'Game is not in progress' });
+        }
+
+        // 2. Validate socket user is a deceiver in this lobby
+        const playerResult = await pool.query(
+          'SELECT role FROM lobby_players WHERE lobby_id = $1 AND user_id = $2',
+          [lobbyId, socket.userId]
+        );
+        if (playerResult.rows.length === 0) {
+          return callback && callback({ error: 'Not in this lobby' });
+        }
+        if (playerResult.rows[0].role !== 'deceiver') {
+          return callback && callback({ error: 'Only deceivers can activate sabotages' });
+        }
+
+        // 3. Reject if a sabotage is already active
+        if (activeSabotages.has(roomKey)) {
+          return callback && callback({ error: 'A sabotage is already active' });
+        }
+
+        // 4. Load sabotage definition
+        const sabotage = getSabotage(sabotageType);
+        if (!sabotage) {
+          return callback && callback({ error: 'Unknown sabotage type' });
+        }
+
+        // 5. Store in activeSabotages
+        const expiresAt = sabotage.isCritical ? Date.now() + sabotage.duration * 1000 : null;
+        const entry = { type: sabotageType, isCritical: sabotage.isCritical, expiresAt, label: sabotage.label, timerId: null };
+
+        if (sabotage.isCritical) {
+          entry.timerId = setTimeout(async () => {
+            activeSabotages.delete(roomKey);
+            try {
+              await pool.query("UPDATE lobbies SET status='completed' WHERE id=$1", [lobbyId]);
+            } catch (err) {
+              console.error('[WS] gameOver DB update error:', err);
+            }
+            io.to(`lobby:${roomKey}`).emit('gameOver', { winner: 'deceivers', reason: sabotage.label });
+            console.log(`[WS] Sabotage ${sabotageType} expired — deceivers win in lobby ${lobbyId}`);
+          }, sabotage.duration * 1000);
+        }
+
+        activeSabotages.set(roomKey, entry);
+
+        // 6. Broadcast sabotageActive to lobby room
+        io.to(`lobby:${roomKey}`).emit('sabotageActive', {
+          type: sabotageType,
+          isCritical: sabotage.isCritical,
+          expiresAt,
+          label: sabotage.label,
+        });
+
+        console.log(`[WS] Sabotage ${sabotageType} activated in lobby ${lobbyId} by user ${socket.userId}`);
+        if (callback) callback({ ok: true });
+      } catch (err) {
+        console.error('[WS] activateSabotage error:', err);
+        if (callback) callback({ error: 'Server error' });
+      }
+    });
+
     // Clean up on disconnect
     socket.on('disconnect', async () => {
       console.log(`[WS] Disconnected: ${socket.id} (user: ${socket.userId})`);
@@ -325,4 +422,4 @@ function setupLobbySocket(httpServer) {
   return io;
 }
 
-module.exports = { setupLobbySocket, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate };
+module.exports = { setupLobbySocket, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed };

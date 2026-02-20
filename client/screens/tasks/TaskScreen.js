@@ -20,7 +20,7 @@ import HoldTask from './mechanics/HoldTask';
 
 const RESULT_DISPLAY_MS = 1500;
 
-export default function TaskScreen({ task, role, isAlive, token, lobbyId, onComplete, onCancel }) {
+export default function TaskScreen({ task, role, isAlive, token, lobbyId, onComplete, onCancel, onCustomSubmit }) {
   const [result, setResult] = useState(null); // null | { success, pointsEarned }
   const handledRef = useRef(false);
 
@@ -28,17 +28,27 @@ export default function TaskScreen({ task, role, isAlive, token, lobbyId, onComp
     if (handledRef.current) return;
     handledRef.current = true;
 
-    let pointsEarned = isAlive ? task.points.alive : task.points.dead;
+    let pointsEarned = 0;
 
-    // Submit to server if we have a token and lobbyId
-    if (token && lobbyId) {
+    if (onCustomSubmit) {
+      // Fix task — no points, custom submission
       try {
-        const { ok, data } = await submitTaskCompletion(token, lobbyId, task.id);
-        if (ok) {
-          pointsEarned = data.pointsEarned;
-        }
+        await onCustomSubmit(task.id);
       } catch (_) {
-        // Continue offline with local points
+        // Continue even if the API call fails
+      }
+    } else {
+      pointsEarned = isAlive ? task.points.alive : task.points.dead;
+      // Submit to server if we have a token and lobbyId
+      if (token && lobbyId) {
+        try {
+          const { ok, data } = await submitTaskCompletion(token, lobbyId, task.id);
+          if (ok) {
+            pointsEarned = data.pointsEarned;
+          }
+        } catch (_) {
+          // Continue offline with local points
+        }
       }
     }
 

@@ -7,21 +7,18 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
 import { getTasksForRole } from '../../data/tasks';
+import { SABOTAGES, getSabotageById, scrambleText } from '../../data/sabotages';
 import { getApiUrl } from '../../utils/networkUtils';
+import SabotageOverlay from './SabotageOverlay';
 
 const POINTS_TARGET = 1000;
-
-const SABOTAGES = [
-  { id: 'lights',   symbol: '⚡', label: 'LIGHTS' },
-  { id: 'reactor',  symbol: '⚛',  label: 'REACTOR' },
-  { id: 'comms',    symbol: '◈',  label: 'COMMS' },
-];
 
 const DIFFICULTY_COLOR = {
   easy: colors.accent.neonGreen,
@@ -29,10 +26,12 @@ const DIFFICULTY_COLOR = {
   hard: colors.state.error,
 };
 
-export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, token, onStartTask, onLogout, onDevExit }) {
+export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, token, onStartTask, onLogout, onDevExit, onGameOver }) {
   const [sabotageVisible, setSabotageVisible] = useState(false);
   const [tasksVisible, setTasksVisible] = useState(false);
   const [livePoints, setLivePoints] = useState(points);
+  const [activeSabotage, setActiveSabotage] = useState(null); // null | { type, isCritical, expiresAt }
+  const [secondsLeft, setSecondsLeft] = useState(null);
   const socketRef = useRef(null);
 
   // TODO: replace with real proximity check
@@ -40,12 +39,32 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
 
   const progress = Math.min(livePoints / POINTS_TARGET, 1);
 
+  const isDeceiver = role === 'deceiver';
+  const availableTasks = getTasksForRole(role, isAlive);
+
   // Keep livePoints in sync with prop (when TaskScreen calls onComplete → App updates points → re-render)
   useEffect(() => {
     setLivePoints(points);
   }, [points]);
 
-  // Socket: subscribe to pointsUpdate events while in-game
+  // Countdown timer for critical sabotages
+  useEffect(() => {
+    if (!activeSabotage?.isCritical || !activeSabotage?.expiresAt) {
+      setSecondsLeft(null);
+      return;
+    }
+
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((activeSabotage.expiresAt - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+    };
+
+    tick();
+    const interval = setInterval(tick, 500);
+    return () => clearInterval(interval);
+  }, [activeSabotage]);
+
+  // Socket: subscribe to game events while in-game
   useEffect(() => {
     if (!token || !lobbyId) return;
 
@@ -66,10 +85,22 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
         });
 
         socket.on('pointsUpdate', (payload) => {
-          // Update our own points from the authoritative server value
           if (String(payload.userId) === String(socket.userId)) {
             setLivePoints(payload.totalPoints);
           }
+        });
+
+        socket.on('sabotageActive', (payload) => {
+          setActiveSabotage(payload);
+        });
+
+        socket.on('sabotageFixed', () => {
+          setActiveSabotage(null);
+          setSecondsLeft(null);
+        });
+
+        socket.on('gameOver', (payload) => {
+          if (onGameOver) onGameOver(payload);
         });
       } catch (_) {
         // Socket.IO not available or connection failed — silent
@@ -95,8 +126,24 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
     }
   };
 
-  const isDeceiver = role === 'deceiver';
-  const availableTasks = getTasksForRole(role, isAlive);
+  const handleActivateSabotage = (s) => {
+    if (!socketRef.current) {
+      Alert.alert('Not connected', 'No socket connection — try again.');
+      return;
+    }
+    socketRef.current.emit('activateSabotage', { lobbyId, sabotageType: s.id }, ({ ok, error } = {}) => {
+      if (error) Alert.alert('Cannot sabotage', error);
+      setSabotageVisible(false);
+    });
+  };
+
+  const handlePressFix = () => {
+    const sabotage = getSabotageById(activeSabotage?.type);
+    if (!sabotage) return;
+    onStartTask && onStartTask(sabotage.fixTask, { isFix: true });
+  };
+
+  const canFix = isAlive;
 
   return (
     <View style={styles.container}>
@@ -123,6 +170,16 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
           </View>
           <Text style={styles.pointsTarget}>/ {POINTS_TARGET.toLocaleString()} to win</Text>
         </View>
+
+        {/* ── Active sabotage overlay ── */}
+        {activeSabotage && (
+          <SabotageOverlay
+            sabotage={getSabotageById(activeSabotage.type)}
+            secondsLeft={secondsLeft}
+            canFix={canFix}
+            onPressFix={handlePressFix}
+          />
+        )}
 
         {/* ── Bottom action bar ── */}
         <View style={styles.actionBar}>
@@ -195,11 +252,12 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
                   <TouchableOpacity
                     key={s.id}
                     style={styles.sabotageOption}
-                    onPress={() => setSabotageVisible(false)}
+                    onPress={() => handleActivateSabotage(s)}
                     activeOpacity={0.7}
                   >
                     <Text style={styles.sabotageSymbol}>{s.symbol}</Text>
-                    <Text style={styles.sabotageOptionLabel}>{s.label}</Text>
+                    <Text style={styles.sabotageOptionLabel}>{s.label.toUpperCase()}</Text>
+                    <Text style={styles.sabotageOptionRef}>{s.reference}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -229,6 +287,9 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
                   Dead — only free-roam tasks available (60% points)
                 </Text>
               )}
+              {activeSabotage?.type === 'confuse_language' && (
+                <Text style={styles.babelNote}>⚠ Language Confounded</Text>
+              )}
               <View style={styles.modalDivider} />
               <ScrollView
                 style={styles.taskList}
@@ -238,30 +299,35 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
                 {availableTasks.length === 0 ? (
                   <Text style={styles.noTasksText}>No tasks available.</Text>
                 ) : (
-                  availableTasks.map((task) => (
-                    <TouchableOpacity
-                      key={task.id}
-                      style={styles.taskRow}
-                      onPress={() => {
-                        setTasksVisible(false);
-                        onStartTask && onStartTask(task);
-                      }}
-                      activeOpacity={0.75}
-                    >
-                      <View style={styles.taskRowLeft}>
-                        <Text style={styles.taskRowTitle}>{task.title}</Text>
-                        <Text style={styles.taskRowRef}>{task.reference}</Text>
-                      </View>
-                      <View style={styles.taskRowRight}>
-                        <Text style={styles.taskRowPoints}>
-                          {isAlive ? task.points.alive : task.points.dead} pts
-                        </Text>
-                        <Text style={[styles.taskRowDiff, { color: DIFFICULTY_COLOR[task.difficulty] }]}>
-                          {task.difficulty}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))
+                  availableTasks.map((task) => {
+                    const scrambled = activeSabotage?.type === 'confuse_language';
+                    const displayTitle = scrambled ? scrambleText(task.title, task.id) : task.title;
+                    const displayRef = scrambled ? scrambleText(task.reference, task.id + '_ref') : task.reference;
+                    return (
+                      <TouchableOpacity
+                        key={task.id}
+                        style={styles.taskRow}
+                        onPress={() => {
+                          setTasksVisible(false);
+                          onStartTask && onStartTask(task);
+                        }}
+                        activeOpacity={0.75}
+                      >
+                        <View style={styles.taskRowLeft}>
+                          <Text style={styles.taskRowTitle}>{displayTitle}</Text>
+                          <Text style={styles.taskRowRef}>{displayRef}</Text>
+                        </View>
+                        <View style={styles.taskRowRight}>
+                          <Text style={styles.taskRowPoints}>
+                            {isAlive ? task.points.alive : task.points.dead} pts
+                          </Text>
+                          <Text style={[styles.taskRowDiff, { color: DIFFICULTY_COLOR[task.difficulty] }]}>
+                            {task.difficulty}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })
                 )}
               </ScrollView>
               <TouchableOpacity
@@ -598,17 +664,24 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   sabotageSymbol: {
-    fontSize: 34,
+    fontSize: 28,
     color: colors.primary.neonRed,
     textAlign: 'center',
     marginBottom: 6,
   },
   sabotageOptionLabel: {
     fontFamily: fonts.display.bold,
-    fontSize: 9,
-    letterSpacing: 1.5,
+    fontSize: 8,
+    letterSpacing: 1,
     color: colors.text.tertiary,
     textAlign: 'center',
+  },
+  sabotageOptionRef: {
+    fontFamily: fonts.accent.semiBold,
+    fontSize: 9,
+    color: colors.accent.amber,
+    textAlign: 'center',
+    marginTop: 2,
   },
 
   // ── Tasks modal ──────────────────────────────────────────────────────────
@@ -644,8 +717,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.text.disabled,
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
     fontStyle: 'italic',
+  },
+  babelNote: {
+    fontFamily: fonts.display.bold,
+    fontSize: 11,
+    letterSpacing: 1,
+    color: colors.primary.neonRed,
+    textAlign: 'center',
+    marginBottom: 6,
   },
   taskList: {
     width: '100%',

@@ -27,10 +27,11 @@ import LobbyScreen from './screens/lobby/LobbyScreen';
 import CountdownScreen from './screens/game/CountdownScreen';
 import RoleRevealScreen from './screens/game/RoleRevealScreen';
 import GameScreen from './screens/game/GameScreen';
+import GameOverScreen from './screens/game/GameOverScreen';
 import DevMenuScreen from './screens/dev/DevMenuScreen';
 import TaskScreen from './screens/tasks/TaskScreen';
 import { colors } from './theme/colors';
-import { fetchCurrentLobby } from './utils/api';
+import { fetchCurrentLobby, submitSabotagefix } from './utils/api';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('loading');
@@ -39,8 +40,10 @@ export default function App() {
   const [currentRole, setCurrentRole] = useState(null);
   const [currentFellowDeceivers, setCurrentFellowDeceivers] = useState([]);
   const [currentTask, setCurrentTask] = useState(null);
+  const [currentTaskOptions, setCurrentTaskOptions] = useState(null);
   const [currentPoints, setCurrentPoints] = useState(0);
   const [isAlive, setIsAlive] = useState(true);
+  const [gameOverResult, setGameOverResult] = useState(null);
 
   const [fontsLoaded] = useFonts({
     Orbitron_400Regular,
@@ -135,14 +138,20 @@ export default function App() {
     setCurrentScreen('game');
   };
 
-  const handleStartTask = (task) => {
+  const handleStartTask = (task, options = {}) => {
     setCurrentTask(task);
+    setCurrentTaskOptions(options);
     setCurrentScreen('task');
   };
 
   const handleTaskComplete = (taskId, pts) => {
     setCurrentPoints((prev) => prev + pts);
     setCurrentScreen('game');
+  };
+
+  const handleGameOver = ({ winner, reason } = {}) => {
+    setGameOverResult({ winner, reason });
+    setCurrentScreen('gameOver');
   };
 
   // Dev menu
@@ -242,6 +251,7 @@ export default function App() {
             token={token}
             onStartTask={handleStartTask}
             onLogout={handleLogout}
+            onGameOver={handleGameOver}
             onDevExit={__DEV__ ? () => setCurrentScreen('devMenu') : undefined}
           />
         );
@@ -255,6 +265,18 @@ export default function App() {
             lobbyId={currentLobbyId}
             onComplete={handleTaskComplete}
             onCancel={() => setCurrentScreen('game')}
+            onCustomSubmit={
+              currentTaskOptions?.isFix
+                ? () => submitSabotagefix(token, currentLobbyId)
+                : undefined
+            }
+          />
+        );
+      case 'gameOver':
+        return (
+          <GameOverScreen
+            result={gameOverResult}
+            onReturn={() => setCurrentScreen('lobbyList')}
           />
         );
       case 'devMenu':

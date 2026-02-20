@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const authenticateToken = require('../middleware/auth');
-const { broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate } = require('../websocket/lobbySocket');
+const { broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed } = require('../websocket/lobbySocket');
 const { getTask } = require('../data/tasks');
 
 const router = express.Router();
@@ -372,6 +372,52 @@ router.post('/:id/tasks/complete', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   } finally {
     client.release();
+  }
+});
+
+// Fix the active sabotage
+router.post('/:id/sabotage/fix', async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.sub;
+
+  try {
+    // 1. Verify lobby is in_progress
+    const lobbyResult = await pool.query(
+      'SELECT status FROM lobbies WHERE id = $1',
+      [id]
+    );
+    if (lobbyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Lobby not found' });
+    }
+    if (lobbyResult.rows[0].status !== 'in_progress') {
+      return res.status(400).json({ error: 'Game is not in progress' });
+    }
+
+    // 2. Verify player is in lobby and is alive
+    const playerResult = await pool.query(
+      'SELECT is_alive FROM lobby_players WHERE lobby_id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    if (playerResult.rows.length === 0) {
+      return res.status(403).json({ error: 'Not in this lobby' });
+    }
+    if (!playerResult.rows[0].is_alive) {
+      return res.status(400).json({ error: 'Dead players cannot fix sabotages' });
+    }
+
+    // 3. Clear the sabotage (in-memory)
+    const cleared = clearSabotage(id);
+    if (!cleared) {
+      return res.status(400).json({ error: 'No active sabotage' });
+    }
+
+    // 4. Broadcast fix to all players in the room
+    broadcastSabotageFixed(id, cleared.type);
+
+    res.json({ ok: true, type: cleared.type });
+  } catch (err) {
+    console.error('[sabotage/fix] error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
