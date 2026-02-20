@@ -126,6 +126,12 @@ async function broadcastLobbyUpdate(lobbyId) {
   }
 }
 
+function getDeceiverCount(n) {
+  if (n <= 4) return 1;
+  if (n <= 7) return 2;
+  return 3;
+}
+
 function setupLobbySocket(httpServer) {
   _io = new Server(httpServer, {
     cors: {
@@ -196,8 +202,9 @@ function setupLobbySocket(httpServer) {
 
     // Host starts the game
     socket.on('startGame', async ({ lobbyId }, callback) => {
+      const client = await pool.connect();
       try {
-        const result = await pool.query(
+        const result = await client.query(
           'SELECT created_by, status FROM lobbies WHERE id = $1',
           [lobbyId]
         );
@@ -216,18 +223,60 @@ function setupLobbySocket(httpServer) {
           throw new Error('Game already started');
         }
 
-        await pool.query(
+        // Fetch all players ordered by join time
+        const playersResult = await client.query(
+          'SELECT user_id FROM lobby_players WHERE lobby_id = $1 ORDER BY joined_at ASC',
+          [lobbyId]
+        );
+        const playerIds = playersResult.rows.map((r) => String(r.user_id));
+
+        // Fisher-Yates shuffle
+        for (let i = playerIds.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [playerIds[i], playerIds[j]] = [playerIds[j], playerIds[i]];
+        }
+
+        const deceiverCount = getDeceiverCount(playerIds.length);
+        const roleMap = {};
+        playerIds.forEach((uid, idx) => {
+          roleMap[uid] = idx < deceiverCount ? 'deceiver' : 'innocent';
+        });
+
+        console.log(`[WS] startGame lobby ${lobbyId}: ${deceiverCount} deceiver(s) among ${playerIds.length} players`);
+
+        // Assign roles + mark in_progress in a transaction
+        await client.query('BEGIN');
+        await client.query(
           "UPDATE lobbies SET status = 'in_progress' WHERE id = $1",
           [lobbyId]
         );
+        for (const [uid, role] of Object.entries(roleMap)) {
+          await client.query(
+            'UPDATE lobby_players SET role = $1 WHERE lobby_id = $2 AND user_id = $3',
+            [role, lobbyId, uid]
+          );
+        }
+        await client.query('COMMIT');
+
+        // Emit roleAssigned privately to each socket in this lobby
+        const roomKey = `lobby:${String(lobbyId)}`;
+        for (const [, sock] of io.sockets.sockets) {
+          if (sock.rooms.has(roomKey) && roleMap[sock.userId] !== undefined) {
+            sock.emit('roleAssigned', { role: roleMap[sock.userId] });
+            console.log(`[WS] roleAssigned ${roleMap[sock.userId]} → user ${sock.userId}`);
+          }
+        }
 
         const state = await getLobbyState(lobbyId);
-        io.to(`lobby:${String(lobbyId)}`).emit('gameStarted', state);
+        io.to(roomKey).emit('gameStarted', { ...state, countdown: 5 });
 
         if (callback) callback({ ok: true });
       } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
         console.error('[WS] startGame error:', err);
         if (callback) callback({ error: err.message });
+      } finally {
+        client.release();
       }
     });
 

@@ -24,12 +24,16 @@ import LoginScreen from './screens/auth/LoginScreen';
 import RegistrationScreen from './screens/auth/RegistrationScreen';
 import LobbyListScreen from './screens/lobby/LobbyListScreen';
 import LobbyScreen from './screens/lobby/LobbyScreen';
+import CountdownScreen from './screens/game/CountdownScreen';
+import RoleRevealScreen from './screens/game/RoleRevealScreen';
+import GameScreen from './screens/game/GameScreen';
 import { colors } from './theme/colors';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('loading');
   const [token, setToken] = useState(null);
   const [currentLobbyId, setCurrentLobbyId] = useState(null);
+  const [currentRole, setCurrentRole] = useState(null);
 
   const [fontsLoaded] = useFonts({
     Orbitron_400Regular,
@@ -85,6 +89,22 @@ export default function App() {
     setCurrentScreen('lobbyList');
   };
 
+  const handleRoleAssigned = (role) => {
+    setCurrentRole(role);
+  };
+
+  const handleGameStarted = () => {
+    setCurrentScreen('countdown');
+  };
+
+  const handleCountdownComplete = () => {
+    setCurrentScreen('roleReveal');
+  };
+
+  const handleRoleRevealComplete = () => {
+    setCurrentScreen('game');
+  };
+
   const renderScreen = () => {
     if (!fontsLoaded) {
       return (
@@ -112,7 +132,7 @@ export default function App() {
         return (
           <RegistrationScreen
             onBack={() => setCurrentScreen('welcome')}
-            onSuccess={() => setCurrentScreen('login')}
+            onSuccess={handleLogin}
           />
         );
       case 'login':
@@ -137,6 +157,27 @@ export default function App() {
             lobbyId={currentLobbyId}
             onLogout={handleLogout}
             onLeaveLobby={handleLeaveLobby}
+            onRoleAssigned={handleRoleAssigned}
+            onGameStarted={handleGameStarted}
+          />
+        );
+      case 'countdown':
+        return (
+          <CountdownScreen
+            onCountdownComplete={handleCountdownComplete}
+          />
+        );
+      case 'roleReveal':
+        return (
+          <RoleRevealScreen
+            role={currentRole}
+            onRevealComplete={handleRoleRevealComplete}
+          />
+        );
+      case 'game':
+        return (
+          <GameScreen
+            onLogout={handleLogout}
           />
         );
       default:
