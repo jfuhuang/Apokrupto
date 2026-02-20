@@ -27,7 +27,7 @@ const SABOTAGES = [
   { id: 'comms',    symbol: '◈',  label: 'COMMS' },
 ];
 
-export default function GameScreen({ role, onLogout }) {
+export default function GameScreen({ role, onLogout, onDevExit }) {
   const [sabotageVisible, setSabotageVisible] = useState(false);
 
   // TODO: replace with real proximity check
@@ -55,6 +55,13 @@ export default function GameScreen({ role, onLogout }) {
         <View style={styles.mapArea}>
           <Text style={styles.mapPlaceholder}>MAP</Text>
         </View>
+
+        {/* ── Dev exit button — top-right overlay ── */}
+        {__DEV__ && (
+          <TouchableOpacity style={styles.devExitBtn} onPress={onDevExit} activeOpacity={0.7}>
+            <Text style={styles.devExitText}>DEV ✕</Text>
+          </TouchableOpacity>
+        )}
 
         {/* ── Task panel — top-left HUD overlay ── */}
         <View style={styles.taskPanel}>
@@ -87,11 +94,11 @@ export default function GameScreen({ role, onLogout }) {
           </View>
         </View>
 
-        {/* ── Bottom action bar — deceiver only ── */}
-        {isDeceiver && (
-          <View style={styles.actionBar}>
+        {/* ── Bottom action bar ── */}
+        <View style={styles.actionBar}>
 
-            {/* Sabotage — bottom left */}
+          {/* Sabotage — bottom left (deceiver only) */}
+          {isDeceiver && (
             <TouchableOpacity
               style={styles.sabotageBtn}
               onPress={() => setSabotageVisible(true)}
@@ -100,16 +107,18 @@ export default function GameScreen({ role, onLogout }) {
               <Text style={styles.sabotageBtnSymbol}>⚠</Text>
               <Text style={styles.sabotageBtnLabel}>SABOTAGE</Text>
             </TouchableOpacity>
+          )}
 
-            <View style={styles.spacer} />
+          <View style={styles.spacer} />
 
-            {/* Right column: Report above Kill */}
-            <View style={styles.rightBtnCol}>
-              <TouchableOpacity style={styles.reportBtn} activeOpacity={0.75}>
-                <Text style={styles.reportBtnSymbol}>!</Text>
-                <Text style={styles.reportBtnLabel}>REPORT</Text>
-              </TouchableOpacity>
+          {/* Right column: Report above Kill (Kill is deceiver-only) */}
+          <View style={styles.rightBtnCol}>
+            <TouchableOpacity style={styles.reportBtn} activeOpacity={0.75}>
+              <Text style={styles.reportBtnSymbol}>!</Text>
+              <Text style={styles.reportBtnLabel}>REPORT</Text>
+            </TouchableOpacity>
 
+            {isDeceiver && (
               <TouchableOpacity
                 style={[styles.killBtn, !canKill && styles.killBtnDisabled]}
                 activeOpacity={canKill ? 0.75 : 1}
@@ -118,9 +127,9 @@ export default function GameScreen({ role, onLogout }) {
                 <Text style={[styles.killBtnSymbol, !canKill && styles.killDimText]}>✕</Text>
                 <Text style={[styles.killBtnLabel, !canKill && styles.killDimText]}>KILL</Text>
               </TouchableOpacity>
-            </View>
+            )}
           </View>
-        )}
+        </View>
 
         {/* ── Sabotage modal ── */}
         <Modal
@@ -183,6 +192,26 @@ const styles = StyleSheet.create({
     color: colors.text.muted,
     letterSpacing: 8,
     opacity: 0.2,
+  },
+
+  // ── Dev exit (absolute, top-right) ──────────────────────────────────────
+  devExitBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: colors.accent.amber,
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(255, 166, 61, 0.08)',
+  },
+  devExitText: {
+    fontFamily: fonts.display.bold,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    color: colors.accent.amber,
   },
 
   // ── Task panel (absolute, top-left) ──────────────────────────────────────

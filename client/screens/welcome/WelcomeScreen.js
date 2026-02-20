@@ -1,14 +1,32 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, TouchableWithoutFeedback, StyleSheet, useWindowDimensions, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedBackground from '../../components/AnimatedBackground';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 
-export default function WelcomeScreen({ onCreateAccount, onLogin }) {
+export default function WelcomeScreen({ onCreateAccount, onLogin, onOpenDevMenu }) {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const floatAnim = useRef(new Animated.Value(0)).current;
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef(null);
+
+  const handleLogoPress = () => {
+    tapCountRef.current += 1;
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+
+    if (tapCountRef.current >= 7) {
+      tapCountRef.current = 0;
+      onOpenDevMenu?.();
+      return;
+    }
+
+    // Reset if the user pauses for more than 1.5 s
+    tapTimerRef.current = setTimeout(() => {
+      tapCountRef.current = 0;
+    }, 1500);
+  };
 
   useEffect(() => {
     Animated.loop(
@@ -31,16 +49,18 @@ export default function WelcomeScreen({ onCreateAccount, onLogin }) {
     <View style={styles.container}>
       <AnimatedBackground />
       <SafeAreaView style={[styles.content, isLandscape && styles.contentLandscape]}>
-        <Animated.View 
-          style={[
-            styles.titleContainer, 
-            isLandscape && styles.titleContainerLandscape,
-            { transform: [{ translateY: floatAnim }] }
-          ]}
-        >
-          <Text style={[styles.title, isLandscape && styles.titleLandscape]} numberOfLines={1} adjustsFontSizeToFit>APOKRUPTO</Text>
-          <Text style={[styles.subtitle, isLandscape && styles.subtitleLandscape]}>Real World Deception</Text>
-        </Animated.View>
+        <TouchableWithoutFeedback onPress={handleLogoPress}>
+          <Animated.View
+            style={[
+              styles.titleContainer,
+              isLandscape && styles.titleContainerLandscape,
+              { transform: [{ translateY: floatAnim }] }
+            ]}
+          >
+            <Text style={[styles.title, isLandscape && styles.titleLandscape]} numberOfLines={1} adjustsFontSizeToFit>APOKRUPTO</Text>
+            <Text style={[styles.subtitle, isLandscape && styles.subtitleLandscape]}>Real World Deception</Text>
+          </Animated.View>
+        </TouchableWithoutFeedback>
 
         <View style={[styles.buttonContainer, isLandscape && styles.buttonContainerLandscape]}>
           <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={onLogin}>

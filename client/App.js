@@ -27,6 +27,7 @@ import LobbyScreen from './screens/lobby/LobbyScreen';
 import CountdownScreen from './screens/game/CountdownScreen';
 import RoleRevealScreen from './screens/game/RoleRevealScreen';
 import GameScreen from './screens/game/GameScreen';
+import DevMenuScreen from './screens/dev/DevMenuScreen';
 import { colors } from './theme/colors';
 import { fetchCurrentLobby } from './utils/api';
 
@@ -130,6 +131,15 @@ export default function App() {
     setCurrentScreen('game');
   };
 
+  // Dev menu
+  const handleOpenDevMenu = () => setCurrentScreen('devMenu');
+
+  const handleDevNavigate = (screen, params = {}) => {
+    if (params.role !== undefined) setCurrentRole(params.role);
+    if (params.fellowDeceivers !== undefined) setCurrentFellowDeceivers(params.fellowDeceivers);
+    setCurrentScreen(screen);
+  };
+
   const renderScreen = () => {
     if (!fontsLoaded) {
       return (
@@ -151,6 +161,7 @@ export default function App() {
           <WelcomeScreen
             onCreateAccount={() => setCurrentScreen('register')}
             onLogin={() => setCurrentScreen('login')}
+            onOpenDevMenu={handleOpenDevMenu}
           />
         );
       case 'register':
@@ -206,6 +217,14 @@ export default function App() {
           <GameScreen
             role={currentRole}
             onLogout={handleLogout}
+            onDevExit={__DEV__ ? () => setCurrentScreen('devMenu') : undefined}
+          />
+        );
+      case 'devMenu':
+        return (
+          <DevMenuScreen
+            onNavigate={handleDevNavigate}
+            onClose={() => setCurrentScreen('welcome')}
           />
         );
       default:
