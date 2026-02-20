@@ -225,10 +225,16 @@ function setupLobbySocket(httpServer) {
 
         // Fetch all players ordered by join time
         const playersResult = await client.query(
-          'SELECT user_id FROM lobby_players WHERE lobby_id = $1 ORDER BY joined_at ASC',
+          `SELECT lp.user_id, u.username
+           FROM lobby_players lp
+           JOIN users u ON u.id = lp.user_id
+           WHERE lp.lobby_id = $1
+           ORDER BY lp.joined_at ASC`,
           [lobbyId]
         );
         const playerIds = playersResult.rows.map((r) => String(r.user_id));
+        const userIdToUsername = {};
+        playersResult.rows.forEach((r) => { userIdToUsername[String(r.user_id)] = r.username; });
 
         // Fisher-Yates shuffle
         for (let i = playerIds.length - 1; i > 0; i--) {
@@ -260,9 +266,18 @@ function setupLobbySocket(httpServer) {
 
         // Emit roleAssigned privately to each socket in this lobby
         const roomKey = `lobby:${String(lobbyId)}`;
+        const deceiverUsernames = playerIds
+          .filter((uid) => roleMap[uid] === 'deceiver')
+          .map((uid) => userIdToUsername[uid]);
         for (const [, sock] of io.sockets.sockets) {
           if (sock.rooms.has(roomKey) && roleMap[sock.userId] !== undefined) {
-            sock.emit('roleAssigned', { role: roleMap[sock.userId] });
+            const payload = { role: roleMap[sock.userId] };
+            if (roleMap[sock.userId] === 'deceiver') {
+              payload.fellowDeceivers = deceiverUsernames.filter(
+                (name) => name !== userIdToUsername[sock.userId]
+              );
+            }
+            sock.emit('roleAssigned', payload);
             console.log(`[WS] roleAssigned ${roleMap[sock.userId]} → user ${sock.userId}`);
           }
         }

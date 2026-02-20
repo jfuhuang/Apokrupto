@@ -23,7 +23,7 @@ const ROLE_CONFIG = {
 
 const AUTO_ADVANCE_MS = 3000;
 
-export default function RoleRevealScreen({ role, onRevealComplete }) {
+export default function RoleRevealScreen({ role, fellowDeceivers = [], onRevealComplete }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const config = ROLE_CONFIG[role] || ROLE_CONFIG.innocent;
 
@@ -56,6 +56,16 @@ export default function RoleRevealScreen({ role, onRevealComplete }) {
           </Text>
           <View style={[styles.divider, { backgroundColor: config.accentColor }]} />
           <Text style={styles.description}>{config.description}</Text>
+          {role === 'deceiver' && fellowDeceivers.length > 0 && (
+            <View style={styles.fellowSection}>
+              <Text style={styles.fellowLabel}>YOUR TEAM</Text>
+              {fellowDeceivers.map((name) => (
+                <Text key={name} style={[styles.fellowName, { color: config.accentColor }]}>
+                  {name}
+                </Text>
+              ))}
+            </View>
+          )}
         </Animated.View>
       </SafeAreaView>
     </View>
@@ -106,5 +116,21 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 24,
+  },
+  fellowSection: {
+    marginTop: 24,
+    alignItems: 'center',
+    width: '100%',
+  },
+  fellowLabel: {
+    ...typography.subtitle,
+    color: colors.text.tertiary,
+    letterSpacing: 4,
+    marginBottom: 10,
+  },
+  fellowName: {
+    ...typography.body,
+    letterSpacing: 1,
+    marginBottom: 4,
   },
 });

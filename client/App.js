@@ -34,6 +34,7 @@ export default function App() {
   const [token, setToken] = useState(null);
   const [currentLobbyId, setCurrentLobbyId] = useState(null);
   const [currentRole, setCurrentRole] = useState(null);
+  const [currentFellowDeceivers, setCurrentFellowDeceivers] = useState([]);
 
   const [fontsLoaded] = useFonts({
     Orbitron_400Regular,
@@ -89,8 +90,9 @@ export default function App() {
     setCurrentScreen('lobbyList');
   };
 
-  const handleRoleAssigned = (role) => {
+  const handleRoleAssigned = (role, fellowDeceivers = []) => {
     setCurrentRole(role);
+    setCurrentFellowDeceivers(fellowDeceivers);
   };
 
   const handleGameStarted = () => {
@@ -171,6 +173,7 @@ export default function App() {
         return (
           <RoleRevealScreen
             role={currentRole}
+            fellowDeceivers={currentFellowDeceivers}
             onRevealComplete={handleRoleRevealComplete}
           />
         );

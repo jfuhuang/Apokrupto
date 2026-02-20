@@ -130,8 +130,8 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
         setIsLoading(false);
       });
 
-      socket.on('roleAssigned', ({ role }) => {
-        if (onRoleAssigned) onRoleAssigned(role);
+      socket.on('roleAssigned', ({ role, fellowDeceivers }) => {
+        if (onRoleAssigned) onRoleAssigned(role, fellowDeceivers || []);
       });
 
       socket.on('gameStarted', () => {
