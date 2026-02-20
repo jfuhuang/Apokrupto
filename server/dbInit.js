@@ -46,6 +46,11 @@ async function init() {
         CREATE INDEX IF NOT EXISTS ix_lobby_players_user_id ON lobby_players (user_id);
   `);
 
+  // Incremental migrations — safe to run on every startup
+  await pool.query(`
+    ALTER TABLE lobby_players ADD COLUMN IF NOT EXISTS role VARCHAR(20);
+  `);
+
 }
 
 module.exports = init;
