@@ -91,6 +91,14 @@ function startIdleLobbyCleaner(io) {
 
       if (toClose.length === 0) return;
 
+      await pool.query(
+        `DELETE FROM users WHERE id IN (
+          SELECT lp.user_id FROM lobby_players lp
+          JOIN users u ON u.id = lp.user_id
+          WHERE lp.lobby_id = ANY($1::int[]) AND u.password_hash IS NULL
+        )`,
+        [toClose]
+      );
       await pool.query('DELETE FROM lobbies WHERE id = ANY($1::int[])', [toClose]);
 
       for (const lobbyId of toClose) {
@@ -283,6 +291,15 @@ function setupLobbySocket(httpServer) {
           "UPDATE lobbies SET status = 'in_progress' WHERE id = $1",
           [lobbyId]
         );
+        // Reset points and task completions from any previous game
+        await client.query(
+          'UPDATE lobby_players SET points = 0, is_alive = true WHERE lobby_id = $1',
+          [lobbyId]
+        );
+        await client.query(
+          'DELETE FROM player_task_completions WHERE lobby_id = $1',
+          [lobbyId]
+        );
         for (const [uid, role] of Object.entries(roleMap)) {
           await client.query(
             'UPDATE lobby_players SET role = $1 WHERE lobby_id = $2 AND user_id = $3',
@@ -371,6 +388,14 @@ function setupLobbySocket(httpServer) {
             activeSabotages.delete(roomKey);
             try {
               await pool.query("UPDATE lobbies SET status='completed' WHERE id=$1", [lobbyId]);
+              await pool.query(
+                `DELETE FROM users WHERE id IN (
+                  SELECT lp.user_id FROM lobby_players lp
+                  JOIN users u ON u.id = lp.user_id
+                  WHERE lp.lobby_id = $1 AND u.password_hash IS NULL
+                )`,
+                [lobbyId]
+              );
             } catch (err) {
               console.error('[WS] gameOver DB update error:', err);
             }

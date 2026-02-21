@@ -76,7 +76,7 @@ export const SABOTAGES = [
       reference: 'Exod 13:21',
       mechanic: MECHANIC.HOLD,
       config: {
-        holdDuration: 6,
+        duration: 6,
         label: 'HOLD THE FLAME',
       },
       timeLimit: 20,

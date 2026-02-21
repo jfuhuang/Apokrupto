@@ -12,23 +12,25 @@ router.use(authenticateToken);
 // Get all active lobbies
 router.get('/', async (req, res) => {
   try {
+    const showAll = process.env.NODE_ENV !== 'production' && req.query.all === 'true';
     const result = await pool.query(`
-      SELECT 
+      SELECT
         l.id,
         l.name,
         l.max_players,
         l.created_by,
         l.created_at,
+        l.status,
         u.username as host_username,
         COUNT(lp.user_id) as current_players
       FROM lobbies l
       LEFT JOIN users u ON l.created_by = u.id
       LEFT JOIN lobby_players lp ON l.id = lp.lobby_id
-      WHERE l.status = 'waiting'
+      ${showAll ? '' : "WHERE l.status = 'waiting'"}
       GROUP BY l.id, u.username
       ORDER BY l.created_at DESC
     `);
-    
+
     res.json({ lobbies: result.rows });
   } catch (err) {
     console.error(err);
@@ -492,6 +494,56 @@ if (process.env.NODE_ENV !== 'production') {
     } catch (err) {
       console.error('[DEV] add-dummy error:', err);
       res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  // DEV ONLY — kick any player from a lobby (admin tool, no host restriction)
+  router.post('/:id/kick/:userId', async (req, res) => {
+    const client = await pool.connect();
+    try {
+      const { id, userId } = req.params;
+
+      await client.query('BEGIN');
+
+      const deleteResult = await client.query(
+        'DELETE FROM lobby_players WHERE lobby_id = $1 AND user_id = $2 RETURNING id',
+        [id, userId]
+      );
+      if (deleteResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Player not in this lobby' });
+      }
+
+      // Remove user if they are a bot (null password_hash means they can never log in)
+      await client.query(
+        'DELETE FROM users WHERE id = $1 AND password_hash IS NULL',
+        [userId]
+      );
+
+      // Delete lobby if now empty
+      const remaining = await client.query(
+        'SELECT COUNT(*) as count FROM lobby_players WHERE lobby_id = $1',
+        [id]
+      );
+      const empty = parseInt(remaining.rows[0].count) === 0;
+      if (empty) {
+        await client.query('DELETE FROM lobbies WHERE id = $1', [id]);
+      }
+
+      await client.query('COMMIT');
+
+      if (!empty) {
+        await broadcastLobbyUpdate(id);
+      }
+      console.log(`[DEV] Kicked user ${userId} from lobby ${id}${empty ? ' (lobby closed)' : ''}`);
+
+      res.json({ ok: true, lobbyClosed: empty });
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      console.error('[DEV] kick error:', err);
+      res.status(500).json({ error: 'Server error' });
+    } finally {
+      client.release();
     }
   });
 }

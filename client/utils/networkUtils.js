@@ -5,20 +5,21 @@ import Constants from 'expo-constants';
 // Get the computer's IP address dynamically
 const getNetworkIp = async () => {
   try {
-    // For physical devices, we'll use the Expo development server's IP
-    // which is available in the manifest
+    // SDK 46+: hostUri lives in expoConfig (manifest.extra.expoClient)
+    if (Constants.expoConfig?.hostUri) {
+      return Constants.expoConfig.hostUri.split(':')[0];
+    }
+
+    // Legacy SDK 45 and below
     if (Constants.manifest?.hostUri) {
-      const host = Constants.manifest.hostUri.split(':')[0];
-      return host;
+      return Constants.manifest.hostUri.split(':')[0];
     }
-    
-    // Fallback: try to detect from debugging info
+
+    // Fallback: Metro bundler's host:port, available in development
     if (Constants.debuggerHost) {
-      const host = Constants.debuggerHost.split(':')[0];
-      return host;
+      return Constants.debuggerHost.split(':')[0];
     }
-    
-    // Last resort fallback
+
     return 'localhost';
   } catch (error) {
     console.warn('Failed to detect network IP:', error);

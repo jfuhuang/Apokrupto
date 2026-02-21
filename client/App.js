@@ -44,6 +44,7 @@ export default function App() {
   const [currentPoints, setCurrentPoints] = useState(0);
   const [isAlive, setIsAlive] = useState(true);
   const [gameOverResult, setGameOverResult] = useState(null);
+  const [activeSabotage, setActiveSabotage] = useState(null);
 
   const [fontsLoaded] = useFonts({
     Orbitron_400Regular,
@@ -129,6 +130,7 @@ export default function App() {
   };
 
   const handleRoleRevealComplete = () => {
+    setActiveSabotage(null);
     setCurrentScreen('game');
   };
 
@@ -249,6 +251,8 @@ export default function App() {
             points={currentPoints}
             lobbyId={currentLobbyId}
             token={token}
+            activeSabotage={activeSabotage}
+            onSabotageChange={setActiveSabotage}
             onStartTask={handleStartTask}
             onLogout={handleLogout}
             onGameOver={handleGameOver}

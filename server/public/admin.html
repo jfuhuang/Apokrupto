@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apokrupto Admin</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0f1a;
+      --surface: #131627;
+      --surface2: #1a1e35;
+      --border: #252a45;
+      --blue: #00d4ff;
+      --green: #00ff9f;
+      --red: #dc143c;
+      --yellow: #ffd700;
+      --text: #c8cfe8;
+      --muted: #5a6080;
+      --font: 'Courier New', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--blue);
+      flex-shrink: 0;
+    }
+    .logo {
+      font-size: 1.3rem;
+      font-weight: bold;
+      letter-spacing: 3px;
+      color: var(--blue);
+      text-transform: uppercase;
+    }
+    .logo span { color: var(--green); }
+    #header-user {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    #header-user strong { color: var(--text); }
+    button {
+      cursor: pointer;
+      font-family: var(--font);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    button:hover:not(:disabled) {
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
+    button.primary { border-color: var(--blue); color: var(--blue); }
+    button.primary:hover:not(:disabled) { background: rgba(0,212,255,.08); }
+    button.danger { border-color: var(--red); color: var(--red); }
+    button.danger:hover:not(:disabled) { background: rgba(220,20,60,.08); }
+    button.success { border-color: var(--green); color: var(--green); }
+    button.success:hover:not(:disabled) { background: rgba(0,255,159,.08); }
+
+    /* ── Main ── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Screens ── */
+    .screen { display: none; flex: 1; flex-direction: column; }
+    .screen.active { display: flex; }
+
+    /* ── Login Screen ── */
+    #screen-login {
+      align-items: center;
+      justify-content: center;
+    }
+    .login-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 40px 48px;
+      width: 360px;
+      max-width: 90vw;
+    }
+    .login-box h2 {
+      font-size: 1rem;
+      letter-spacing: 2px;
+      color: var(--blue);
+      text-transform: uppercase;
+      margin-bottom: 28px;
+      text-align: center;
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+    .field label { font-size: 0.75rem; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+    .field input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.9rem;
+      padding: 8px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus { border-color: var(--blue); }
+    #login-error { color: var(--red); font-size: 0.8rem; min-height: 1.2em; margin-bottom: 10px; }
+    #btn-login { width: 100%; padding: 10px; font-size: 0.9rem; }
+
+    /* ── Lobby List Screen ── */
+    #screen-lobbies { padding: 24px; gap: 16px; }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .toolbar h2 { font-size: 0.9rem; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+    .toolbar-right { display: flex; gap: 10px; align-items: center; }
+    .refresh-indicator { font-size: 0.75rem; color: var(--muted); }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { border-bottom: 1px solid var(--border); }
+    th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 0.72rem;
+      letter-spacing: 1px;
+      color: var(--muted);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    td {
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      border-bottom: 1px solid rgba(37,42,69,.5);
+      vertical-align: middle;
+    }
+    tbody tr:hover { background: rgba(255,255,255,.02); }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border-radius: 2px;
+    }
+    .badge-waiting { background: rgba(0,212,255,.12); color: var(--blue); border: 1px solid rgba(0,212,255,.3); }
+    .badge-in_progress { background: rgba(0,255,159,.12); color: var(--green); border: 1px solid rgba(0,255,159,.3); }
+    .badge-completed { background: rgba(90,96,128,.15); color: var(--muted); border: 1px solid var(--border); }
+
+    .empty-row td { text-align: center; color: var(--muted); padding: 40px; font-size: 0.85rem; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.75);
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 32px 36px;
+      width: 340px;
+      max-width: 90vw;
+    }
+    .modal h3 { font-size: 0.9rem; letter-spacing: 2px; color: var(--blue); text-transform: uppercase; margin-bottom: 24px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+    #modal-error { color: var(--red); font-size: 0.8rem; min-height: 1.2em; margin-bottom: 4px; }
+
+    /* ── Lobby Detail Screen ── */
+    #screen-detail {
+      flex-direction: column;
+      gap: 0;
+      overflow: hidden;
+    }
+    .detail-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .detail-header h2 { font-size: 1rem; letter-spacing: 1px; }
+    .detail-header .badge { font-size: 0.75rem; }
+    .ws-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .ws-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .back-btn { margin-left: auto; }
+
+    .detail-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* Left panel */
+    .panel-left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      min-width: 0;
+      overflow: hidden;
+    }
+    .panel-title {
+      padding: 10px 20px;
+      font-size: 0.72rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    #player-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+    .player-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 20px;
+      transition: background 0.1s;
+    }
+    .player-row:hover { background: rgba(255,255,255,.025); }
+    .avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem;
+      font-weight: bold;
+      color: var(--blue);
+      flex-shrink: 0;
+      text-transform: uppercase;
+    }
+    .player-info { flex: 1; min-width: 0; }
+    .player-name {
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .player-name .host-star { color: var(--yellow); font-size: 0.75rem; }
+    .player-name .conn-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      display: inline-block;
+    }
+    .player-name .conn-dot.on { background: var(--green); }
+    .player-meta {
+      font-size: 0.72rem;
+      color: var(--muted);
+      display: flex;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .role-badge {
+      font-size: 0.65rem;
+      padding: 1px 6px;
+      border-radius: 2px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .role-deceiver { background: rgba(220,20,60,.15); color: var(--red); border: 1px solid rgba(220,20,60,.3); }
+    .role-innocent { background: rgba(0,212,255,.1); color: var(--blue); border: 1px solid rgba(0,212,255,.25); }
+    .player-actions { display: flex; gap: 6px; }
+    .kick-btn { padding: 3px 8px; font-size: 0.7rem; }
+
+    .panel-footer {
+      padding: 12px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    /* Leaderboard */
+    #leaderboard { padding: 8px 20px; }
+    .lb-title {
+      font-size: 0.72rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      padding: 8px 0 4px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 4px;
+    }
+    .lb-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 0.85rem;
+      border-bottom: 1px solid rgba(37,42,69,.4);
+    }
+    .lb-rank { width: 20px; color: var(--muted); font-size: 0.75rem; }
+    .lb-name { flex: 1; }
+    .lb-pts { color: var(--green); font-size: 0.8rem; }
+
+    /* Right panel */
+    .panel-right {
+      width: 340px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      min-width: 0;
+    }
+    @media (max-width: 900px) {
+      .detail-body { flex-direction: column; }
+      .panel-left { border-right: none; border-bottom: 1px solid var(--border); max-height: 50vh; }
+      .panel-right { width: 100%; }
+    }
+
+    .wip-section {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .wip-section:last-child { border-bottom: none; }
+    .wip-label {
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .wip-label::after {
+      content: 'WIP';
+      background: rgba(255,215,0,.1);
+      color: var(--yellow);
+      border: 1px solid rgba(255,215,0,.25);
+      padding: 0 5px;
+      font-size: 0.6rem;
+      border-radius: 2px;
+    }
+    .map-placeholder {
+      background: var(--surface2);
+      border: 1px dashed var(--border);
+      height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    .wip-player-list { display: flex; flex-direction: column; gap: 6px; }
+    .wip-player-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .select-field {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.8rem;
+      padding: 6px 10px;
+      outline: none;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .action-grid button { font-size: 0.72rem; padding: 7px 6px; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 10px 18px;
+      font-size: 0.82rem;
+      color: var(--text);
+      opacity: 0;
+      transition: opacity 0.25s;
+      pointer-events: none;
+      z-index: 200;
+      max-width: 320px;
+    }
+    #toast.show { opacity: 1; }
+    #toast.error { border-color: var(--red); color: var(--red); }
+    #toast.success { border-color: var(--green); color: var(--green); }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">APOKRUPTO <span>ADMIN</span></div>
+  <div id="header-user" style="display:none">
+    <span>Logged in as <strong id="header-username"></strong></span>
+    <button id="btn-logout">Logout</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Screen: Login ── -->
+  <div id="screen-login" class="screen active">
+    <div class="login-box">
+      <h2>Admin Login</h2>
+      <div class="field">
+        <label>Username</label>
+        <input id="login-username" type="text" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input id="login-password" type="password" autocomplete="current-password" />
+      </div>
+      <div id="login-error"></div>
+      <button id="btn-login" class="primary">Sign In</button>
+    </div>
+  </div>
+
+  <!-- ── Screen: Lobby List ── -->
+  <div id="screen-lobbies" class="screen">
+    <div class="toolbar">
+      <h2>Lobbies</h2>
+      <div class="toolbar-right">
+        <span class="refresh-indicator" id="refresh-timer">Refreshing in 5s</span>
+        <button class="primary" id="btn-create">+ Create Lobby</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto; flex:1;">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Players</th>
+            <th>Host</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="lobby-table-body">
+          <tr class="empty-row"><td colspan="6">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Screen: Lobby Detail ── -->
+  <div id="screen-detail" class="screen">
+    <div class="detail-header">
+      <button class="back-btn" style="margin-left:0" id="btn-back">← Back</button>
+      <h2 id="detail-name">Lobby</h2>
+      <span id="detail-badge" class="badge"></span>
+      <span id="detail-players" style="font-size:.8rem;color:var(--muted)"></span>
+      <span class="ws-dot" id="ws-dot" title="Socket.IO connection"></span>
+      <span style="font-size:.72rem;color:var(--muted)" id="ws-label">Connecting...</span>
+    </div>
+
+    <div class="detail-body">
+      <!-- Left: Player list -->
+      <div class="panel-left">
+        <div class="panel-title">Players</div>
+        <div id="player-list"></div>
+        <div id="leaderboard" style="display:none"></div>
+        <div class="panel-footer">
+          <button class="primary" id="btn-add-dummy">+ Add Dummy</button>
+          <button class="success" id="btn-start-game" style="display:none">&#9654; Start Game</button>
+          <div id="game-over-banner" style="display:none;color:var(--yellow);font-size:.85rem;align-self:center"></div>
+        </div>
+      </div>
+
+      <!-- Right: WIP features -->
+      <div class="panel-right">
+        <div class="panel-title">Dev Tools</div>
+
+        <!-- Section A: Location Mocking -->
+        <div class="wip-section">
+          <div class="wip-label">Location Mocking</div>
+          <div class="map-placeholder">GPS Mocking — Coming Soon</div>
+          <div class="wip-player-list" id="gps-player-list"></div>
+        </div>
+
+        <!-- Section B: Action Triggers -->
+        <div class="wip-section">
+          <div class="wip-label">Game Action Injection</div>
+          <select class="select-field" id="action-player-select" disabled>
+            <option value="">Select player...</option>
+          </select>
+          <div class="action-grid">
+            <button disabled>Complete Task</button>
+            <button disabled>Kill Player</button>
+            <button disabled>Report Body</button>
+            <button disabled>Fix Sabotage</button>
+          </div>
+          <p style="font-size:.72rem;color:var(--muted);margin-top:10px;">Game Action Injection — Coming Soon</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── Modal: Create Lobby ── -->
+<div class="modal-overlay" id="modal-create">
+  <div class="modal">
+    <h3>Create Lobby</h3>
+    <div class="field">
+      <label>Lobby Name</label>
+      <input id="new-lobby-name" type="text" placeholder="e.g. Alpha Station" />
+    </div>
+    <div class="field">
+      <label>Max Players (4–15)</label>
+      <input id="new-lobby-max" type="number" min="4" max="15" value="8" />
+    </div>
+    <div id="modal-error"></div>
+    <div class="modal-actions">
+      <button id="btn-modal-cancel">Cancel</button>
+      <button class="primary" id="btn-modal-create">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast"></div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  const state = {
+    token: null,
+    username: null,
+    currentLobby: null, // { id, name, status, hostId, maxPlayers }
+    socket: null,
+    lobbyData: null,    // latest lobbyUpdate payload
+    refreshInterval: null,
+    refreshCountdown: 5,
+  };
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function apiBase() { return window.location.origin; }
+
+  async function apiFetch(path, options = {}) {
+    const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+    if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
+    const res = await fetch(apiBase() + path, { ...options, headers });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+
+  let toastTimer = null;
+  function showToast(msg, type = '') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'show' + (type ? ' ' + type : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = ''; }, 3500);
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ── Screen switching ───────────────────────────────────────────────────────
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + id).classList.add('active');
+  }
+
+  // ── Auth ───────────────────────────────────────────────────────────────────
+  function loadSession() {
+    try {
+      const tok = sessionStorage.getItem('apk_token');
+      const usr = sessionStorage.getItem('apk_username');
+      if (tok && usr) { state.token = tok; state.username = usr; return true; }
+    } catch (_) {}
+    return false;
+  }
+
+  function saveSession(token, username) {
+    state.token = token;
+    state.username = username;
+    sessionStorage.setItem('apk_token', token);
+    sessionStorage.setItem('apk_username', username);
+  }
+
+  function clearSession() {
+    state.token = null;
+    state.username = null;
+    sessionStorage.removeItem('apk_token');
+    sessionStorage.removeItem('apk_username');
+  }
+
+  function setHeaderUser(username) {
+    document.getElementById('header-user').style.display = username ? 'flex' : 'none';
+    document.getElementById('header-username').textContent = username || '';
+  }
+
+  // ── Login ──────────────────────────────────────────────────────────────────
+  document.getElementById('btn-login').addEventListener('click', async () => {
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errEl = document.getElementById('login-error');
+    errEl.textContent = '';
+    if (!username || !password) { errEl.textContent = 'Enter username and password.'; return; }
+    try {
+      const data = await apiFetch('/api/users/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      });
+      saveSession(data.token, data.user?.username || username);
+      setHeaderUser(state.username);
+      showScreen('lobbies');
+      startLobbyRefresh();
+    } catch (err) {
+      errEl.textContent = err.message;
+    }
+  });
+
+  document.getElementById('login-password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btn-login').click();
+  });
+
+  document.getElementById('btn-logout').addEventListener('click', () => {
+    disconnectSocket();
+    stopLobbyRefresh();
+    clearSession();
+    setHeaderUser(null);
+    showScreen('login');
+  });
+
+  // ── Lobby List ─────────────────────────────────────────────────────────────
+  async function fetchLobbies() {
+    try {
+      const data = await apiFetch('/api/lobbies?all=true');
+      renderLobbyTable(data.lobbies || []);
+    } catch (err) {
+      console.error('fetchLobbies error:', err);
+    }
+  }
+
+  function renderLobbyTable(lobbies) {
+    const tbody = document.getElementById('lobby-table-body');
+    if (lobbies.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No active lobbies</td></tr>';
+      return;
+    }
+    tbody.innerHTML = lobbies.map(l => {
+      const status = l.status || 'waiting';
+      return `
+      <tr>
+        <td>${escHtml(l.name)}</td>
+        <td><span class="badge badge-${status}">${status.replace('_', ' ')}</span></td>
+        <td>${l.current_players} / ${l.max_players}</td>
+        <td>${escHtml(l.host_username || '—')}</td>
+        <td>${formatDate(l.created_at)}</td>
+        <td><button class="primary" onclick="openLobbyDetail(${l.id}, '${escAttr(l.name)}', '${status}', ${l.created_by}, ${l.max_players})">Manage</button></td>
+      </tr>
+    `}).join('');
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function escAttr(s) { return String(s).replace(/'/g, "\\'"); }
+
+  let refreshTimer = null;
+  function startLobbyRefresh() {
+    fetchLobbies();
+    state.refreshCountdown = 5;
+    updateRefreshLabel();
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(() => {
+      state.refreshCountdown--;
+      updateRefreshLabel();
+      if (state.refreshCountdown <= 0) {
+        fetchLobbies();
+        state.refreshCountdown = 5;
+      }
+    }, 1000);
+  }
+  function stopLobbyRefresh() {
+    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+  }
+  function updateRefreshLabel() {
+    const el = document.getElementById('refresh-timer');
+    if (el) el.textContent = `Refreshing in ${state.refreshCountdown}s`;
+  }
+
+  // ── Create Lobby Modal ─────────────────────────────────────────────────────
+  document.getElementById('btn-create').addEventListener('click', () => {
+    document.getElementById('modal-error').textContent = '';
+    document.getElementById('new-lobby-name').value = '';
+    document.getElementById('new-lobby-max').value = '8';
+    document.getElementById('modal-create').classList.add('open');
+    document.getElementById('new-lobby-name').focus();
+  });
+  document.getElementById('btn-modal-cancel').addEventListener('click', () => {
+    document.getElementById('modal-create').classList.remove('open');
+  });
+  document.getElementById('modal-create').addEventListener('click', e => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+  });
+  document.getElementById('btn-modal-create').addEventListener('click', async () => {
+    const name = document.getElementById('new-lobby-name').value.trim();
+    const max_players = parseInt(document.getElementById('new-lobby-max').value, 10);
+    const errEl = document.getElementById('modal-error');
+    errEl.textContent = '';
+    if (!name) { errEl.textContent = 'Name is required.'; return; }
+    if (max_players < 4 || max_players > 15 || isNaN(max_players)) {
+      errEl.textContent = 'Max players must be 4–15.'; return;
+    }
+    try {
+      await apiFetch('/api/lobbies', { method: 'POST', body: JSON.stringify({ name, max_players }) });
+      document.getElementById('modal-create').classList.remove('open');
+      fetchLobbies();
+      showToast('Lobby created', 'success');
+    } catch (err) {
+      errEl.textContent = err.message;
+    }
+  });
+
+  // ── Lobby Detail ───────────────────────────────────────────────────────────
+  function openLobbyDetail(id, name, status, hostId, maxPlayers) {
+    stopLobbyRefresh();
+    state.currentLobby = { id, name, status, hostId, maxPlayers };
+    document.getElementById('detail-name').textContent = name;
+    updateDetailBadge(status);
+    document.getElementById('detail-players').textContent = '';
+    document.getElementById('player-list').innerHTML = '<div style="padding:20px;color:var(--muted);font-size:.85rem;">Connecting...</div>';
+    document.getElementById('leaderboard').style.display = 'none';
+    document.getElementById('game-over-banner').style.display = 'none';
+    document.getElementById('game-over-banner').textContent = '';
+
+    // Show/hide Start Game button
+    const startBtn = document.getElementById('btn-start-game');
+    const myId = getUserIdFromToken(state.token);
+    startBtn.style.display = (status === 'waiting' && String(hostId) === String(myId)) ? 'inline-block' : 'none';
+
+    showScreen('detail');
+    connectSocket(id);
+  }
+
+  function updateDetailBadge(status) {
+    const el = document.getElementById('detail-badge');
+    el.textContent = status.replace('_', ' ');
+    el.className = 'badge badge-' + status;
+    state.currentLobby.status = status;
+  }
+
+  document.getElementById('btn-back').addEventListener('click', () => {
+    disconnectSocket();
+    showScreen('lobbies');
+    startLobbyRefresh();
+  });
+
+  // ── Socket.IO ──────────────────────────────────────────────────────────────
+  function connectSocket(lobbyId) {
+    disconnectSocket();
+    setWsDot(false);
+
+    const socket = io(window.location.origin, {
+      auth: { token: state.token },
+      transports: ['websocket', 'polling'],
+    });
+    state.socket = socket;
+
+    socket.on('connect', () => {
+      setWsDot(true);
+      socket.emit('joinRoom', { lobbyId }, (ack) => {
+        if (ack && ack.error) showToast('joinRoom error: ' + ack.error, 'error');
+      });
+    });
+
+    socket.on('disconnect', () => setWsDot(false));
+    socket.on('connect_error', (err) => {
+      setWsDot(false);
+      showToast('Socket error: ' + err.message, 'error');
+    });
+
+    socket.on('lobbyUpdate', (data) => {
+      state.lobbyData = data;
+      renderPlayers(data);
+      updateDetailBadge(data.status);
+      document.getElementById('detail-players').textContent =
+        `${data.players.length} / ${data.maxPlayers}`;
+
+      // Show Start Game button only if waiting + we are host
+      const myId = getUserIdFromToken(state.token);
+      const startBtn = document.getElementById('btn-start-game');
+      startBtn.style.display = (data.status === 'waiting' && String(data.hostId) === String(myId)) ? 'inline-block' : 'none';
+
+      updateWipPlayerList(data.players);
+    });
+
+    socket.on('gameStarted', (data) => {
+      showToast('Game started!', 'success');
+      state.lobbyData = data;
+      updateDetailBadge('in_progress');
+      renderPlayers(data);
+      document.getElementById('btn-start-game').style.display = 'none';
+      document.getElementById('leaderboard').style.display = 'block';
+      renderLeaderboard(data.players);
+    });
+
+    socket.on('pointsUpdate', (payload) => {
+      if (!payload.leaderboard) return;
+      renderLeaderboard(payload.leaderboard.map(p => ({
+        id: p.user_id, username: p.username, points: p.points
+      })));
+    });
+
+    socket.on('gameOver', (data) => {
+      const banner = document.getElementById('game-over-banner');
+      banner.style.display = 'block';
+      banner.textContent = `Game Over — Winner: ${data.winner} (${data.reason || ''})`;
+      updateDetailBadge('completed');
+    });
+
+    socket.on('lobbyClosed', () => {
+      showToast('Lobby was closed', 'error');
+      disconnectSocket();
+      showScreen('lobbies');
+      startLobbyRefresh();
+    });
+  }
+
+  function disconnectSocket() {
+    if (state.socket) {
+      state.socket.disconnect();
+      state.socket = null;
+    }
+    setWsDot(false);
+  }
+
+  function setWsDot(connected) {
+    const dot = document.getElementById('ws-dot');
+    const label = document.getElementById('ws-label');
+    dot.className = 'ws-dot' + (connected ? ' connected' : '');
+    label.textContent = connected ? 'Live' : 'Disconnected';
+  }
+
+  // ── Player list rendering ──────────────────────────────────────────────────
+  function renderPlayers(data) {
+    const container = document.getElementById('player-list');
+    const myId = getUserIdFromToken(state.token);
+
+    if (!data || !data.players || data.players.length === 0) {
+      container.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:.85rem;">No players</div>';
+      return;
+    }
+
+    container.innerHTML = data.players.map(p => {
+      const initials = p.username.charAt(0).toUpperCase();
+      const isHost = String(p.id) === String(data.hostId);
+      const roleHtml = p.role
+        ? `<span class="role-badge role-${p.role}">${p.role}</span>`
+        : '';
+      const pointsHtml = (p.points !== undefined && p.points !== null)
+        ? `<span style="color:var(--green)">${p.points}pts</span>` : '';
+
+      return `
+        <div class="player-row">
+          <div class="avatar">${initials}</div>
+          <div class="player-info">
+            <div class="player-name">
+              ${escHtml(p.username)}
+              ${isHost ? '<span class="host-star" title="Host">★</span>' : ''}
+              <span class="conn-dot ${p.isConnected ? 'on' : ''}" title="${p.isConnected ? 'Connected' : 'Offline'}"></span>
+              ${roleHtml}
+            </div>
+            <div class="player-meta">${pointsHtml}</div>
+          </div>
+          <div class="player-actions">
+            <button class="kick-btn danger" onclick="kickPlayer(${p.id})">✕ Remove</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderLeaderboard(players) {
+    const el = document.getElementById('leaderboard');
+    const sorted = [...players].sort((a, b) => (b.points || 0) - (a.points || 0));
+    el.innerHTML = '<div class="lb-title">Leaderboard</div>' +
+      sorted.map((p, i) => `
+        <div class="lb-row">
+          <span class="lb-rank">#${i + 1}</span>
+          <span class="lb-name">${escHtml(p.username)}</span>
+          <span class="lb-pts">${p.points || 0} pts</span>
+        </div>
+      `).join('');
+  }
+
+  function updateWipPlayerList(players) {
+    const el = document.getElementById('gps-player-list');
+    el.innerHTML = players.map(p => `
+      <div class="wip-player-row">
+        <span>${escHtml(p.username)}</span>
+        <button disabled style="font-size:.65rem;padding:2px 7px;">Set Position</button>
+      </div>
+    `).join('');
+
+    const sel = document.getElementById('action-player-select');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">Select player...</option>' +
+      players.map(p => `<option value="${p.id}" ${String(p.id) === current ? 'selected' : ''}>${escHtml(p.username)}</option>`).join('');
+  }
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+  async function kickPlayer(userId) {
+    if (!state.currentLobby) return;
+    try {
+      const result = await apiFetch(`/api/lobbies/${state.currentLobby.id}/kick/${userId}`, { method: 'POST' });
+      if (result.lobbyClosed) {
+        showToast('Last player removed — lobby closed', 'success');
+        disconnectSocket();
+        showScreen('lobbies');
+        startLobbyRefresh();
+      } else {
+        showToast('Player removed', 'success');
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  document.getElementById('btn-add-dummy').addEventListener('click', async () => {
+    if (!state.currentLobby) return;
+    try {
+      await apiFetch(`/api/lobbies/${state.currentLobby.id}/add-dummy`, { method: 'POST' });
+      showToast('Dummy added', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  document.getElementById('btn-start-game').addEventListener('click', () => {
+    if (!state.socket || !state.currentLobby) return;
+    state.socket.emit('startGame', { lobbyId: state.currentLobby.id }, (ack) => {
+      if (ack && ack.error) showToast(ack.error, 'error');
+      else showToast('Game started!', 'success');
+    });
+  });
+
+  // ── JWT decode (payload only, no verify) ───────────────────────────────────
+  function getUserIdFromToken(token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.sub;
+    } catch (_) { return null; }
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  if (loadSession()) {
+    setHeaderUser(state.username);
+    showScreen('lobbies');
+    startLobbyRefresh();
+  } else {
+    showScreen('login');
+  }
+</script>
+</body>
+</html>
