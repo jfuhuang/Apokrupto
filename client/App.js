@@ -140,6 +140,11 @@ export default function App() {
     setCurrentScreen('game');
   };
 
+  const handleLobbyGone = () => {
+    setCurrentLobbyId(null);
+    setCurrentScreen('lobbyList');
+  };
+
   const handleStartTask = (task, options = {}) => {
     setCurrentTask(task);
     setCurrentTaskOptions(options);
@@ -257,6 +262,7 @@ export default function App() {
             onStartTask={handleStartTask}
             onLogout={handleLogout}
             onGameOver={handleGameOver}
+            onLobbyGone={handleLobbyGone}
             onDevExit={__DEV__ ? () => setCurrentScreen('devMenu') : undefined}
           />
         );

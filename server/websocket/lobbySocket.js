@@ -227,13 +227,19 @@ function setupLobbySocket(httpServer) {
         console.log(`[WS] User ${socket.userId} joined room lobby:${roomKey}`);
 
         const state = await getLobbyState(lobbyId);
+
+        if (!state) {
+          if (callback) callback({ error: 'Lobby not found' });
+          return;
+        }
+
         console.log(`[WS] Sending lobbyUpdate to lobby:${roomKey}`, {
           playerCount: state?.players?.length,
           roomKey,
         });
         io.to(`lobby:${roomKey}`).emit('lobbyUpdate', state);
 
-        if (callback) callback({ ok: true, totalInnocentPoints: state?.totalInnocentPoints ?? 0 });
+        if (callback) callback({ ok: true, totalInnocentPoints: state.totalInnocentPoints ?? 0 });
       } catch (err) {
         console.error('[WS] joinRoom error:', err);
         if (callback) callback({ error: err.message });

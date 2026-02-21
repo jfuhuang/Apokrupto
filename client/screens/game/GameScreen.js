@@ -26,7 +26,7 @@ const DIFFICULTY_COLOR = {
   hard: colors.state.error,
 };
 
-export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, token, activeSabotage, onSabotageChange, onStartTask, onLogout, onDevExit, onGameOver }) {
+export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, token, activeSabotage, onSabotageChange, onStartTask, onLogout, onDevExit, onGameOver, onLobbyGone }) {
   const [sabotageVisible, setSabotageVisible] = useState(false);
   const [tasksVisible, setTasksVisible] = useState(false);
   const [livePoints, setLivePoints] = useState(points);
@@ -87,10 +87,18 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
 
         socket.on('connect', () => {
           socket.emit('joinRoom', { lobbyId }, (response) => {
+            if (response?.error) {
+              if (onLobbyGone) onLobbyGone();
+              return;
+            }
             if (response?.totalInnocentPoints !== undefined) {
               setLivePoints(response.totalInnocentPoints);
             }
           });
+        });
+
+        socket.on('lobbyClosed', () => {
+          if (onLobbyGone) onLobbyGone();
         });
 
         socket.on('pointsUpdate', (payload) => {
