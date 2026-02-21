@@ -16,6 +16,7 @@ import { typography, fonts } from '../../theme/typography';
 import { getTasksForRole } from '../../data/tasks';
 import { SABOTAGES, getSabotageById, scrambleText } from '../../data/sabotages';
 import { getApiUrl } from '../../utils/networkUtils';
+import { fetchGameState } from '../../utils/api';
 import SabotageOverlay from './SabotageOverlay';
 
 const POINTS_TARGET = 1000;
@@ -29,11 +30,16 @@ const DIFFICULTY_COLOR = {
 export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, token, activeSabotage, onSabotageChange, onStartTask, onLogout, onDevExit, onGameOver, onLobbyGone }) {
   const [sabotageVisible, setSabotageVisible] = useState(false);
   const [tasksVisible, setTasksVisible] = useState(false);
-  const [livePoints, setLivePoints] = useState(points);
+  const [livePoints, setLivePoints] = useState(0);
+  const [localIsAlive, setLocalIsAlive] = useState(isAlive);
   const [secondsLeft, setSecondsLeft] = useState(null);
   const [taskNotif, setTaskNotif] = useState(null); // { username, taskId, pointsEarned }
   const socketRef = useRef(null);
   const myUserIdRef = useRef(null);
+  const activeSabotageRef = useRef(activeSabotage);
+
+  // Keep activeSabotageRef in sync so the poll closure can read current state
+  activeSabotageRef.current = activeSabotage;
 
   // Decode our own user ID from the JWT so we can identify our pointsUpdate events
   useEffect(() => {
@@ -50,7 +56,37 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
   const progress = Math.min(livePoints / POINTS_TARGET, 1);
 
   const isDeceiver = role === 'deceiver';
-  const availableTasks = getTasksForRole(role, isAlive);
+  const availableTasks = getTasksForRole(role, localIsAlive);
+
+  // Poll server for authoritative game state (points, alive status, active sabotage)
+  useEffect(() => {
+    if (!token || !lobbyId) return;
+
+    const poll = async () => {
+      try {
+        const { ok, data } = await fetchGameState(token, lobbyId);
+        if (!ok) return;
+        setLivePoints(data.totalInnocentPoints);
+        const me = data.players.find((p) => String(p.id) === myUserIdRef.current);
+        if (me) setLocalIsAlive(me.isAlive);
+        // Only update sabotage state if it changed or we have no socket-anchored timing
+        const cur = activeSabotageRef.current;
+        const srv = data.activeSabotage;
+        if (!srv) {
+          onSabotageChange(null);
+        } else if (cur?.type !== srv.type || !cur?.clientReceivedAt) {
+          // New sabotage or poll is first to inform us — no clientReceivedAt,
+          // so the countdown will fall back to expiresAt - Date.now()
+          onSabotageChange(srv);
+        }
+        // else: same sabotage already tracked by socket with clientReceivedAt — leave it alone
+      } catch (_) {}
+    };
+
+    poll(); // immediate on mount
+    const interval = setInterval(poll, 10_000);
+    return () => clearInterval(interval);
+  }, [token, lobbyId]);
 
   // Countdown timer for critical sabotages
   useEffect(() => {
@@ -60,7 +96,16 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
     }
 
     const tick = () => {
-      const remaining = Math.max(0, Math.ceil((activeSabotage.expiresAt - Date.now()) / 1000));
+      let remaining;
+      if (activeSabotage.clientReceivedAt && activeSabotage.startedAt) {
+        // Socket-received: elapsed time on THIS device's clock — no clock-drift error
+        const totalDuration = activeSabotage.expiresAt - activeSabotage.startedAt;
+        const elapsed = Date.now() - activeSabotage.clientReceivedAt;
+        remaining = Math.max(0, Math.ceil((totalDuration - elapsed) / 1000));
+      } else {
+        // Poll-received (joined mid-sabotage): server expiresAt is best we have
+        remaining = Math.max(0, Math.ceil((activeSabotage.expiresAt - Date.now()) / 1000));
+      }
       setSecondsLeft(remaining);
     };
 
@@ -112,7 +157,9 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
         });
 
         socket.on('sabotageActive', (payload) => {
-          onSabotageChange(payload);
+          // Stamp clientReceivedAt so the countdown is anchored to this device's
+          // clock rather than the server's, eliminating clock-drift differences.
+          onSabotageChange({ ...payload, clientReceivedAt: Date.now() });
         });
 
         socket.on('sabotageFixed', () => {
@@ -164,7 +211,7 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
     onStartTask && onStartTask(sabotage.fixTask, { isFix: true });
   };
 
-  const canFix = isAlive;
+  const canFix = localIsAlive;
 
   return (
     <View style={styles.container}>
@@ -312,7 +359,7 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
           <Pressable style={styles.modalBackdrop} onPress={() => setTasksVisible(false)}>
             <Pressable style={styles.tasksModalCard}>
               <Text style={styles.tasksModalTitle}>TASKS</Text>
-              {!isAlive && (
+              {!localIsAlive && (
                 <Text style={styles.deadNote}>
                   Dead — only free-roam tasks available (60% points)
                 </Text>
@@ -349,7 +396,7 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
                         </View>
                         <View style={styles.taskRowRight}>
                           <Text style={styles.taskRowPoints}>
-                            {isAlive ? task.points.alive : task.points.dead} pts
+                            {localIsAlive ? task.points.alive : task.points.dead} pts
                           </Text>
                           <Text style={[styles.taskRowDiff, { color: DIFFICULTY_COLOR[task.difficulty] }]}>
                             {task.difficulty}

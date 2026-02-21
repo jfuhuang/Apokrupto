@@ -391,8 +391,9 @@ function setupLobbySocket(httpServer) {
         }
 
         // 5. Store in activeSabotages
-        const expiresAt = sabotage.isCritical ? Date.now() + sabotage.duration * 1000 : null;
-        const entry = { type: sabotageType, isCritical: sabotage.isCritical, expiresAt, label: sabotage.label, timerId: null };
+        const startedAt = Date.now();
+        const expiresAt = sabotage.isCritical ? startedAt + sabotage.duration * 1000 : null;
+        const entry = { type: sabotageType, isCritical: sabotage.isCritical, startedAt, expiresAt, label: sabotage.label, timerId: null };
 
         if (sabotage.isCritical) {
           entry.timerId = setTimeout(async () => {
@@ -421,6 +422,7 @@ function setupLobbySocket(httpServer) {
         io.to(`lobby:${roomKey}`).emit('sabotageActive', {
           type: sabotageType,
           isCritical: sabotage.isCritical,
+          startedAt,
           expiresAt,
           label: sabotage.label,
         });
@@ -468,4 +470,11 @@ function setupLobbySocket(httpServer) {
   return io;
 }
 
-module.exports = { setupLobbySocket, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed };
+function getActiveSabotage(lobbyId) {
+  const entry = activeSabotages.get(String(lobbyId));
+  if (!entry) return null;
+  const { timerId, ...rest } = entry; // strip non-serialisable timer handle
+  return rest;
+}
+
+module.exports = { setupLobbySocket, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage };

@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const authenticateToken = require('../middleware/auth');
-const { broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed } = require('../websocket/lobbySocket');
+const { broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage } = require('../websocket/lobbySocket');
 const { getTask } = require('../data/tasks');
 
 const router = express.Router();
@@ -65,6 +65,41 @@ router.get('/current', async (req, res) => {
     res.json({ lobby: result.rows[0] || null });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Authoritative game state for in-progress polling
+router.get('/:id/gamestate', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.username, lp.is_alive, lp.points, lp.role
+       FROM lobby_players lp
+       JOIN users u ON u.id = lp.user_id
+       WHERE lp.lobby_id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Lobby not found' });
+    }
+
+    const totalInnocentPoints = result.rows
+      .filter((p) => p.role === 'innocent')
+      .reduce((sum, p) => sum + parseInt(p.points || 0), 0);
+
+    res.json({
+      totalInnocentPoints,
+      players: result.rows.map((p) => ({
+        id: p.id,
+        username: p.username,
+        isAlive: p.is_alive,
+      })),
+      activeSabotage: getActiveSabotage(id),
+    });
+  } catch (err) {
+    console.error('[gamestate]', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
