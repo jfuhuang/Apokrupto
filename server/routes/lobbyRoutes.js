@@ -23,7 +23,7 @@ function requireAdmin(req, res, next) {
 // Get all active lobbies
 router.get('/', async (req, res) => {
   try {
-    const showAll = process.env.NODE_ENV !== 'production' && req.query.all === 'true';
+    const showAll = req.query.all === 'true' && ADMIN_USERNAMES.has(req.user.username);
     const result = await pool.query(`
       SELECT
         l.id,
