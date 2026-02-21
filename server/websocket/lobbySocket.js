@@ -68,12 +68,12 @@ function startIdleLobbyCleaner(io) {
 
   setInterval(async () => {
     try {
-      // Active lobbies with at least one DB player, past the grace period
+      // Only clean up waiting lobbies — never kill an in_progress game
       const result = await pool.query(`
         SELECT l.id
         FROM lobbies l
         JOIN lobby_players lp ON lp.lobby_id = l.id
-        WHERE l.status IN ('waiting', 'in_progress')
+        WHERE l.status = 'waiting'
           AND l.created_at < NOW() - INTERVAL '2 minutes'
         GROUP BY l.id
       `);
@@ -427,18 +427,28 @@ function setupLobbySocket(httpServer) {
       console.log(`[WS] Disconnected: ${socket.id} (user: ${socket.userId})`);
 
       if (currentLobbyId) {
-        const connected = lobbyConnections.get(currentLobbyId);
-        if (connected) {
-          connected.delete(socket.userId);
-          if (connected.size === 0) {
-            lobbyConnections.delete(currentLobbyId);
+        const roomKey = `lobby:${currentLobbyId}`;
+
+        // Only remove from connection tracking if this user has no other
+        // active socket still in the room (handles reconnects / duplicate tabs)
+        const stillConnected = [...io.sockets.sockets.values()].some(
+          (s) => s !== socket && s.userId === socket.userId && s.rooms.has(roomKey)
+        );
+
+        if (!stillConnected) {
+          const connected = lobbyConnections.get(currentLobbyId);
+          if (connected) {
+            connected.delete(socket.userId);
+            if (connected.size === 0) {
+              lobbyConnections.delete(currentLobbyId);
+            }
           }
         }
 
         // Broadcast updated state so other clients see the player dim
         const state = await getLobbyState(currentLobbyId);
         if (state) {
-          io.to(`lobby:${currentLobbyId}`).emit('lobbyUpdate', state);
+          io.to(roomKey).emit('lobbyUpdate', state);
         }
       }
     });
