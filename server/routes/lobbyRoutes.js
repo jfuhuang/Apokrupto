@@ -9,6 +9,17 @@ const router = express.Router();
 // All lobby routes require authentication
 router.use(authenticateToken);
 
+// Admin-only middleware — checks req.user.username against ADMIN_USERNAMES env var
+const ADMIN_USERNAMES = new Set(
+  (process.env.ADMIN_USERNAMES || '').split(',').map(s => s.trim()).filter(Boolean)
+);
+function requireAdmin(req, res, next) {
+  if (!ADMIN_USERNAMES.has(req.user.username)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
 // Get all active lobbies
 router.get('/', async (req, res) => {
   try {
@@ -123,6 +134,9 @@ router.post('/', async (req, res) => {
     
     res.status(201).json({ lobby });
   } catch (err) {
+    if (err.code === '23503') {
+      return res.status(401).json({ error: 'Account not found — please log in again' });
+    }
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
@@ -423,14 +437,14 @@ router.post('/:id/sabotage/fix', async (req, res) => {
   }
 });
 
-// DEV ONLY — add a throwaway dummy player to a lobby for testing
-if (process.env.NODE_ENV !== 'production') {
+// ADMIN — add a throwaway dummy player to a lobby for testing
+{
   const BOT_NAMES = [
     'Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo',
     'Foxtrot', 'Golf', 'Hotel', 'India', 'Juliet',
   ];
 
-  router.post('/:id/add-dummy', async (req, res) => {
+  router.post('/:id/add-dummy', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
 
@@ -488,7 +502,7 @@ if (process.env.NODE_ENV !== 'production') {
 
       // Push live update to anyone already in the room
       await broadcastLobbyUpdate(id);
-      console.log(`[DEV] Added dummy player ${username} to lobby ${id}`);
+      console.log(`[ADMIN] Added dummy player ${username} to lobby ${id} (by ${req.user.username})`);
 
       res.json({ player: dummy });
     } catch (err) {
@@ -497,8 +511,8 @@ if (process.env.NODE_ENV !== 'production') {
     }
   });
 
-  // DEV ONLY — kick any player from a lobby (admin tool, no host restriction)
-  router.post('/:id/kick/:userId', async (req, res) => {
+  // ADMIN — kick any player from a lobby
+  router.post('/:id/kick/:userId', requireAdmin, async (req, res) => {
     const client = await pool.connect();
     try {
       const { id, userId } = req.params;
@@ -535,7 +549,7 @@ if (process.env.NODE_ENV !== 'production') {
       if (!empty) {
         await broadcastLobbyUpdate(id);
       }
-      console.log(`[DEV] Kicked user ${userId} from lobby ${id}${empty ? ' (lobby closed)' : ''}`);
+      console.log(`[ADMIN] Kicked user ${userId} from lobby ${id}${empty ? ' (lobby closed)' : ''} (by ${req.user.username})`);
 
       res.json({ ok: true, lobbyClosed: empty });
     } catch (err) {

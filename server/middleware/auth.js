@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const pool = require('../db');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -7,7 +8,7 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
-function authenticateToken(req, res, next) {
+async function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -15,13 +16,22 @@ function authenticateToken(req, res, next) {
     return res.status(401).json({ error: 'Access token required' });
   }
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
-    }
-    req.user = user; // { sub: userId, username: 'username' }
-    next();
-  });
+  let user;
+  try {
+    user = jwt.verify(token, JWT_SECRET);
+  } catch {
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
+
+  // Verify the user still exists in the DB (guards against stale tokens
+  // after a DB wipe or account deletion)
+  const { rows } = await pool.query('SELECT id FROM users WHERE id = $1', [user.sub]);
+  if (rows.length === 0) {
+    return res.status(401).json({ error: 'Account not found — please log in again' });
+  }
+
+  req.user = user; // { sub: userId, username: 'username' }
+  next();
 }
 
 module.exports = authenticateToken;

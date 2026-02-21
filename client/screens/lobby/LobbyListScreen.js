@@ -166,7 +166,13 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
 
     setIsCreating(true);
     try {
-      const { ok, data } = await apiCreateLobby(token, newLobbyName.trim(), players);
+      const { ok, status, data } = await apiCreateLobby(token, newLobbyName.trim(), players);
+
+      if (status === 401 || status === 403) {
+        Alert.alert('Session Expired', 'Please login again.');
+        handleLogout();
+        return;
+      }
 
       if (ok) {
         setShowCreateModal(false);
