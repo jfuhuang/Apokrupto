@@ -31,7 +31,7 @@ async function getLobbyState(lobbyId) {
   const lobby = lobbyResult.rows[0];
 
   const playersResult = await pool.query(
-    `SELECT u.id, u.username
+    `SELECT u.id, u.username, lp.points, lp.role
      FROM lobby_players lp
      JOIN users u ON lp.user_id = u.id
      WHERE lp.lobby_id = $1
@@ -48,6 +48,10 @@ async function getLobbyState(lobbyId) {
     isConnected: connected.has(String(p.id)),
   }));
 
+  const totalInnocentPoints = playersResult.rows
+    .filter((p) => p.role === 'innocent')
+    .reduce((sum, p) => sum + parseInt(p.points || 0), 0);
+
   return {
     lobbyId: lobby.id,
     name: lobby.name,
@@ -55,6 +59,7 @@ async function getLobbyState(lobbyId) {
     status: lobby.status,
     hostId: lobby.created_by,
     players,
+    totalInnocentPoints,
   };
 }
 
@@ -228,7 +233,7 @@ function setupLobbySocket(httpServer) {
         });
         io.to(`lobby:${roomKey}`).emit('lobbyUpdate', state);
 
-        if (callback) callback({ ok: true });
+        if (callback) callback({ ok: true, totalInnocentPoints: state?.totalInnocentPoints ?? 0 });
       } catch (err) {
         console.error('[WS] joinRoom error:', err);
         if (callback) callback({ error: err.message });

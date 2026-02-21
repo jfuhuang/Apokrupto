@@ -358,9 +358,9 @@ router.post('/:id/tasks/complete', async (req, res) => {
     );
     const totalPoints = updateResult.rows[0].points;
 
-    // 6. Build leaderboard for the socket event
+    // 6. Build leaderboard and total innocent points for the socket event
     const leaderboardResult = await client.query(
-      `SELECT u.id AS user_id, u.username, lp.points
+      `SELECT u.id AS user_id, u.username, lp.points, lp.role
        FROM lobby_players lp
        JOIN users u ON u.id = lp.user_id
        WHERE lp.lobby_id = $1
@@ -368,6 +368,9 @@ router.post('/:id/tasks/complete', async (req, res) => {
       [id]
     );
     const leaderboard = leaderboardResult.rows;
+    const totalInnocentPoints = leaderboard
+      .filter((r) => r.role === 'innocent')
+      .reduce((sum, r) => sum + parseInt(r.points), 0);
 
     await client.query('COMMIT');
 
@@ -378,6 +381,7 @@ router.post('/:id/tasks/complete', async (req, res) => {
       taskId,
       pointsEarned,
       totalPoints,
+      totalInnocentPoints,
       leaderboard,
     });
 

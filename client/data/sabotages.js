@@ -98,7 +98,7 @@ export const SABOTAGES = [
       reference: 'Gen 41:56',
       mechanic: MECHANIC.RAPID_TAP,
       config: {
-        tapsRequired: 40,
+        targetTaps: 40,
         timeLimit: 15,
         label: 'DISTRIBUTE',
       },

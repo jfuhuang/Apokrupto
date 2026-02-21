@@ -31,7 +31,18 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
   const [tasksVisible, setTasksVisible] = useState(false);
   const [livePoints, setLivePoints] = useState(points);
   const [secondsLeft, setSecondsLeft] = useState(null);
+  const [taskNotif, setTaskNotif] = useState(null); // { username, taskId, pointsEarned }
   const socketRef = useRef(null);
+  const myUserIdRef = useRef(null);
+
+  // Decode our own user ID from the JWT so we can identify our pointsUpdate events
+  useEffect(() => {
+    if (!token) return;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      myUserIdRef.current = String(payload.sub);
+    } catch (_) {}
+  }, [token]);
 
   // TODO: replace with real proximity check
   const canKill = true;
@@ -40,11 +51,6 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
 
   const isDeceiver = role === 'deceiver';
   const availableTasks = getTasksForRole(role, isAlive);
-
-  // Keep livePoints in sync with prop (when TaskScreen calls onComplete → App updates points → re-render)
-  useEffect(() => {
-    setLivePoints(points);
-  }, [points]);
 
   // Countdown timer for critical sabotages
   useEffect(() => {
@@ -80,13 +86,21 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
         socketRef.current = socket;
 
         socket.on('connect', () => {
-          socket.emit('joinRoom', { lobbyId });
+          socket.emit('joinRoom', { lobbyId }, (response) => {
+            if (response?.totalInnocentPoints !== undefined) {
+              setLivePoints(response.totalInnocentPoints);
+            }
+          });
         });
 
         socket.on('pointsUpdate', (payload) => {
-          if (String(payload.userId) === String(socket.userId)) {
-            setLivePoints(payload.totalPoints);
+          // Update the shared innocent points total for all players
+          if (payload.totalInnocentPoints !== undefined) {
+            setLivePoints(payload.totalInnocentPoints);
           }
+          // Show a brief notification for every player's completion
+          setTaskNotif({ username: payload.username, pointsEarned: payload.pointsEarned });
+          setTimeout(() => setTaskNotif(null), 3000);
         });
 
         socket.on('sabotageActive', (payload) => {
@@ -178,6 +192,15 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
             canFix={canFix}
             onPressFix={handlePressFix}
           />
+        )}
+
+        {/* ── Task completion notification ── */}
+        {taskNotif && (
+          <View style={styles.taskNotif}>
+            <Text style={styles.taskNotifText}>
+              {taskNotif.username}  +{taskNotif.pointsEarned} pts
+            </Text>
+          </View>
         )}
 
         {/* ── Bottom action bar ── */}
@@ -436,6 +459,25 @@ const styles = StyleSheet.create({
     color: colors.text.disabled,
     marginTop: 5,
     letterSpacing: 0.5,
+  },
+
+  // ── Task notification ────────────────────────────────────────────────────
+  taskNotif: {
+    marginHorizontal: 12,
+    marginBottom: 6,
+    backgroundColor: 'rgba(0, 255, 159, 0.12)',
+    borderWidth: 1,
+    borderColor: colors.accent.neonGreen,
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+  },
+  taskNotifText: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 13,
+    color: colors.accent.neonGreen,
+    letterSpacing: 1,
   },
 
   // ── Action bar ───────────────────────────────────────────────────────────

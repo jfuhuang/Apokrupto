@@ -148,6 +148,7 @@ export default function App() {
 
   const handleTaskComplete = (taskId, pts) => {
     setCurrentPoints((prev) => prev + pts);
+    if (currentTaskOptions?.isFix) setActiveSabotage(null);
     setCurrentScreen('game');
   };
 
