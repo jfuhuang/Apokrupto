@@ -440,6 +440,22 @@ function setupLobbySocket(httpServer) {
       }
     });
 
+    // GM advances the game to the next movement/phase
+    socket.on('gmAdvance', async ({ gameId } = {}, callback) => {
+      try {
+        // When the full game state machine is built, this will advance the movement.
+        // For now, emit a movementStart placeholder so clients can react.
+        if (currentLobbyId) {
+          io.to(`lobby:${currentLobbyId}`).emit('movementStart', { gameId, advancedBy: socket.userId });
+          console.log(`[WS] gmAdvance emitted for game ${gameId} in lobby ${currentLobbyId} by user ${socket.userId}`);
+        }
+        if (callback) callback({ ok: true });
+      } catch (err) {
+        console.error('[WS] gmAdvance error:', err);
+        if (callback) callback({ error: 'Server error' });
+      }
+    });
+
     // Clean up on disconnect
     socket.on('disconnect', async () => {
       console.log(`[WS] Disconnected: ${socket.id} (user: ${socket.userId})`);
@@ -482,4 +498,6 @@ function getActiveSabotage(lobbyId) {
   return rest;
 }
 
-module.exports = { setupLobbySocket, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage, broadcastPlayerKicked };
+function getIO() { return _io; }
+
+module.exports = { setupLobbySocket, getIO, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage, broadcastPlayerKicked };

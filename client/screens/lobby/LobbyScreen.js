@@ -7,8 +7,6 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  Switch,
-  Modal,
   Pressable,
   useWindowDimensions,
   Animated,
@@ -37,7 +35,7 @@ function parseJwt(token) {
   }
 }
 
-export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, onRoleAssigned, onGameStarted, onRejoinGame, showTaskNotif, onShowTaskNotifChange }) {
+export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, onRoleAssigned, onGameStarted, onRejoinGame }) {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
 
@@ -45,7 +43,6 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
   const [lobbyInfo, setLobbyInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [socketConnected, setSocketConnected] = useState(false);
-  const [settingsVisible, setSettingsVisible] = useState(false);
 
   const myUserId = useRef(String(parseJwt(token).sub));
   const socketRef = useRef(null);
@@ -163,8 +160,8 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
         setIsLoading(false);
       });
 
-      socket.on('roleAssigned', ({ role, fellowDeceivers }) => {
-        if (onRoleAssigned) onRoleAssigned(role, fellowDeceivers || []);
+      socket.on('roleAssigned', ({ team, skotiaTeammates }) => {
+        if (onRoleAssigned) onRoleAssigned(team, skotiaTeammates || []);
       });
 
       socket.on('gameStarted', () => {
@@ -282,7 +279,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
   };
 
   const isHost = lobbyInfo ? String(lobbyInfo.hostId ?? lobbyInfo.created_by) === myUserId.current : false;
-  const canStart = isHost && players.length >= 4;
+  const canStart = isHost && players.length >= 5;
 
   if (isLoading) {
     return (
@@ -298,12 +295,6 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={[styles.header, isLandscape && styles.headerLandscape]}>
-          {/* Left: settings gear */}
-          <TouchableOpacity style={styles.settingsButton} onPress={() => setSettingsVisible(true)}>
-            <Text style={styles.settingsGear}>⚙</Text>
-            <Text style={styles.settingsGearLabel}>Settings</Text>
-          </TouchableOpacity>
-
           {/* Center: title + lobby info */}
           <View style={styles.headerCenter}>
             <Animated.Text style={[styles.title, { transform: [{ translateY: floatAnim }] }]}>
@@ -391,9 +382,9 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
 
           {/* Footer: waiting text + action buttons on one row */}
           <View style={styles.windowFooter}>
-            {players.length < 4 && (
+            {players.length < 5 && (
               <Text style={styles.waitingText} numberOfLines={2}>
-                Waiting for {4 - players.length} more player{4 - players.length !== 1 ? 's' : ''} to start
+                Waiting for {5 - players.length} more player{5 - players.length !== 1 ? 's' : ''} to start
               </Text>
             )}
             <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveLobby}>
@@ -412,41 +403,6 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
           </View>
         </View>
 
-        {/* Settings modal */}
-        <Modal
-          visible={settingsVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setSettingsVisible(false)}
-        >
-          <Pressable style={styles.modalOverlay} onPress={() => setSettingsVisible(false)}>
-            <Pressable style={styles.modalContainer} onPress={() => {}}>
-              <Text style={styles.modalTitle}>SETTINGS</Text>
-
-              {!isHost && (
-                <Text style={styles.modalHostNote}>Only the host can change settings</Text>
-              )}
-
-              <View style={styles.modalRow}>
-                <View style={styles.modalRowLabels}>
-                  <Text style={styles.modalRowLabel}>Task completion alerts</Text>
-                  <Text style={styles.modalRowHint}>Shows who completed a task — reveals identities</Text>
-                </View>
-                <Switch
-                  value={showTaskNotif}
-                  onValueChange={isHost ? onShowTaskNotifChange : undefined}
-                  disabled={!isHost}
-                  trackColor={{ false: colors.background.frost, true: colors.accent.neonGreen }}
-                  thumbColor={colors.text.primary}
-                />
-              </View>
-
-              <TouchableOpacity style={styles.modalCloseButton} onPress={() => setSettingsVisible(false)}>
-                <Text style={styles.modalCloseText}>CLOSE</Text>
-              </TouchableOpacity>
-            </Pressable>
-          </Pressable>
-        </Modal>
       </SafeAreaView>
     </View>
   );

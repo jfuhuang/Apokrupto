@@ -5,12 +5,14 @@ const app = express(); // Create an Express application instance
 const port = process.env.PORT || 3000; // Define the port number
 const userRoutes = require('./routes/userRoutes');
 const lobbyRoutes = require('./routes/lobbyRoutes');
+const gameRoutes = require('./routes/gameRoutes');
 const { setupLobbySocket } = require('./websocket/lobbySocket');
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/users', userRoutes);
 app.use('/api/lobbies', lobbyRoutes);
+app.use('/api/games', gameRoutes);
 
 app.get('/', (req, res) => {
   res.send('Apokrupto Server - Lobby & Realtime System Active');

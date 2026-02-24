@@ -1,0 +1,565 @@
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { io } from 'socket.io-client';
+import { getApiUrl } from '../../config';
+import { colors } from '../../theme/colors';
+import { typography, fonts } from '../../theme/typography';
+
+const TURN_TIME_LIMIT = 30;
+
+// phase: 'waiting_turn' | 'my_turn' | 'waiting_others' | 'deliberation'
+
+export default function MovementAScreen({
+  token,
+  gameId,
+  groupId,
+  currentUserId,
+  currentTeam,
+  roundNumber,
+  groupMembers,
+  onMovementComplete,
+}) {
+  const [phase, setPhase] = useState('waiting_turn');
+  const [prompt, setPrompt] = useState('');
+  const [myWord, setMyWord] = useState('');
+  const [wordInput, setWordInput] = useState('');
+  const [currentTurnPlayerId, setCurrentTurnPlayerId] = useState(null);
+  const [currentTurnPlayerName, setCurrentTurnPlayerName] = useState('');
+  const [completedCount, setCompletedCount] = useState(0);
+  const [turnSecondsLeft, setTurnSecondsLeft] = useState(TURN_TIME_LIMIT);
+  const [allWords, setAllWords] = useState([]);
+  const [deliberationSecondsLeft, setDeliberationSecondsLeft] = useState(120);
+  const [submitting, setSubmitting] = useState(false);
+
+  const socketRef = useRef(null);
+  const turnTimerRef = useRef(null);
+  const deliberationTimerRef = useRef(null);
+
+  // Fetch prompt on mount (server returns team-specific prompt via JWT)
+  useEffect(() => {
+    const fetchPrompt = async () => {
+      try {
+        const baseUrl = await getApiUrl();
+        const res = await fetch(`${baseUrl}/api/games/${gameId}/movement-a/prompt`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.prompt) setPrompt(data.prompt);
+      } catch (err) {
+        console.warn('[MovementA] Could not fetch prompt:', err.message);
+        setPrompt('Think of a word that fits your theme.');
+      }
+    };
+    if (gameId) fetchPrompt();
+  }, [gameId, token]);
+
+  // Socket connection
+  useEffect(() => {
+    let socket;
+
+    const connect = async () => {
+      const baseUrl = await getApiUrl();
+      socket = io(baseUrl, {
+        auth: { token },
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+      });
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        socket.emit('joinRoom', { lobbyId: groupId });
+      });
+
+      // Server announces whose turn it is
+      socket.on('turnStart', ({ currentPlayerId, completedCount: cc, timeLimit }) => {
+        clearInterval(turnTimerRef.current);
+        setCurrentTurnPlayerId(currentPlayerId);
+        setCompletedCount(cc);
+
+        const name = groupMembers?.find((m) => String(m.id) === String(currentPlayerId))?.username || 'Someone';
+        setCurrentTurnPlayerName(name);
+
+        const limit = timeLimit || TURN_TIME_LIMIT;
+        setTurnSecondsLeft(limit);
+
+        if (String(currentPlayerId) === String(currentUserId)) {
+          setPhase('my_turn');
+        } else {
+          setPhase('waiting_turn');
+        }
+
+        // Countdown for current turn
+        let secs = limit;
+        turnTimerRef.current = setInterval(() => {
+          secs -= 1;
+          setTurnSecondsLeft(secs);
+          if (secs <= 0) {
+            clearInterval(turnTimerRef.current);
+            // If it's still our turn and we haven't submitted, auto-submit blank
+            if (String(currentPlayerId) === String(currentUserId)) {
+              handleSubmit('');
+            }
+          }
+        }, 1000);
+      });
+
+      // All players submitted — show words for deliberation
+      socket.on('deliberationStart', ({ words }) => {
+        clearInterval(turnTimerRef.current);
+        setAllWords(words || []);
+        setPhase('deliberation');
+
+        let secs = 120;
+        setDeliberationSecondsLeft(secs);
+        deliberationTimerRef.current = setInterval(() => {
+          secs -= 1;
+          setDeliberationSecondsLeft(secs);
+          if (secs <= 0) clearInterval(deliberationTimerRef.current);
+        }, 1000);
+      });
+
+      // GM advanced to next movement
+      socket.on('movementAComplete', () => {
+        clearInterval(deliberationTimerRef.current);
+        if (onMovementComplete) onMovementComplete();
+      });
+
+      socket.on('connect_error', (err) => console.warn('[MovementA] Socket error:', err.message));
+    };
+
+    connect().catch(console.error);
+
+    return () => {
+      clearInterval(turnTimerRef.current);
+      clearInterval(deliberationTimerRef.current);
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, [gameId, groupId, token, currentUserId]);
+
+  const handleSubmit = async (word) => {
+    const finalWord = (word ?? wordInput).trim();
+    if (submitting) return;
+    setSubmitting(true);
+    clearInterval(turnTimerRef.current);
+    setMyWord(finalWord);
+    setPhase('waiting_others');
+
+    try {
+      const baseUrl = await getApiUrl();
+      await fetch(`${baseUrl}/api/games/${gameId}/movement-a/submit`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word: finalWord }),
+      });
+    } catch (err) {
+      console.warn('[MovementA] Submit error:', err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const total = groupMembers?.length || 5;
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const renderPhase = () => {
+    if (phase === 'waiting_turn') {
+      return (
+        <View style={styles.phaseContainer}>
+          <Text style={styles.promptLabel}>YOUR PROMPT</Text>
+          <View style={styles.promptBox}>
+            <Text style={styles.promptText}>{prompt || '...'}</Text>
+          </View>
+          <Text style={styles.promptHint}>Think of your word while you wait.</Text>
+
+          <View style={styles.turnIndicator}>
+            <Text style={styles.turnIndicatorName}>{currentTurnPlayerName} is choosing...</Text>
+            <Text style={styles.turnTimer}>{turnSecondsLeft}s</Text>
+          </View>
+
+          <View style={styles.progressRow}>
+            <Text style={styles.progressText}>{completedCount} of {total} chosen</Text>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${(completedCount / total) * 100}%` }]} />
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (phase === 'my_turn') {
+      return (
+        <KeyboardAvoidingView
+          style={styles.phaseContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <Text style={styles.yourTurnLabel}>YOUR TURN</Text>
+          <View style={[styles.timerCircle, turnSecondsLeft <= 10 && styles.timerCircleUrgent]}>
+            <Text style={[styles.timerValue, turnSecondsLeft <= 10 && { color: colors.primary.neonRed }]}>
+              {turnSecondsLeft}
+            </Text>
+          </View>
+
+          <Text style={styles.promptLabel}>YOUR PROMPT</Text>
+          <View style={styles.promptBox}>
+            <Text style={styles.promptText}>{prompt || '...'}</Text>
+          </View>
+
+          <TextInput
+            style={styles.wordInput}
+            placeholder="Type one word..."
+            placeholderTextColor={colors.text.placeholder}
+            value={wordInput}
+            onChangeText={setWordInput}
+            autoFocus
+            maxLength={30}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="done"
+            onSubmitEditing={() => handleSubmit()}
+          />
+
+          <TouchableOpacity
+            style={[styles.submitBtn, !wordInput.trim() && styles.submitBtnDisabled]}
+            onPress={() => handleSubmit()}
+            disabled={!wordInput.trim() || submitting}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.submitBtnText}>SUBMIT</Text>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      );
+    }
+
+    if (phase === 'waiting_others') {
+      return (
+        <View style={styles.phaseContainer}>
+          <Text style={styles.myWordLabel}>YOU CHOSE</Text>
+          <Text style={styles.myWordDisplay}>{myWord || '—'}</Text>
+
+          <Text style={styles.waitingLabel}>Waiting for the group...</Text>
+
+          <View style={styles.progressRow}>
+            <Text style={styles.progressText}>{completedCount} of {total} chosen</Text>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${(completedCount / total) * 100}%` }]} />
+            </View>
+          </View>
+
+          {currentTurnPlayerName ? (
+            <Text style={styles.turnIndicatorName}>{currentTurnPlayerName} is choosing...</Text>
+          ) : null}
+        </View>
+      );
+    }
+
+    if (phase === 'deliberation') {
+      return (
+        <View style={styles.phaseContainer}>
+          <Text style={styles.deliberationTitle}>DISCUSS</Text>
+          <Text style={styles.deliberationHint}>
+            One of these words may not belong. Talk it over.
+          </Text>
+
+          <View style={styles.wordList}>
+            {allWords.map((word, i) => (
+              <View key={i} style={styles.wordItem}>
+                <Text style={styles.wordItemText}>{word}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.deliberationTimerRow}>
+            <Text style={styles.deliberationTimerLabel}>Time remaining</Text>
+            <Text style={[
+              styles.deliberationTimerValue,
+              deliberationSecondsLeft <= 30 && { color: colors.accent.amber },
+            ]}>
+              {Math.floor(deliberationSecondsLeft / 60)}:{String(deliberationSecondsLeft % 60).padStart(2, '0')}
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    return null;
+  };
+
+  return (
+    <View style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <Text style={styles.headerLabel}>MOVEMENT A — DEDUCTION</Text>
+          <Text style={styles.headerRound}>ROUND {roundNumber}</Text>
+        </View>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {renderPhase()}
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.space,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
+  },
+  headerLabel: {
+    fontFamily: fonts.display.bold,
+    fontSize: 10,
+    letterSpacing: 2,
+    color: colors.primary.electricBlue,
+  },
+  headerRound: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 13,
+    color: colors.text.tertiary,
+    letterSpacing: 1,
+  },
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  phaseContainer: {
+    flex: 1,
+    padding: 24,
+    alignItems: 'center',
+    gap: 20,
+  },
+
+  // Waiting turn
+  promptLabel: {
+    fontFamily: fonts.display.bold,
+    fontSize: 9,
+    letterSpacing: 3,
+    color: colors.text.tertiary,
+  },
+  promptBox: {
+    width: '100%',
+    backgroundColor: colors.background.void,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    padding: 20,
+    alignItems: 'center',
+  },
+  promptText: {
+    ...typography.h2,
+    color: colors.text.primary,
+    textAlign: 'center',
+  },
+  promptHint: {
+    ...typography.small,
+    color: colors.text.muted,
+    textAlign: 'center',
+  },
+  turnIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.background.void,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    width: '100%',
+  },
+  turnIndicatorName: {
+    ...typography.body,
+    color: colors.text.secondary,
+    flex: 1,
+  },
+  turnTimer: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 20,
+    color: colors.accent.amber,
+  },
+  progressRow: {
+    width: '100%',
+    gap: 8,
+  },
+  progressText: {
+    ...typography.small,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: colors.background.frost,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.primary.electricBlue,
+    borderRadius: 2,
+  },
+
+  // My turn
+  yourTurnLabel: {
+    fontFamily: fonts.display.bold,
+    fontSize: 13,
+    letterSpacing: 4,
+    color: colors.primary.electricBlue,
+    textShadowColor: colors.shadow.electricBlue,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  timerCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2,
+    borderColor: colors.primary.electricBlue,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 212, 255, 0.08)',
+  },
+  timerCircleUrgent: {
+    borderColor: colors.primary.neonRed,
+    backgroundColor: 'rgba(255, 51, 102, 0.08)',
+  },
+  timerValue: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 28,
+    color: colors.primary.electricBlue,
+    letterSpacing: 1,
+  },
+  wordInput: {
+    width: '100%',
+    backgroundColor: colors.input.background,
+    borderWidth: 1,
+    borderColor: colors.input.border,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    ...typography.h2,
+    color: colors.text.primary,
+    textAlign: 'center',
+    letterSpacing: 2,
+  },
+  submitBtn: {
+    width: '100%',
+    paddingVertical: 16,
+    backgroundColor: colors.primary.electricBlue,
+    borderRadius: 10,
+    alignItems: 'center',
+    shadowColor: colors.shadow.electricBlue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  submitBtnDisabled: {
+    backgroundColor: colors.background.panel,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  submitBtnText: {
+    fontFamily: fonts.display.bold,
+    fontSize: 14,
+    letterSpacing: 3,
+    color: colors.background.space,
+  },
+
+  // Waiting others
+  myWordLabel: {
+    fontFamily: fonts.display.bold,
+    fontSize: 9,
+    letterSpacing: 3,
+    color: colors.text.tertiary,
+  },
+  myWordDisplay: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 42,
+    color: colors.primary.electricBlue,
+    letterSpacing: 3,
+    textShadowColor: colors.shadow.electricBlue,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
+  },
+  waitingLabel: {
+    ...typography.body,
+    color: colors.text.muted,
+    textAlign: 'center',
+  },
+
+  // Deliberation
+  deliberationTitle: {
+    ...typography.screenTitle,
+    color: colors.primary.electricBlue,
+    textShadowColor: colors.shadow.electricBlue,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 16,
+  },
+  deliberationHint: {
+    ...typography.body,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+  },
+  wordList: {
+    width: '100%',
+    gap: 10,
+  },
+  wordItem: {
+    backgroundColor: colors.background.void,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  wordItemText: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 22,
+    color: colors.text.primary,
+    letterSpacing: 2,
+  },
+  deliberationTimerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  deliberationTimerLabel: {
+    ...typography.small,
+    color: colors.text.tertiary,
+  },
+  deliberationTimerValue: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 20,
+    color: colors.text.primary,
+    letterSpacing: 1,
+  },
+});

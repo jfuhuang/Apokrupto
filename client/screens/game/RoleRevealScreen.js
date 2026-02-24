@@ -13,23 +13,23 @@ const SHARED_STYLE = {
 };
 
 const ROLE_CONFIG = {
-  deceiver: {
-    label: 'DECEIVER',
-    description: 'Eliminate innocents before they complete their tasks.',
+  phos: {
+    label: 'ΦΩΣ',
+    description: 'You are the light. Work with your group to find and mark the Skotia among you.',
     ...SHARED_STYLE,
   },
-  innocent: {
-    label: 'INNOCENT',
-    description: 'Complete your tasks and expose the deceivers.',
+  skotia: {
+    label: 'ΣΚΟΤΊΑ',
+    description: 'You are the darkness. Blend in. The Phos must not discover you.',
     ...SHARED_STYLE,
   },
 };
 
 const AUTO_ADVANCE_MS = 6000;
 
-export default function RoleRevealScreen({ role, fellowDeceivers = [], onRevealComplete }) {
+export default function RoleRevealScreen({ role, skotiaTeammates = [], onRevealComplete }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const config = ROLE_CONFIG[role] || ROLE_CONFIG.innocent;
+  const config = ROLE_CONFIG[role] || ROLE_CONFIG.phos;
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -60,10 +60,10 @@ export default function RoleRevealScreen({ role, fellowDeceivers = [], onRevealC
           </Text>
           <View style={[styles.divider, { backgroundColor: config.accentColor }]} />
           <Text style={styles.description}>{config.description}</Text>
-          {role === 'deceiver' && fellowDeceivers.length > 0 && (
+          {role === 'skotia' && skotiaTeammates.length > 0 && (
             <View style={styles.fellowSection}>
               <Text style={styles.fellowLabel}>YOUR TEAM</Text>
-              {fellowDeceivers.map((name) => (
+              {skotiaTeammates.map((name) => (
                 <Text key={name} style={[styles.fellowName, { color: config.accentColor }]}>
                   {name}
                 </Text>

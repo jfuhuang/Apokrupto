@@ -10,6 +10,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
 
+const MOCK_GROUP = [
+  { id: '101', username: 'Apollos',   isMarked: false },
+  { id: '102', username: 'Priscilla', isMarked: true  },
+  { id: '103', username: 'Barnabas',  isMarked: false },
+  { id: '104', username: 'Lydia',     isMarked: false },
+  { id: '105', username: 'Timothy',   isMarked: false },
+];
+
 const SCREEN_GROUPS = [
   {
     category: 'AUTH',
@@ -26,27 +34,187 @@ const SCREEN_GROUPS = [
     ],
   },
   {
-    category: 'GAME FLOW',
+    category: 'PRE-GAME',
     items: [
       { label: 'Countdown', screen: 'countdown' },
       {
-        label: 'Role Reveal — Deceiver',
+        label: 'Role Reveal — Phos',
         screen: 'roleReveal',
-        params: { role: 'deceiver', fellowDeceivers: ['Alpha', 'Bravo'] },
+        params: { team: 'phos' },
       },
       {
-        label: 'Role Reveal — Innocent',
+        label: 'Role Reveal — Skotia',
         screen: 'roleReveal',
-        params: { role: 'innocent' },
+        params: { team: 'skotia', skotiaTeammates: ['Alpha', 'Bravo', 'Gamma'] },
       },
     ],
   },
   {
-    category: 'GAME',
+    category: 'ROUND FLOW',
     items: [
-      { label: 'Game — Deceiver', screen: 'game', params: { role: 'deceiver', isAlive: true } },
-      { label: 'Game — Innocent (alive)', screen: 'game', params: { role: 'innocent', isAlive: true } },
-      { label: 'Game — Innocent (dead)', screen: 'game', params: { role: 'innocent', isAlive: false } },
+      {
+        label: 'Round Hub — Phos',
+        screen: 'roundHub',
+        params: {
+          team: 'phos',
+          currentRound: 2,
+          totalRounds: 4,
+          isMarked: false,
+          currentGroupMembers: MOCK_GROUP,
+          teamPoints: { phos: 12, skotia: 6 },
+        },
+      },
+      {
+        label: 'Round Hub — Skotia',
+        screen: 'roundHub',
+        params: {
+          team: 'skotia',
+          currentRound: 2,
+          totalRounds: 4,
+          isMarked: false,
+          currentGroupMembers: MOCK_GROUP,
+          teamPoints: { phos: 12, skotia: 6 },
+        },
+      },
+      {
+        label: 'Round Hub — Phos (marked)',
+        screen: 'roundHub',
+        params: {
+          team: 'phos',
+          currentRound: 3,
+          totalRounds: 4,
+          isMarked: true,
+          currentGroupMembers: MOCK_GROUP,
+          teamPoints: { phos: 8, skotia: 14 },
+        },
+      },
+      {
+        label: 'Movement A — Word Prompt',
+        screen: 'movementA',
+        params: {
+          team: 'phos',
+          currentRound: 1,
+          currentGroupMembers: MOCK_GROUP,
+        },
+      },
+      {
+        label: 'Voting — Movement C',
+        screen: 'movementC',
+        params: {
+          team: 'phos',
+          currentRound: 2,
+          currentGroupMembers: MOCK_GROUP,
+        },
+      },
+      {
+        label: 'Round Summary — Mid Game',
+        screen: 'roundSummary',
+        params: {
+          currentRound: 2,
+          totalRounds: 4,
+          roundSummary: { marksApplied: 3, unmarksApplied: 1, phosPoints: 6, skotiaPoints: 2 },
+        },
+      },
+      {
+        label: 'Round Summary — Final Round',
+        screen: 'roundSummary',
+        params: {
+          currentRound: 4,
+          totalRounds: 4,
+          roundSummary: { marksApplied: 2, unmarksApplied: 2, phosPoints: 4, skotiaPoints: 4 },
+        },
+      },
+    ],
+  },
+  {
+    category: 'GM',
+    items: [
+      {
+        label: 'GM Dashboard',
+        screen: 'gmDashboard',
+        params: { isGm: true },
+      },
+    ],
+  },
+  {
+    category: 'GAME OVER',
+    items: [
+      {
+        label: 'Game Over — Phos Win (Points)',
+        screen: 'gameOver',
+        params: {
+          gameOverResult: {
+            winner: 'phos',
+            condition: 'points',
+            phosPoints: 48,
+            skotiaPoints: 22,
+            skotiaPlayers: ['Judas', 'Ananias', 'Demas'],
+          },
+        },
+      },
+      {
+        label: 'Game Over — Phos Win (Deduction)',
+        screen: 'gameOver',
+        params: {
+          gameOverResult: {
+            winner: 'phos',
+            condition: 'deduction',
+            phosPoints: 30,
+            skotiaPoints: 18,
+            skotiaPlayers: ['Judas', 'Ananias', 'Demas'],
+          },
+        },
+      },
+      {
+        label: 'Game Over — Skotia Win',
+        screen: 'gameOver',
+        params: {
+          gameOverResult: {
+            winner: 'skotia',
+            condition: 'points',
+            phosPoints: 20,
+            skotiaPoints: 45,
+            skotiaPlayers: ['Judas', 'Ananias', 'Demas'],
+          },
+        },
+      },
+    ],
+  },
+  {
+    category: 'TASKS',
+    items: [
+      {
+        label: 'Task — Cipher (Operator)',
+        screen: 'task',
+        params: {
+          team: 'phos',
+          currentTask: {
+            type: 'cipher',
+            config: {
+              cipherRole: 'operator',
+              encodedText: 'KHOOR ZRUOG',
+              shiftKey: 3,
+              partnerName: 'Priscilla',
+            },
+          },
+        },
+      },
+      {
+        label: 'Task — Cipher (Manual Holder)',
+        screen: 'task',
+        params: {
+          team: 'phos',
+          currentTask: {
+            type: 'cipher',
+            config: {
+              cipherRole: 'manual',
+              encodedText: 'KHOOR ZRUOG',
+              shiftKey: 3,
+              partnerName: 'Apollos',
+            },
+          },
+        },
+      },
     ],
   },
 ];

@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apokrupto — GM Dashboard</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0f1a;
+      --surface:   #131627;
+      --surface2:  #1a1e35;
+      --border:    #252a45;
+      --blue:      #00d4ff;
+      --blue-dim:  rgba(0, 212, 255, 0.12);
+      --red:       #dc143c;
+      --red-dim:   rgba(220, 20, 60, 0.12);
+      --green:     #00ff9f;
+      --amber:     #ffd700;
+      --text:      #c8cfe8;
+      --muted:     #5a6080;
+      --disabled:  #3a3f5c;
+      --font:      'Courier New', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .logo {
+      font-size: 1rem;
+      font-weight: bold;
+      letter-spacing: 4px;
+      color: var(--blue);
+      text-transform: uppercase;
+    }
+    .header-center {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.75rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    #round-badge {
+      color: var(--text);
+      font-weight: bold;
+    }
+    #movement-badge {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 3px 10px;
+      letter-spacing: 2px;
+      font-size: 0.7rem;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    #conn-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--disabled);
+      transition: background 0.3s;
+    }
+    #conn-dot.live { background: var(--green); }
+    #conn-dot.offline { background: var(--red); }
+
+    /* ── Scoreboard ── */
+    #scoreboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      flex: 1;
+      min-height: 280px;
+    }
+    .team-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .team-card.phos  { border-right: 1px solid var(--border); }
+    .team-card.skotia {}
+
+    .team-name {
+      font-size: 1rem;
+      letter-spacing: 6px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .phos  .team-name  { color: var(--blue); }
+    .skotia .team-name { color: var(--red); }
+
+    .team-label {
+      font-size: 0.6rem;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .team-points {
+      font-size: clamp(72px, 12vw, 140px);
+      font-weight: bold;
+      line-height: 1;
+      letter-spacing: 2px;
+      transition: all 0.4s ease;
+    }
+    .phos  .team-points { color: var(--blue); text-shadow: 0 0 40px rgba(0,212,255,0.4); }
+    .skotia .team-points { color: var(--red);  text-shadow: 0 0 40px rgba(220,20,60,0.4); }
+
+    .team-count {
+      font-size: 0.8rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+    }
+
+    /* ── Game-over overlay ── */
+    #game-over-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(13,15,26,0.92);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 20px;
+      z-index: 100;
+    }
+    #game-over-overlay.visible { display: flex; }
+    #game-over-title {
+      font-size: clamp(28px, 6vw, 56px);
+      font-weight: bold;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+    }
+    #game-over-sub {
+      font-size: 0.9rem;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    /* ── Disconnected banner ── */
+    #offline-banner {
+      display: none;
+      background: rgba(220,20,60,0.15);
+      border-bottom: 1px solid var(--red);
+      color: var(--red);
+      text-align: center;
+      padding: 6px;
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    #offline-banner.visible { display: block; }
+
+    /* ── Control panel ── */
+    #control-panel {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+      padding: 20px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+    #control-panel.visible { display: flex; }
+
+    /* Token gate */
+    #token-gate {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #token-gate label {
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    #token-gate input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.8rem;
+      padding: 8px 12px;
+      width: 100%;
+      outline: none;
+    }
+    #token-gate input:focus { border-color: var(--blue); }
+
+    /* Controls (shown after token is set) */
+    #controls {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+    }
+    #controls.visible { display: flex; }
+
+    .ctrl-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    button {
+      cursor: pointer;
+      font-family: var(--font);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      padding: 8px 18px;
+      font-size: 0.75rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    button:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
+    button:disabled { opacity: 0.3; cursor: not-allowed; }
+    button.primary { border-color: var(--amber); color: var(--amber); }
+    button.primary:hover:not(:disabled) { background: rgba(255,215,0,0.08); }
+    button.danger { border-color: var(--red); color: var(--red); }
+    button.danger:hover:not(:disabled) { background: rgba(220,20,60,0.08); }
+
+    #broadcast-input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.8rem;
+      padding: 8px 12px;
+      flex: 1;
+      min-width: 200px;
+      outline: none;
+    }
+    #broadcast-input:focus { border-color: var(--blue); }
+
+    /* ── Player roster ── */
+    #roster {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #roster.visible { display: flex; }
+
+    .roster-section { display: flex; flex-direction: column; gap: 6px; }
+    .roster-title {
+      font-size: 0.65rem;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+      padding-bottom: 2px;
+      border-bottom: 1px solid var(--border);
+    }
+    .player-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 7px 12px;
+      font-size: 0.8rem;
+    }
+    .player-row.phos-row  { border-left: 2px solid var(--blue); }
+    .player-row.skotia-row { border-left: 2px solid var(--red); }
+    .mark-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--red);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+    .section-header .toggle-label {
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .section-header .caret { color: var(--muted); font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Offline banner -->
+  <div id="offline-banner">Socket disconnected — data may be stale</div>
+
+  <!-- Header -->
+  <header>
+    <span class="logo">Apokrupto</span>
+    <div class="header-center">
+      <span id="round-badge">— / —</span>
+      <span id="movement-badge">—</span>
+    </div>
+    <div class="header-right">
+      <div id="conn-dot" class="offline"></div>
+      <span id="conn-label">OFFLINE</span>
+    </div>
+  </header>
+
+  <!-- Scoreboard (always visible) -->
+  <div id="scoreboard">
+    <div class="team-card phos">
+      <span class="team-label">Team</span>
+      <span class="team-name">ΦΩΣ</span>
+      <span class="team-points" id="phos-pts">0</span>
+      <span class="team-count" id="phos-count">— players</span>
+    </div>
+    <div class="team-card skotia">
+      <span class="team-label">Team</span>
+      <span class="team-name">ΣΚΟΤΊΑ</span>
+      <span class="team-points" id="skotia-pts">0</span>
+      <span class="team-count" id="skotia-count">— players</span>
+    </div>
+  </div>
+
+  <!-- Control panel (mode=control only) -->
+  <div id="control-panel">
+
+    <!-- Token gate -->
+    <div id="token-gate">
+      <label for="token-input">Paste GM token to unlock controls</label>
+      <div style="display:flex; gap:8px;">
+        <input type="password" id="token-input" placeholder="eyJ..." autocomplete="off" />
+        <button onclick="unlockControls()">UNLOCK</button>
+      </div>
+    </div>
+
+    <!-- Controls (unlocked) -->
+    <div id="controls">
+      <div class="ctrl-row">
+        <button class="primary" id="advance-btn" onclick="advanceMovement()" disabled>
+          ADVANCE MOVEMENT
+        </button>
+      </div>
+      <div class="ctrl-row">
+        <input type="text" id="broadcast-input" placeholder="Broadcast message to all players..." maxlength="200" />
+        <button onclick="sendBroadcast()">SEND</button>
+      </div>
+
+      <!-- Player roster (collapsible) -->
+      <div class="section-header" onclick="toggleRoster()">
+        <span class="toggle-label">Player Roster</span>
+        <span class="caret" id="roster-caret">▼</span>
+      </div>
+      <div id="roster">
+        <div class="roster-section">
+          <div class="roster-title">ΣΚΟΤΊΑ — Darkness</div>
+          <div id="skotia-list"><span style="color:var(--muted);font-size:0.75rem;">No data yet</span></div>
+        </div>
+        <div class="roster-section">
+          <div class="roster-title">ΦΩΣ — Light</div>
+          <div id="phos-list"><span style="color:var(--muted);font-size:0.75rem;">No data yet</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game over overlay -->
+  <div id="game-over-overlay">
+    <div id="game-over-title">—</div>
+    <div id="game-over-sub">—</div>
+    <button onclick="document.getElementById('game-over-overlay').classList.remove('visible')">DISMISS</button>
+  </div>
+
+  <script>
+    // ── URL params ──────────────────────────────────────────────────────────
+    const params   = new URLSearchParams(location.search);
+    const gameId   = params.get('gameId')   || '';
+    const lobbyId  = params.get('lobbyId')  || '';
+    const isControl = params.get('mode') === 'control';
+    let   gmToken  = params.get('token')    || '';
+
+    // ── State ───────────────────────────────────────────────────────────────
+    let socket = null;
+    let pollInterval = null;
+    let rosterOpen = false;
+
+    // ── Init ────────────────────────────────────────────────────────────────
+    if (isControl) {
+      document.getElementById('control-panel').classList.add('visible');
+      if (gmToken) {
+        // Token pre-supplied in URL
+        unlockControls();
+      }
+    }
+
+    connectSocket();
+    fetchState();
+    pollInterval = setInterval(fetchState, 10000);
+
+    // ── Socket ──────────────────────────────────────────────────────────────
+    function connectSocket() {
+      // Unauthenticated connection for scoreboard; authenticated for control
+      const opts = {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+      };
+      if (gmToken) opts.auth = { token: gmToken };
+
+      socket = io(opts);
+
+      socket.on('connect', () => {
+        setConnected(true);
+        if (lobbyId) socket.emit('joinRoom', { lobbyId });
+      });
+
+      socket.on('disconnect', () => setConnected(false));
+      socket.on('connect_error', () => setConnected(false));
+
+      socket.on('gameStateUpdate', (data) => {
+        applyState(data);
+      });
+
+      socket.on('gameOver', ({ winner, reason } = {}) => {
+        showGameOver(winner, reason);
+      });
+
+      socket.on('lobbyClosed', () => {
+        document.getElementById('offline-banner').textContent = 'Lobby closed.';
+        document.getElementById('offline-banner').classList.add('visible');
+      });
+    }
+
+    // ── REST poll ───────────────────────────────────────────────────────────
+    async function fetchState() {
+      if (!gameId) return;
+      const headers = {};
+      if (gmToken) headers['Authorization'] = `Bearer ${gmToken}`;
+      try {
+        const res = await fetch(`/api/games/${gameId}/gm-state`, { headers });
+        if (!res.ok) return;
+        const data = await res.json();
+        applyState(data);
+      } catch (_) {}
+    }
+
+    // ── Apply game state to DOM ─────────────────────────────────────────────
+    function applyState({ players = [], gameState = {}, teamPoints = {} } = {}) {
+      // Scores
+      setText('phos-pts',    teamPoints.phos   ?? 0);
+      setText('skotia-pts',  teamPoints.skotia ?? 0);
+
+      // Player counts
+      const phosPlayers   = players.filter(p => p.team === 'phos');
+      const skotiaPlayers = players.filter(p => p.team === 'skotia');
+      setText('phos-count',   phosPlayers.length   + ' player' + (phosPlayers.length   !== 1 ? 's' : ''));
+      setText('skotia-count', skotiaPlayers.length + ' player' + (skotiaPlayers.length !== 1 ? 's' : ''));
+
+      // Round / movement
+      const round = gameState.round;
+      const total = gameState.totalRounds;
+      setText('round-badge',    round ? `ROUND ${round} / ${total}` : '— / —');
+      const movLabel = { A: 'MOV A — DEDUCTION', B: 'MOV B — TASKS', C: 'MOV C — VOTING' };
+      setText('movement-badge', movLabel[gameState.movement] || '—');
+
+      // Roster (control mode)
+      if (isControl) {
+        renderRoster('phos-list',   phosPlayers,   'phos-row');
+        renderRoster('skotia-list', skotiaPlayers, 'skotia-row');
+      }
+    }
+
+    function renderRoster(containerId, players, rowClass) {
+      const el = document.getElementById(containerId);
+      if (players.length === 0) {
+        el.innerHTML = '<span style="color:var(--muted);font-size:0.75rem;">No players yet</span>';
+        return;
+      }
+      el.innerHTML = players.map(p => `
+        <div class="player-row ${rowClass}">
+          <span>${escHtml(p.username)}</span>
+          ${p.isMarked ? '<div class="mark-dot" title="Marked"></div>' : ''}
+        </div>`
+      ).join('');
+    }
+
+    // ── Connection indicator ────────────────────────────────────────────────
+    function setConnected(live) {
+      const dot   = document.getElementById('conn-dot');
+      const label = document.getElementById('conn-label');
+      const banner = document.getElementById('offline-banner');
+      dot.className = live ? 'live' : 'offline';
+      label.textContent = live ? 'LIVE' : 'OFFLINE';
+      if (live) banner.classList.remove('visible');
+      else      banner.classList.add('visible');
+
+      // Advance button requires live socket
+      const btn = document.getElementById('advance-btn');
+      if (btn) btn.disabled = !live;
+    }
+
+    // ── Game over ───────────────────────────────────────────────────────────
+    function showGameOver(winner, reason) {
+      const titleEl = document.getElementById('game-over-title');
+      const subEl   = document.getElementById('game-over-sub');
+
+      if (winner === 'phos') {
+        titleEl.style.color = 'var(--blue)';
+        titleEl.textContent = 'ΦΩΣ WINS';
+      } else if (winner === 'skotia') {
+        titleEl.style.color = 'var(--red)';
+        titleEl.textContent = 'ΣΚΟΤΊΑ WINS';
+      } else {
+        titleEl.style.color = 'var(--text)';
+        titleEl.textContent = 'GAME OVER';
+      }
+
+      subEl.textContent = reason ? reason.toUpperCase() : '';
+      document.getElementById('game-over-overlay').classList.add('visible');
+    }
+
+    // ── Control panel actions ───────────────────────────────────────────────
+    function unlockControls() {
+      const input = document.getElementById('token-input');
+      const val = input ? input.value.trim() : gmToken;
+      if (!val) return;
+      gmToken = val;
+      document.getElementById('token-gate').style.display = 'none';
+      document.getElementById('controls').classList.add('visible');
+
+      // Reconnect socket with auth token
+      if (socket) socket.disconnect();
+      connectSocket();
+    }
+
+    function advanceMovement() {
+      if (!socket || !socket.connected) return;
+      socket.emit('gmAdvance', { gameId }, (res) => {
+        if (res && res.error) alert('Error: ' + res.error);
+      });
+    }
+
+    async function sendBroadcast() {
+      const input = document.getElementById('broadcast-input');
+      const message = input.value.trim();
+      if (!message || !gameId || !lobbyId || !gmToken) return;
+
+      try {
+        await fetch(`/api/games/${gameId}/broadcast`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${gmToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message, lobbyId }),
+        });
+        input.value = '';
+      } catch (err) {
+        alert('Broadcast failed: ' + err.message);
+      }
+    }
+
+    function toggleRoster() {
+      rosterOpen = !rosterOpen;
+      document.getElementById('roster').classList.toggle('visible', rosterOpen);
+      document.getElementById('roster-caret').textContent = rosterOpen ? '▲' : '▼';
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+    function setText(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // Enter key on broadcast input
+    document.addEventListener('DOMContentLoaded', () => {
+      const bi = document.getElementById('broadcast-input');
+      if (bi) bi.addEventListener('keydown', e => { if (e.key === 'Enter') sendBroadcast(); });
+    });
+  </script>
+</body>
+</html>
