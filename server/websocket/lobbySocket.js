@@ -166,6 +166,11 @@ function broadcastSabotageFixed(lobbyId, type) {
   _io.to(`lobby:${String(lobbyId)}`).emit('sabotageFixed', { type });
 }
 
+function broadcastPlayerKicked(lobbyId, userId) {
+  if (!_io) return;
+  _io.to(`lobby:${String(lobbyId)}`).emit('playerKicked', { userId: String(userId) });
+}
+
 function getDeceiverCount(n) {
   if (n <= 4) return 1;
   if (n <= 7) return 2;
@@ -477,4 +482,4 @@ function getActiveSabotage(lobbyId) {
   return rest;
 }
 
-module.exports = { setupLobbySocket, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage };
+module.exports = { setupLobbySocket, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage, broadcastPlayerKicked };

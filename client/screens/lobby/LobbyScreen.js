@@ -7,6 +7,9 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Switch,
+  Modal,
+  Pressable,
   useWindowDimensions,
   Animated,
 } from 'react-native';
@@ -14,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
-import { fetchLobbyPlayers, fetchCurrentLobby, leaveLobby as apiLeaveLobby, addDummyPlayer } from '../../utils/api';
+import { fetchLobbyPlayers, fetchCurrentLobby, leaveLobby as apiLeaveLobby, addDummyPlayer, kickPlayer as apiKickPlayer } from '../../utils/api';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 
@@ -34,7 +37,7 @@ function parseJwt(token) {
   }
 }
 
-export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, onRoleAssigned, onGameStarted, onRejoinGame }) {
+export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, onRoleAssigned, onGameStarted, onRejoinGame, showTaskNotif, onShowTaskNotifChange }) {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
 
@@ -42,6 +45,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
   const [lobbyInfo, setLobbyInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [socketConnected, setSocketConnected] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
 
   const myUserId = useRef(String(parseJwt(token).sub));
   const socketRef = useRef(null);
@@ -167,6 +171,12 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
         if (onGameStarted) onGameStarted();
       });
 
+      socket.on('playerKicked', ({ userId }) => {
+        if (userId === myUserId.current) {
+          onLeaveLobby();
+        }
+      });
+
       socket.on('connect_error', (err) => {
         console.error('[WS] Connection error:', {
           message: err.message,
@@ -240,6 +250,28 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
     }
   };
 
+  const handleKick = (player) => {
+    Alert.alert(
+      'Kick Player',
+      `Remove ${player.username} from the lobby?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Kick',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { ok, data } = await apiKickPlayer(token, lobbyId, player.id);
+              if (!ok) Alert.alert('Error', data?.error || 'Failed to kick player');
+            } catch (err) {
+              Alert.alert('Error', 'Network error: ' + err.message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleLogout = async () => {
     try {
       await SecureStore.deleteItemAsync('jwtToken');
@@ -264,15 +296,19 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        {/* Compact single-row header */}
+        {/* Header */}
         <View style={[styles.header, isLandscape && styles.headerLandscape]}>
-          <Animated.Text
-            style={[styles.title, { transform: [{ translateY: floatAnim }] }]}
-          >
-            LOBBY
-          </Animated.Text>
+          {/* Left: settings gear */}
+          <TouchableOpacity style={styles.settingsButton} onPress={() => setSettingsVisible(true)}>
+            <Text style={styles.settingsGear}>⚙</Text>
+            <Text style={styles.settingsGearLabel}>Settings</Text>
+          </TouchableOpacity>
 
+          {/* Center: title + lobby info */}
           <View style={styles.headerCenter}>
+            <Animated.Text style={[styles.title, { transform: [{ translateY: floatAnim }] }]}>
+              LOBBY
+            </Animated.Text>
             {lobbyInfo && (
               <Text style={styles.lobbyName} numberOfLines={1}>{lobbyInfo.name}</Text>
             )}
@@ -281,6 +317,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
             </Text>
           </View>
 
+          {/* Right: connection dot + logout */}
           <View style={styles.headerRight}>
             <View style={[styles.connectionDot, socketConnected ? styles.dotConnected : styles.dotDisconnected]} />
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -304,10 +341,18 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
           >
             {players.map((player, index) => (
               <View key={player.id} style={styles.playerCardWrapper}>
-                <View style={[
-                  styles.playerCard,
-                  !player.isConnected && styles.playerCardDisconnected,
-                ]}>
+                <Pressable
+                  style={[
+                    styles.playerCard,
+                    !player.isConnected && styles.playerCardDisconnected,
+                  ]}
+                  onLongPress={
+                    isHost && String(player.id) !== myUserId.current
+                      ? () => handleKick(player)
+                      : undefined
+                  }
+                  delayLongPress={400}
+                >
                   {/* Color strip */}
                   <View style={[styles.colorStrip, { backgroundColor: PLAYER_COLORS[index % PLAYER_COLORS.length] }]} />
 
@@ -335,7 +380,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
                       <Text style={styles.offlineBadgeText}>OFFLINE</Text>
                     </View>
                   )}
-                </View>
+                </Pressable>
               </View>
             ))}
 
@@ -344,25 +389,64 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
             )}
           </ScrollView>
 
-          {players.length < 4 && (
-            <Text style={styles.waitingText}>
-              Waiting for {4 - players.length} more player{4 - players.length !== 1 ? 's' : ''} to start
-            </Text>
-          )}
-        </View>
-
-        {/* Bottom actions */}
-        <View style={styles.buttonContainer}>
-          {canStart && (
-            <TouchableOpacity style={styles.startButton} onPress={handleStartGame}>
-              <Text style={styles.startButtonText}>START GAME</Text>
+          {/* Footer: waiting text + action buttons on one row */}
+          <View style={styles.windowFooter}>
+            {players.length < 4 && (
+              <Text style={styles.waitingText} numberOfLines={2}>
+                Waiting for {4 - players.length} more player{4 - players.length !== 1 ? 's' : ''} to start
+              </Text>
+            )}
+            <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveLobby}>
+              <Text style={styles.leaveButtonText}>Leave</Text>
             </TouchableOpacity>
-          )}
 
-          <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveLobby}>
-            <Text style={styles.leaveButtonText}>Leave Lobby</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.startButton, !canStart && styles.startButtonDisabled]}
+              onPress={handleStartGame}
+              disabled={!canStart}
+            >
+              <Text style={[styles.startButtonText, !canStart && styles.startButtonTextDisabled]}>
+                START
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
+
+        {/* Settings modal */}
+        <Modal
+          visible={settingsVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSettingsVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setSettingsVisible(false)}>
+            <Pressable style={styles.modalContainer} onPress={() => {}}>
+              <Text style={styles.modalTitle}>SETTINGS</Text>
+
+              {!isHost && (
+                <Text style={styles.modalHostNote}>Only the host can change settings</Text>
+              )}
+
+              <View style={styles.modalRow}>
+                <View style={styles.modalRowLabels}>
+                  <Text style={styles.modalRowLabel}>Task completion alerts</Text>
+                  <Text style={styles.modalRowHint}>Shows who completed a task — reveals identities</Text>
+                </View>
+                <Switch
+                  value={showTaskNotif}
+                  onValueChange={isHost ? onShowTaskNotifChange : undefined}
+                  disabled={!isHost}
+                  trackColor={{ false: colors.background.frost, true: colors.accent.neonGreen }}
+                  thumbColor={colors.text.primary}
+                />
+              </View>
+
+              <TouchableOpacity style={styles.modalCloseButton} onPress={() => setSettingsVisible(false)}>
+                <Text style={styles.modalCloseText}>CLOSE</Text>
+              </TouchableOpacity>
+            </Pressable>
+          </Pressable>
+        </Modal>
       </SafeAreaView>
     </View>
   );
@@ -466,39 +550,39 @@ const styles = StyleSheet.create({
   playerGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 6,
+    padding: 4,
   },
   playerCardWrapper: {
     width: '33.33%',
-    padding: 4,
+    padding: 3,
   },
   playerCard: {
-    borderRadius: 8,
+    borderRadius: 6,
     backgroundColor: colors.background.panel,
     borderWidth: 1,
     borderColor: colors.border.default,
     alignItems: 'center',
     overflow: 'hidden',
-    paddingBottom: 10,
-    minHeight: 90,
+    paddingBottom: 6,
+    minHeight: 64,
   },
   playerCardDisconnected: {
     opacity: 0.4,
   },
   colorStrip: {
     width: '100%',
-    height: 5,
-    marginBottom: 6,
+    height: 3,
+    marginBottom: 4,
   },
   crown: {
-    fontSize: 14,
-    marginBottom: 2,
+    fontSize: 11,
+    marginBottom: 1,
   },
   playerName: {
-    ...typography.small,
+    ...typography.tiny,
     color: colors.text.primary,
     textAlign: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
   },
   playerNameSelf: {
     color: colors.primary.cyan,
@@ -516,13 +600,13 @@ const styles = StyleSheet.create({
   },
   offlineBadge: {
     backgroundColor: colors.background.frost,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginTop: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+    marginTop: 2,
   },
   offlineBadgeText: {
-    ...typography.tiny,
+    fontSize: 8,
     color: colors.text.disabled,
     letterSpacing: 0.5,
   },
@@ -533,24 +617,55 @@ const styles = StyleSheet.create({
     marginTop: 24,
     width: '100%',
   },
-  waitingText: {
-    ...typography.small,
-    color: colors.text.muted,
-    textAlign: 'center',
-    padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
+
+  // Settings gear (header left)
+  settingsButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 52,
+  },
+  settingsGear: {
+    fontSize: 22,
+    color: colors.text.secondary,
+  },
+  settingsGearLabel: {
+    ...typography.tiny,
+    color: colors.text.tertiary,
+    marginTop: 1,
   },
 
-  // Bottom buttons
-  buttonContainer: {
-    padding: 16,
-    gap: 12,
+  // Footer inside player window — single row
+  windowFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.border.subtle,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 6,
+  },
+  waitingText: {
+    ...typography.tiny,
+    color: colors.text.muted,
+    flex: 1,
+  },
+  leaveButton: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  leaveButtonText: {
+    ...typography.tiny,
+    color: colors.text.tertiary,
   },
   startButton: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
     backgroundColor: colors.accent.neonGreen,
-    paddingVertical: 16,
-    borderRadius: 10,
+    borderRadius: 6,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: colors.accent.neonGreen,
@@ -560,19 +675,78 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  startButtonText: {
-    ...typography.button,
-    color: colors.background.space,
+  startButtonDisabled: {
+    backgroundColor: colors.background.panel,
+    borderColor: colors.border.subtle,
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  leaveButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: 14,
-    borderRadius: 10,
+  startButtonText: {
+    ...typography.tiny,
+    color: colors.background.space,
+    fontWeight: '700',
+  },
+  startButtonTextDisabled: {
+    color: colors.text.disabled,
+  },
+
+  // Settings modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '85%',
+    backgroundColor: colors.background.panel,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border.focus,
+    padding: 24,
+    gap: 20,
+  },
+  modalTitle: {
+    ...typography.screenTitle,
+    fontSize: 18,
+    color: colors.primary.electricBlue,
+    textAlign: 'center',
+    textShadowColor: colors.shadow.electricBlue,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  modalHostNote: {
+    ...typography.small,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+    marginTop: -8,
+  },
+  modalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  modalRowLabels: {
+    flex: 1,
+  },
+  modalRowLabel: {
+    ...typography.body,
+    color: colors.text.primary,
+  },
+  modalRowHint: {
+    ...typography.tiny,
+    color: colors.text.tertiary,
+    marginTop: 3,
+  },
+  modalCloseButton: {
+    paddingVertical: 12,
+    borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border.default,
   },
-  leaveButtonText: {
+  modalCloseText: {
     ...typography.button,
     color: colors.text.tertiary,
   },

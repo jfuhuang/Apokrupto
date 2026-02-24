@@ -73,6 +73,13 @@ export async function fetchLobbyPlayers(token, lobbyId) {
   });
 }
 
+export async function kickPlayer(token, lobbyId, userId) {
+  return request(`/api/lobbies/${lobbyId}/kick/${userId}`, {
+    method: 'POST',
+    headers: authHeader(token),
+  });
+}
+
 export async function addDummyPlayer(token, lobbyId) {
   return request(`/api/lobbies/${lobbyId}/add-dummy`, {
     method: 'POST',

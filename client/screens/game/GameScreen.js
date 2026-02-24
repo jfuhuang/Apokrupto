@@ -27,7 +27,7 @@ const DIFFICULTY_COLOR = {
   hard: colors.state.error,
 };
 
-export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, token, activeSabotage, onSabotageChange, onStartTask, onLogout, onDevExit, onGameOver, onLobbyGone }) {
+export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, token, activeSabotage, onSabotageChange, onStartTask, onLogout, onDevExit, onGameOver, onLobbyGone, showTaskNotif = false }) {
   const [sabotageVisible, setSabotageVisible] = useState(false);
   const [tasksVisible, setTasksVisible] = useState(false);
   const [livePoints, setLivePoints] = useState(0);
@@ -151,9 +151,11 @@ export default function GameScreen({ role, isAlive = true, points = 0, lobbyId, 
           if (payload.totalInnocentPoints !== undefined) {
             setLivePoints(payload.totalInnocentPoints);
           }
-          // Show a brief notification for every player's completion
-          setTaskNotif({ username: payload.username, pointsEarned: payload.pointsEarned });
-          setTimeout(() => setTaskNotif(null), 3000);
+          // Show a brief notification for every player's completion (if enabled)
+          if (showTaskNotif) {
+            setTaskNotif({ username: payload.username, pointsEarned: payload.pointsEarned });
+            setTimeout(() => setTaskNotif(null), 3000);
+          }
         });
 
         socket.on('sabotageActive', (payload) => {

@@ -45,6 +45,7 @@ export default function App() {
   const [isAlive, setIsAlive] = useState(true);
   const [gameOverResult, setGameOverResult] = useState(null);
   const [activeSabotage, setActiveSabotage] = useState(null);
+  const [showTaskNotif, setShowTaskNotif] = useState(false);
 
   const [fontsLoaded] = useFonts({
     Orbitron_400Regular,
@@ -233,6 +234,8 @@ export default function App() {
             onRoleAssigned={handleRoleAssigned}
             onGameStarted={handleGameStarted}
             onRejoinGame={handleRejoinGame}
+            showTaskNotif={showTaskNotif}
+            onShowTaskNotifChange={setShowTaskNotif}
           />
         );
       case 'countdown':
@@ -263,6 +266,7 @@ export default function App() {
             onLogout={handleLogout}
             onGameOver={handleGameOver}
             onLobbyGone={handleLobbyGone}
+            showTaskNotif={showTaskNotif}
             onDevExit={__DEV__ ? () => setCurrentScreen('devMenu') : undefined}
           />
         );

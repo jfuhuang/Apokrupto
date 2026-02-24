@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const authenticateToken = require('../middleware/auth');
-const { broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage } = require('../websocket/lobbySocket');
+const { broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage, broadcastPlayerKicked } = require('../websocket/lobbySocket');
 const { getTask } = require('../data/tasks');
 
 const router = express.Router();
@@ -550,11 +550,35 @@ router.post('/:id/sabotage/fix', async (req, res) => {
     }
   });
 
-  // ADMIN — kick any player from a lobby
-  router.post('/:id/kick/:userId', requireAdmin, async (req, res) => {
+  // Kick a player — host can kick from their own waiting lobby; admins can kick anywhere
+  router.post('/:id/kick/:userId', async (req, res) => {
+    const { id, userId } = req.params;
+    const requesterId = String(req.user.sub);
+    const isAdmin = ADMIN_USERNAMES.has(req.user.username);
+
+    if (String(userId) === requesterId) {
+      return res.status(400).json({ error: 'Cannot kick yourself' });
+    }
+
     const client = await pool.connect();
     try {
-      const { id, userId } = req.params;
+      // Verify lobby and check host permission
+      const lobbyResult = await client.query(
+        'SELECT created_by, status FROM lobbies WHERE id = $1',
+        [id]
+      );
+      if (lobbyResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Lobby not found' });
+      }
+      const lobby = lobbyResult.rows[0];
+      const isHost = String(lobby.created_by) === requesterId;
+
+      if (!isAdmin && !isHost) {
+        return res.status(403).json({ error: 'Only the host or an admin can kick players' });
+      }
+      if (!isAdmin && lobby.status !== 'waiting') {
+        return res.status(400).json({ error: 'Cannot kick during an active game' });
+      }
 
       await client.query('BEGIN');
 
@@ -567,7 +591,7 @@ router.post('/:id/sabotage/fix', async (req, res) => {
         return res.status(404).json({ error: 'Player not in this lobby' });
       }
 
-      // Remove user if they are a bot (null password_hash means they can never log in)
+      // Remove guest accounts (no password_hash) — they can never log in again
       await client.query(
         'DELETE FROM users WHERE id = $1 AND password_hash IS NULL',
         [userId]
@@ -585,15 +609,14 @@ router.post('/:id/sabotage/fix', async (req, res) => {
 
       await client.query('COMMIT');
 
-      if (!empty) {
-        await broadcastLobbyUpdate(id);
-      }
-      console.log(`[ADMIN] Kicked user ${userId} from lobby ${id}${empty ? ' (lobby closed)' : ''} (by ${req.user.username})`);
+      broadcastPlayerKicked(id, userId);
+      if (!empty) await broadcastLobbyUpdate(id);
+      console.log(`[kick] User ${userId} kicked from lobby ${id} by ${req.user.username}`);
 
       res.json({ ok: true, lobbyClosed: empty });
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});
-      console.error('[DEV] kick error:', err);
+      console.error('[kick] error:', err);
       res.status(500).json({ error: 'Server error' });
     } finally {
       client.release();
