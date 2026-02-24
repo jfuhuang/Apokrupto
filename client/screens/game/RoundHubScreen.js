@@ -333,10 +333,10 @@ const styles = StyleSheet.create({
 
   // Status box
   statusBox: {
-    marginHorizontal: 14,
-    marginTop: 10,
+    marginHorizontal: 18,
+    marginTop: 12,
     marginBottom: 2,
-    padding: 10,
+    padding: 12,
     backgroundColor: colors.background.void,
     borderRadius: 8,
     borderWidth: 1,
@@ -352,9 +352,9 @@ const styles = StyleSheet.create({
   // Group section
   groupSection: {
     flex: 1,
-    marginHorizontal: 14,
+    marginHorizontal: 18,
     marginTop: 10,
-    marginBottom: 8,
+    marginBottom: 12,
     gap: 8,
   },
   groupHeader: {
@@ -398,8 +398,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border.default,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   memberRowMarked: {
     backgroundColor: 'rgba(220, 20, 60, 0.12)',

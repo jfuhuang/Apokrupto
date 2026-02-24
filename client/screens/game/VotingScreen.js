@@ -121,32 +121,21 @@ export default function VotingScreen({
         disabled={phase !== 'voting'}
         activeOpacity={0.75}
       >
-        <View style={styles.cardLeft}>
-          <Text style={[
-            styles.memberName,
-            isPhosVote && { color: colors.primary.electricBlue },
-            isSkotiaVote && { color: colors.primary.neonRed },
-          ]}>
-            {member.username}
-          </Text>
-          {member.isMarked && (
-            <View style={styles.currentMarkBadge}>
-              <Text style={styles.currentMarkText}>MARKED</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.cardRight}>
-          {isVoted ? (
-            <Text style={[
-              styles.voteLabel,
-              isPhosVote ? { color: colors.primary.electricBlue } : { color: colors.primary.neonRed },
-            ]}>
-              {isPhosVote ? 'ΦΩΣ' : 'ΣΚΟΤΊΑ'}
-            </Text>
-          ) : (
-            <Text style={styles.tapHint}>TAP</Text>
-          )}
-        </View>
+        <Text style={[
+          styles.memberName,
+          isPhosVote && { color: colors.primary.electricBlue },
+          isSkotiaVote && { color: colors.primary.neonRed },
+        ]}>
+          {member.username}
+        </Text>
+        {member.isMarked && (
+          <View style={styles.currentMarkBadge}>
+            <Text style={styles.currentMarkText}>MARKED</Text>
+          </View>
+        )}
+        {!isVoted && (
+          <Text style={styles.tapHint}>tap to vote</Text>
+        )}
       </TouchableOpacity>
     );
   };
@@ -256,8 +245,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   instructionBox: {
-    marginHorizontal: 14,
-    marginTop: 10,
+    marginHorizontal: 18,
+    marginTop: 12,
     padding: 10,
     backgroundColor: colors.background.void,
     borderRadius: 8,
@@ -274,24 +263,24 @@ const styles = StyleSheet.create({
   // Card list fills remaining vertical space, no scroll
   cardList: {
     flex: 1,
-    marginHorizontal: 14,
+    marginHorizontal: 18,
     marginTop: 10,
     marginBottom: 4,
-    gap: 8,
+    gap: 10,
   },
 
-  // Vote card — takes equal flex share
+  // Vote card — takes equal flex share, column layout
   memberCard: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    justifyContent: 'center',
     backgroundColor: colors.background.void,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.border.default,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
+    gap: 4,
   },
   memberCardPhos: {
     backgroundColor: 'rgba(0, 212, 255, 0.1)',
@@ -300,10 +289,6 @@ const styles = StyleSheet.create({
   memberCardSkotia: {
     backgroundColor: 'rgba(220, 20, 60, 0.1)',
     borderColor: colors.primary.neonRed,
-  },
-  cardLeft: {
-    flex: 1,
-    gap: 4,
   },
   memberName: {
     ...typography.body,
@@ -324,19 +309,10 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     color: colors.primary.neonRed,
   },
-  cardRight: {
-    marginLeft: 12,
-    alignItems: 'flex-end',
-  },
-  voteLabel: {
-    fontFamily: fonts.display.bold,
-    fontSize: 11,
-    letterSpacing: 2,
-  },
   tapHint: {
     fontFamily: fonts.display.bold,
-    fontSize: 9,
-    letterSpacing: 2,
+    fontSize: 8,
+    letterSpacing: 1,
     color: colors.text.disabled,
   },
 
@@ -344,8 +320,8 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: colors.border.subtle,
     gap: 12,
