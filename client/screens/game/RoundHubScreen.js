@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
@@ -23,6 +22,7 @@ export default function RoundHubScreen({
   currentTeam,
   isMarked,
   currentGroupMembers,
+  groupNumber,
   teamPoints,
   movementBMode,
   onStartTask,
@@ -67,7 +67,6 @@ export default function RoundHubScreen({
 
       socket.on('disconnect', () => setSocketConnected(false));
 
-      // Server sends full game state on join or update
       socket.on('gameStateUpdate', (state) => {
         if (!state) return;
         if (state.teamPoints) setLiveTeamPoints(state.teamPoints);
@@ -75,7 +74,6 @@ export default function RoundHubScreen({
         if (onGameStateUpdate) onGameStateUpdate(state);
       });
 
-      // GM has advanced to the next movement
       socket.on('movementStart', ({ movement, groupId, groupMembers }) => {
         setActiveMovement(movement);
         setStatusMessage(`Movement ${movement} — ${MOVEMENT_LABELS[movement]} beginning...`);
@@ -83,12 +81,10 @@ export default function RoundHubScreen({
         if (onMovementReady) onMovementReady(movement, groupId, groupMembers);
       });
 
-      // Movement B task assignment
       socket.on('taskAssigned', (task) => {
         if (movementBMode && onStartTask) onStartTask(task);
       });
 
-      // GM announcement broadcast
       socket.on('announcement', ({ message }) => {
         if (message) setStatusMessage(message);
       });
@@ -115,10 +111,12 @@ export default function RoundHubScreen({
   }, [lobbyId, token]);
 
   const teamColor = currentTeam === 'skotia' ? colors.primary.neonRed : colors.primary.electricBlue;
+  const groupLabel = groupNumber != null ? `GROUP ${groupNumber}` : 'YOUR GROUP';
 
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
+
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -130,10 +128,7 @@ export default function RoundHubScreen({
             {MOVEMENT_SEQUENCE.map((m) => (
               <View
                 key={m}
-                style={[
-                  styles.movementPip,
-                  activeMovement === m && styles.movementPipActive,
-                ]}
+                style={[styles.movementPip, activeMovement === m && styles.movementPipActive]}
               >
                 <Text style={[
                   styles.movementPipLabel,
@@ -172,41 +167,53 @@ export default function RoundHubScreen({
 
         {/* Status message */}
         <View style={styles.statusBox}>
-          <Text style={styles.statusText}>{statusMessage}</Text>
+          <Text style={styles.statusText} numberOfLines={2}>{statusMessage}</Text>
         </View>
 
-        {/* Group members */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>YOUR GROUP</Text>
-        </View>
-        <ScrollView
-          style={styles.groupList}
-          contentContainerStyle={styles.groupListContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {liveGroupMembers.map((member) => (
-            <View key={member.id} style={styles.memberRow}>
-              <View style={styles.memberInfo}>
-                <Text style={styles.memberName}>{member.username}</Text>
-                {member.isYou && <Text style={styles.youTag}>you</Text>}
+        {/* Group section — fills remaining space */}
+        <View style={styles.groupSection}>
+          <View style={styles.groupHeader}>
+            <Text style={styles.groupLabel}>{groupLabel}</Text>
+            {isMarked && (
+              <View style={styles.selfMarkedBadge}>
+                <Text style={styles.selfMarkedText}>YOU ARE MARKED</Text>
               </View>
-              {member.isMarked && (
-                <View style={styles.markBadge}>
-                  <Text style={styles.markBadgeText}>MARKED</Text>
-                </View>
-              )}
-            </View>
-          ))}
-          {liveGroupMembers.length === 0 && (
-            <Text style={styles.emptyGroup}>Group assignment pending...</Text>
-          )}
-        </ScrollView>
-
-        {isMarked && (
-          <View style={styles.selfMarkedBanner}>
-            <Text style={styles.selfMarkedText}>YOU ARE MARKED</Text>
+            )}
           </View>
-        )}
+
+          <View style={styles.groupList}>
+            {liveGroupMembers.length === 0 ? (
+              <View style={styles.emptyGroup}>
+                <Text style={styles.emptyGroupText}>Group assignment pending...</Text>
+              </View>
+            ) : (
+              liveGroupMembers.map((member) => (
+                <View
+                  key={member.id}
+                  style={[
+                    styles.memberRow,
+                    member.isMarked && styles.memberRowMarked,
+                  ]}
+                >
+                  <View style={styles.memberInfo}>
+                    <Text style={[
+                      styles.memberName,
+                      member.isMarked && { color: colors.primary.neonRed },
+                    ]}>
+                      {member.username}
+                    </Text>
+                    {member.isYou && <Text style={styles.youTag}>you</Text>}
+                  </View>
+                  {member.isMarked && (
+                    <View style={styles.markBadge}>
+                      <Text style={styles.markBadgeText}>MARKED</Text>
+                    </View>
+                  )}
+                </View>
+              ))
+            )}
+          </View>
+        </View>
 
       </SafeAreaView>
     </View>
@@ -221,11 +228,13 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.subtle,
   },
@@ -243,18 +252,18 @@ const styles = StyleSheet.create({
   },
   roundNumber: {
     fontFamily: fonts.accent.bold,
-    fontSize: 22,
+    fontSize: 20,
     letterSpacing: 1,
   },
   movementIndicator: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     alignItems: 'center',
   },
   movementPip: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     borderWidth: 1,
     borderColor: colors.border.default,
     backgroundColor: colors.background.panel,
@@ -276,7 +285,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: 8,
+    gap: 7,
   },
   connDot: {
     width: 7,
@@ -290,20 +299,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 2,
   },
+
+  // Score bar
   scoreBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 24,
-    gap: 24,
+    gap: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.subtle,
   },
   scoreBlock: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 8,
+    gap: 7,
   },
   scoreTeam: {
     fontFamily: fonts.display.bold,
@@ -312,48 +323,74 @@ const styles = StyleSheet.create({
   },
   scoreValue: {
     fontFamily: fonts.accent.bold,
-    fontSize: 24,
+    fontSize: 22,
     letterSpacing: 1,
   },
   scoreSep: {
     ...typography.body,
     color: colors.text.disabled,
   },
+
+  // Status box
   statusBox: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 16,
+    marginHorizontal: 14,
+    marginTop: 10,
+    marginBottom: 2,
+    padding: 10,
     backgroundColor: colors.background.void,
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border.default,
   },
   statusText: {
-    ...typography.body,
+    ...typography.small,
     color: colors.text.secondary,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 18,
   },
-  sectionHeader: {
-    marginHorizontal: 16,
-    marginTop: 20,
+
+  // Group section
+  groupSection: {
+    flex: 1,
+    marginHorizontal: 14,
+    marginTop: 10,
     marginBottom: 8,
+    gap: 8,
   },
-  sectionTitle: {
+  groupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  groupLabel: {
     fontFamily: fonts.display.bold,
     fontSize: 10,
     letterSpacing: 3,
     color: colors.text.tertiary,
   },
+  selfMarkedBadge: {
+    backgroundColor: 'rgba(255, 51, 102, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 51, 102, 0.4)',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  selfMarkedText: {
+    fontFamily: fonts.display.bold,
+    fontSize: 8,
+    letterSpacing: 2,
+    color: colors.primary.neonRed,
+  },
+
   groupList: {
     flex: 1,
-    marginHorizontal: 16,
+    gap: 6,
   },
-  groupListContent: {
-    gap: 8,
-    paddingBottom: 16,
-  },
+
+  // Member cards
   memberRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -362,7 +399,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.default,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 8,
+  },
+  memberRowMarked: {
+    backgroundColor: 'rgba(220, 20, 60, 0.12)',
+    borderColor: 'rgba(255, 51, 102, 0.45)',
   },
   memberInfo: {
     flexDirection: 'row',
@@ -374,7 +415,8 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   youTag: {
-    ...typography.tiny,
+    fontFamily: fonts.ui.regular,
+    fontSize: 10,
     color: colors.primary.electricBlue,
     backgroundColor: 'rgba(0, 212, 255, 0.1)',
     paddingHorizontal: 6,
@@ -385,8 +427,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 51, 102, 0.15)',
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.4)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
+    borderRadius: 5,
+    paddingHorizontal: 7,
     paddingVertical: 3,
   },
   markBadgeText: {
@@ -395,26 +437,15 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     color: colors.primary.neonRed,
   },
-  selfMarkedBanner: {
-    marginHorizontal: 16,
-    marginBottom: 12,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(255, 51, 102, 0.1)',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 51, 102, 0.4)',
+
+  emptyGroup: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  selfMarkedText: {
-    fontFamily: fonts.display.bold,
-    fontSize: 11,
-    letterSpacing: 3,
-    color: colors.primary.neonRed,
-  },
-  emptyGroup: {
+  emptyGroupText: {
     ...typography.body,
     color: colors.text.disabled,
     textAlign: 'center',
-    paddingVertical: 20,
   },
 });

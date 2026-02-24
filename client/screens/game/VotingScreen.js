@@ -4,15 +4,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
-
-// phase: 'voting' | 'waiting' | 'preview'
 
 export default function VotingScreen({
   token,
@@ -24,8 +21,8 @@ export default function VotingScreen({
   groupMembers,
   onMovementComplete,
 }) {
-  const [phase, setPhase] = useState('voting');
-  const [myVotes, setMyVotes] = useState({});       // { [playerId]: 'phos' | 'skotia' }
+  const [phase, setPhase] = useState('voting'); // 'voting' | 'waiting' | 'preview'
+  const [myVotes, setMyVotes] = useState({});        // { [playerId]: 'phos' | 'skotia' }
   const [markResults, setMarkResults] = useState([]); // [{ playerId, username, action }]
   const [submitting, setSubmitting] = useState(false);
 
@@ -50,12 +47,9 @@ export default function VotingScreen({
         socket.emit('joinRoom', { lobbyId: groupId });
       });
 
-      // All votes tallied — results come back with mark/unmark actions
       socket.on('votingComplete', ({ markResults: results, roundSummary }) => {
         setMarkResults(results || []);
         setPhase('preview');
-
-        // Auto-advance to round summary after 3s preview
         previewTimerRef.current = setTimeout(() => {
           if (onMovementComplete) onMovementComplete(roundSummary || null);
         }, 3000);
@@ -75,23 +69,23 @@ export default function VotingScreen({
     };
   }, [gameId, groupId, token]);
 
+  // Tap cycles: unset → phos (blue) → skotia (red) → phos → ...
   const toggleVote = (playerId) => {
     if (phase !== 'voting') return;
     setMyVotes((prev) => {
       const current = prev[playerId];
-      // Cycle: unset → skotia → phos → skotia...
-      const next = current === 'skotia' ? 'phos' : 'skotia';
-      return { ...prev, [playerId]: next };
+      if (current === undefined || current === 'skotia') return { ...prev, [playerId]: 'phos' };
+      return { ...prev, [playerId]: 'skotia' };
     });
   };
 
   const allVoted = others.length > 0 && others.every((m) => myVotes[m.id] !== undefined);
+  const votedCount = others.filter((m) => myVotes[m.id] !== undefined).length;
 
   const handleSubmit = async () => {
     if (!allVoted || submitting) return;
     setSubmitting(true);
     setPhase('waiting');
-
     try {
       const baseUrl = await getApiUrl();
       await fetch(`${baseUrl}/api/games/${gameId}/movement-c/vote`, {
@@ -107,44 +101,57 @@ export default function VotingScreen({
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Member card ──────────────────────────────────────────────────────────
 
-  const renderVoteRow = (member) => {
+  const renderVoteCard = (member) => {
     const vote = myVotes[member.id];
     const isPhosVote = vote === 'phos';
     const isSkotiaVote = vote === 'skotia';
+    const isVoted = vote !== undefined;
 
     return (
-      <View key={member.id} style={styles.memberCard}>
-        <View style={styles.memberLeft}>
-          <Text style={styles.memberName}>{member.username}</Text>
+      <TouchableOpacity
+        key={member.id}
+        style={[
+          styles.memberCard,
+          isPhosVote && styles.memberCardPhos,
+          isSkotiaVote && styles.memberCardSkotia,
+        ]}
+        onPress={() => toggleVote(member.id)}
+        disabled={phase !== 'voting'}
+        activeOpacity={0.75}
+      >
+        <View style={styles.cardLeft}>
+          <Text style={[
+            styles.memberName,
+            isPhosVote && { color: colors.primary.electricBlue },
+            isSkotiaVote && { color: colors.primary.neonRed },
+          ]}>
+            {member.username}
+          </Text>
           {member.isMarked && (
             <View style={styles.currentMarkBadge}>
               <Text style={styles.currentMarkText}>MARKED</Text>
             </View>
           )}
         </View>
-        <View style={styles.voteButtons}>
-          <TouchableOpacity
-            style={[styles.voteBtn, styles.phosBtn, isPhosVote && styles.phosBtnActive]}
-            onPress={() => { setMyVotes((prev) => ({ ...prev, [member.id]: 'phos' })); }}
-            disabled={phase !== 'voting'}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.voteBtnText, isPhosVote && styles.phosBtnTextActive]}>ΦΩΣ</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.voteBtn, styles.skotiaBtn, isSkotiaVote && styles.skotiaBtnActive]}
-            onPress={() => { setMyVotes((prev) => ({ ...prev, [member.id]: 'skotia' })); }}
-            disabled={phase !== 'voting'}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.voteBtnText, isSkotiaVote && styles.skotiaBtnTextActive]}>ΣΚΟΤΊΑ</Text>
-          </TouchableOpacity>
+        <View style={styles.cardRight}>
+          {isVoted ? (
+            <Text style={[
+              styles.voteLabel,
+              isPhosVote ? { color: colors.primary.electricBlue } : { color: colors.primary.neonRed },
+            ]}>
+              {isPhosVote ? 'ΦΩΣ' : 'ΣΚΟΤΊΑ'}
+            </Text>
+          ) : (
+            <Text style={styles.tapHint}>TAP</Text>
+          )}
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
+
+  // ── Preview ──────────────────────────────────────────────────────────────
 
   const renderPreview = () => (
     <View style={styles.previewContainer}>
@@ -159,9 +166,7 @@ export default function VotingScreen({
               <Text style={styles.previewName}>{r.username}</Text>
               <Text style={[
                 styles.previewAction,
-                r.action === 'mark'
-                  ? { color: colors.primary.neonRed }
-                  : { color: colors.accent.neonGreen },
+                r.action === 'mark' ? { color: colors.primary.neonRed } : { color: colors.accent.neonGreen },
               ]}>
                 {r.action === 'mark' ? 'MARKED' : 'UNMARKED'}
               </Text>
@@ -173,6 +178,8 @@ export default function VotingScreen({
     </View>
   );
 
+  // ── Main render ──────────────────────────────────────────────────────────
+
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -181,30 +188,24 @@ export default function VotingScreen({
           <Text style={styles.headerRound}>ROUND {roundNumber}</Text>
         </View>
 
-        {phase === 'preview' ? (
-          renderPreview()
-        ) : (
+        {phase === 'preview' ? renderPreview() : (
           <>
             <View style={styles.instructionBox}>
               <Text style={styles.instructionText}>
                 {phase === 'voting'
-                  ? 'Vote on each group member. Majority vote marks or unmarks them.'
-                  : 'Votes submitted. Waiting for the rest of your group...'}
+                  ? 'Tap once for ΦΩΣ (blue), tap again for ΣΚΟΤΊΑ (red).'
+                  : 'Votes submitted. Waiting for your group...'}
               </Text>
             </View>
 
-            <ScrollView
-              style={styles.list}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-            >
-              {others.map(renderVoteRow)}
-            </ScrollView>
+            <View style={styles.cardList}>
+              {others.map(renderVoteCard)}
+            </View>
 
             {phase === 'voting' && (
               <View style={styles.footer}>
                 <Text style={styles.footerCount}>
-                  {Object.keys(myVotes).length} / {others.length} voted
+                  {votedCount} / {others.length} voted
                 </Text>
                 <TouchableOpacity
                   style={[styles.submitBtn, !allVoted && styles.submitBtnDisabled]}
@@ -238,7 +239,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.subtle,
   },
@@ -255,9 +256,9 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   instructionBox: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    padding: 12,
+    marginHorizontal: 14,
+    marginTop: 10,
+    padding: 10,
     backgroundColor: colors.background.void,
     borderRadius: 8,
     borderWidth: 1,
@@ -269,16 +270,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
-  list: {
+
+  // Card list fills remaining vertical space, no scroll
+  cardList: {
     flex: 1,
-    marginTop: 12,
-    marginHorizontal: 16,
+    marginHorizontal: 14,
+    marginTop: 10,
+    marginBottom: 4,
+    gap: 8,
   },
-  listContent: {
-    gap: 10,
-    paddingBottom: 12,
-  },
+
+  // Vote card — takes equal flex share
   memberCard: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -286,10 +290,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.border.default,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
-  memberLeft: {
+  memberCardPhos: {
+    backgroundColor: 'rgba(0, 212, 255, 0.1)',
+    borderColor: colors.primary.electricBlue,
+  },
+  memberCardSkotia: {
+    backgroundColor: 'rgba(220, 20, 60, 0.1)',
+    borderColor: colors.primary.neonRed,
+  },
+  cardLeft: {
     flex: 1,
     gap: 4,
   },
@@ -312,51 +324,28 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     color: colors.primary.neonRed,
   },
-  voteButtons: {
-    flexDirection: 'row',
-    gap: 8,
+  cardRight: {
+    marginLeft: 12,
+    alignItems: 'flex-end',
   },
-  voteBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    minWidth: 62,
-    alignItems: 'center',
-  },
-  phosBtn: {
-    borderColor: 'rgba(0, 212, 255, 0.3)',
-    backgroundColor: 'transparent',
-  },
-  phosBtnActive: {
-    borderColor: colors.primary.electricBlue,
-    backgroundColor: 'rgba(0, 212, 255, 0.15)',
-  },
-  skotiaBtn: {
-    borderColor: 'rgba(255, 51, 102, 0.3)',
-    backgroundColor: 'transparent',
-  },
-  skotiaBtnActive: {
-    borderColor: colors.primary.neonRed,
-    backgroundColor: 'rgba(255, 51, 102, 0.15)',
-  },
-  voteBtnText: {
+  voteLabel: {
     fontFamily: fonts.display.bold,
-    fontSize: 8,
-    letterSpacing: 1,
+    fontSize: 11,
+    letterSpacing: 2,
+  },
+  tapHint: {
+    fontFamily: fonts.display.bold,
+    fontSize: 9,
+    letterSpacing: 2,
     color: colors.text.disabled,
   },
-  phosBtnTextActive: {
-    color: colors.primary.electricBlue,
-  },
-  skotiaBtnTextActive: {
-    color: colors.primary.neonRed,
-  },
+
+  // Footer
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: colors.border.subtle,
     gap: 12,
@@ -399,7 +388,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
-    gap: 20,
+    gap: 16,
   },
   previewTitle: {
     ...typography.screenTitle,
@@ -419,7 +408,7 @@ const styles = StyleSheet.create({
   },
   previewList: {
     width: '100%',
-    gap: 10,
+    gap: 8,
   },
   previewRow: {
     flexDirection: 'row',
@@ -428,7 +417,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.void,
     borderRadius: 8,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   previewName: {
     ...typography.body,

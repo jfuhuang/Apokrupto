@@ -274,6 +274,7 @@ export default function App() {
     if (params.teamPoints !== undefined) setTeamPoints(params.teamPoints);
     if (params.isMarked !== undefined) setIsMarked(params.isMarked);
     if (params.currentGroupMembers !== undefined) setCurrentGroupMembers(params.currentGroupMembers);
+    if (params.groupNumber !== undefined) setCurrentGroupId(params.groupNumber);
     if (params.roundSummary !== undefined) setRoundSummary(params.roundSummary);
     if (params.gameOverResult !== undefined) setGameOverResult(params.gameOverResult);
     if (params.currentTask !== undefined) setCurrentTask(params.currentTask);
@@ -375,6 +376,7 @@ export default function App() {
             currentTeam={currentTeam}
             isMarked={isMarked}
             currentGroupMembers={currentGroupMembers}
+            groupNumber={currentGroupId}
             teamPoints={teamPoints}
             onMovementReady={handleMovementReady}
             onGameStateUpdate={handleGameStateUpdate}
@@ -408,6 +410,7 @@ export default function App() {
             currentTeam={currentTeam}
             isMarked={isMarked}
             currentGroupMembers={currentGroupMembers}
+            groupNumber={currentGroupId}
             teamPoints={teamPoints}
             movementBMode
             onStartTask={handleStartTask}

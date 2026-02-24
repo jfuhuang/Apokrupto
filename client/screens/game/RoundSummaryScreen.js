@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
@@ -13,7 +13,7 @@ export default function RoundSummaryScreen({ roundNumber, totalRounds, summary, 
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.body}>
           <Text style={styles.roundLabel}>ROUND {roundNumber} OF {totalRounds}</Text>
           <Text style={styles.title}>ROUND COMPLETE</Text>
 
@@ -59,7 +59,7 @@ export default function RoundSummaryScreen({ roundNumber, totalRounds, summary, 
               {isLastRound ? 'SEE RESULTS' : 'NEXT ROUND'}
             </Text>
           </TouchableOpacity>
-        </ScrollView>
+        </View>
       </SafeAreaView>
     </View>
   );
@@ -73,12 +73,12 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  scroll: {
-    flexGrow: 1,
+  body: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 32,
+    paddingVertical: 24,
     gap: 20,
   },
   roundLabel: {
