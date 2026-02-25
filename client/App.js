@@ -69,7 +69,8 @@ export default function App() {
   const [isGm, setIsGm] = useState(false);
 
   // Group (changes each round)
-  const [currentGroupId, setCurrentGroupId] = useState(null);
+  const [currentGroupId, setCurrentGroupId] = useState(null);       // DB id, used for socket rooms
+  const [currentGroupNumber, setCurrentGroupNumber] = useState(null); // 1-indexed display label
   const [currentGroupMembers, setCurrentGroupMembers] = useState([]);
 
   // Scores (team-level only)
@@ -167,10 +168,13 @@ export default function App() {
 
   // ── Pre-game ──────────────────────────────────────────────────────────────
 
-  const handleTeamAssigned = (team, teammates = [], gmFlag = false) => {
+  const handleTeamAssigned = (team, teammates = [], gmFlag = false, groupId = null, groupNumber = null, groupMembers = []) => {
     setCurrentTeam(team);
     setSkotiaTeammates(teammates);
     setIsGm(gmFlag);
+    if (groupId) setCurrentGroupId(groupId);
+    if (groupNumber != null) setCurrentGroupNumber(groupNumber);
+    if (groupMembers.length > 0) setCurrentGroupMembers(groupMembers);
   };
 
   const handleGameStarted = (gId) => {
@@ -193,10 +197,11 @@ export default function App() {
   // ── Round / Movement flow ─────────────────────────────────────────────────
 
   // Called by RoundHubScreen when the server announces the next movement
-  const handleMovementReady = (movement, groupId, groupMembers) => {
+  const handleMovementReady = (movement, groupId, groupMembers, groupNumber) => {
     setCurrentMovement(movement);
     if (groupId) setCurrentGroupId(groupId);
     if (groupMembers) setCurrentGroupMembers(groupMembers);
+    if (groupNumber != null) setCurrentGroupNumber(groupNumber);
 
     if (movement === 'A') setCurrentScreen('movementA');
     else if (movement === 'B') setCurrentScreen('movementB');
@@ -256,6 +261,7 @@ export default function App() {
     setIsMarked(false);
     setIsGm(false);
     setCurrentGroupId(null);
+    setCurrentGroupNumber(null);
     setCurrentGroupMembers([]);
     setTeamPoints({ phos: 0, skotia: 0 });
     setCurrentTask(null);
@@ -278,7 +284,7 @@ export default function App() {
     if (params.teamPoints !== undefined) setTeamPoints(params.teamPoints);
     if (params.isMarked !== undefined) setIsMarked(params.isMarked);
     if (params.currentGroupMembers !== undefined) setCurrentGroupMembers(params.currentGroupMembers);
-    if (params.groupNumber !== undefined) setCurrentGroupId(params.groupNumber);
+    if (params.groupNumber !== undefined) setCurrentGroupNumber(params.groupNumber);
     if (params.roundSummary !== undefined) setRoundSummary(params.roundSummary);
     if (params.gameOverResult !== undefined) setGameOverResult(params.gameOverResult);
     if (params.currentTask !== undefined) setCurrentTask(params.currentTask);
@@ -380,7 +386,7 @@ export default function App() {
             currentTeam={currentTeam}
             isMarked={isMarked}
             currentGroupMembers={currentGroupMembers}
-            groupNumber={currentGroupId}
+            groupNumber={currentGroupNumber}
             teamPoints={teamPoints}
             onMovementReady={handleMovementReady}
             onGameStateUpdate={handleGameStateUpdate}
@@ -414,7 +420,7 @@ export default function App() {
             currentTeam={currentTeam}
             isMarked={isMarked}
             currentGroupMembers={currentGroupMembers}
-            groupNumber={currentGroupId}
+            groupNumber={currentGroupNumber}
             teamPoints={teamPoints}
             movementBMode
             onStartTask={handleStartTask}

@@ -74,11 +74,11 @@ export default function RoundHubScreen({
         if (onGameStateUpdate) onGameStateUpdate(state);
       });
 
-      socket.on('movementStart', ({ movement, groupId, groupMembers }) => {
+      socket.on('movementStart', ({ movement, groupId, groupMembers, groupNumber }) => {
         setActiveMovement(movement);
         setStatusMessage(`Movement ${movement} — ${MOVEMENT_LABELS[movement]} beginning...`);
         if (groupMembers) setLiveGroupMembers(groupMembers);
-        if (onMovementReady) onMovementReady(movement, groupId, groupMembers);
+        if (onMovementReady) onMovementReady(movement, groupId, groupMembers, groupNumber ?? null);
       });
 
       socket.on('taskAssigned', (task) => {

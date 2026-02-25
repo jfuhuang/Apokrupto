@@ -634,7 +634,7 @@ router.post('/:id/force-end', requireAdmin, async (req, res) => {
 
     // Mark any active game for this lobby as completed
     await pool.query(
-      `UPDATE games SET status = 'completed', winner = NULL, win_condition = 'force_ended'
+      `UPDATE games SET status = 'completed', winner = NULL, win_condition = NULL
        WHERE lobby_id = $1 AND status = 'active'`,
       [id]
     );

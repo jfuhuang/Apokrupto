@@ -160,8 +160,15 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
         setIsLoading(false);
       });
 
-      socket.on('roleAssigned', ({ team, skotiaTeammates, isGm }) => {
-        if (onRoleAssigned) onRoleAssigned(team, skotiaTeammates || [], isGm || false);
+      socket.on('roleAssigned', ({ team, skotiaTeammates, isGm, groupId, groupNumber, groupMembers }) => {
+        if (onRoleAssigned) onRoleAssigned(
+          team,
+          skotiaTeammates || [],
+          isGm || false,
+          groupId || null,
+          groupNumber ?? null,
+          groupMembers || []
+        );
       });
 
       socket.on('gameStarted', ({ gameId } = {}) => {
