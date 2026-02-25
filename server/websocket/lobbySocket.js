@@ -2,6 +2,7 @@ const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const { getSabotage } = require('../data/sabotages');
+const gameService = require('../services/gameService');
 
 // In-memory map of lobbyId -> Set of connected userIds (as strings)
 const lobbyConnections = new Map();
@@ -171,12 +172,6 @@ function broadcastPlayerKicked(lobbyId, userId) {
   _io.to(`lobby:${String(lobbyId)}`).emit('playerKicked', { userId: String(userId) });
 }
 
-function getDeceiverCount(n) {
-  if (n <= 4) return 1;
-  if (n <= 7) return 2;
-  return 3;
-}
-
 function setupLobbySocket(httpServer) {
   _io = new Server(httpServer, {
     cors: {
@@ -251,107 +246,63 @@ function setupLobbySocket(httpServer) {
       }
     });
 
-    // Host starts the game
+    // Host starts the game (Phos/Skotia social deduction)
     socket.on('startGame', async ({ lobbyId }, callback) => {
-      const client = await pool.connect();
       try {
-        const result = await client.query(
+        const lobbyRes = await pool.query(
           'SELECT created_by, status FROM lobbies WHERE id = $1',
           [lobbyId]
         );
+        if (lobbyRes.rows.length === 0) throw new Error('Lobby not found');
 
-        if (result.rows.length === 0) {
-          throw new Error('Lobby not found');
-        }
-
-        const lobby = result.rows[0];
-
+        const lobby = lobbyRes.rows[0];
         if (String(lobby.created_by) !== socket.userId) {
           throw new Error('Only the host can start the game');
         }
+        if (lobby.status !== 'waiting') throw new Error('Game already started');
 
-        if (lobby.status !== 'waiting') {
-          throw new Error('Game already started');
-        }
+        // Create game record + start it (assigns teams, groups, round 1 Movement A)
+        const gameId = await gameService.createGame(lobbyId, 4);
+        const { playerTeams, playerGroups, skotiaPlayers } =
+          await gameService.startGame(gameId);
 
-        // Fetch all players ordered by join time
-        const playersResult = await client.query(
-          `SELECT lp.user_id, u.username
-           FROM lobby_players lp
-           JOIN users u ON u.id = lp.user_id
-           WHERE lp.lobby_id = $1
-           ORDER BY lp.joined_at ASC`,
-          [lobbyId]
+        console.log(
+          `[WS] startGame lobby ${lobbyId}: gameId=${gameId}, ` +
+          `${skotiaPlayers.length} skotia / ${playerTeams.size - skotiaPlayers.length} phos`
         );
-        const playerIds = playersResult.rows.map((r) => String(r.user_id));
-        const userIdToUsername = {};
-        playersResult.rows.forEach((r) => { userIdToUsername[String(r.user_id)] = r.username; });
 
-        // Fisher-Yates shuffle
-        for (let i = playerIds.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [playerIds[i], playerIds[j]] = [playerIds[j], playerIds[i]];
-        }
-
-        const deceiverCount = getDeceiverCount(playerIds.length);
-        const roleMap = {};
-        playerIds.forEach((uid, idx) => {
-          roleMap[uid] = idx < deceiverCount ? 'deceiver' : 'innocent';
-        });
-
-        console.log(`[WS] startGame lobby ${lobbyId}: ${deceiverCount} deceiver(s) among ${playerIds.length} players`);
-
-        // Assign roles + mark in_progress in a transaction
-        await client.query('BEGIN');
-        await client.query(
-          "UPDATE lobbies SET status = 'in_progress' WHERE id = $1",
-          [lobbyId]
-        );
-        // Reset points and task completions from any previous game
-        await client.query(
-          'UPDATE lobby_players SET points = 0, is_alive = true WHERE lobby_id = $1',
-          [lobbyId]
-        );
-        await client.query(
-          'DELETE FROM player_task_completions WHERE lobby_id = $1',
-          [lobbyId]
-        );
-        for (const [uid, role] of Object.entries(roleMap)) {
-          await client.query(
-            'UPDATE lobby_players SET role = $1 WHERE lobby_id = $2 AND user_id = $3',
-            [role, lobbyId, uid]
-          );
-        }
-        await client.query('COMMIT');
-
-        // Emit roleAssigned privately to each socket in this lobby
+        // Emit per-player roleAssigned
         const roomKey = `lobby:${String(lobbyId)}`;
-        const deceiverUsernames = playerIds
-          .filter((uid) => roleMap[uid] === 'deceiver')
-          .map((uid) => userIdToUsername[uid]);
+        const skotiaUsernames = skotiaPlayers.map((p) => p.username);
+
         for (const [, sock] of io.sockets.sockets) {
-          if (sock.rooms.has(roomKey) && roleMap[sock.userId] !== undefined) {
-            const payload = { role: roleMap[sock.userId] };
-            if (roleMap[sock.userId] === 'deceiver') {
-              payload.fellowDeceivers = deceiverUsernames.filter(
-                (name) => name !== userIdToUsername[sock.userId]
-              );
-            }
-            sock.emit('roleAssigned', payload);
-            console.log(`[WS] roleAssigned ${roleMap[sock.userId]} → user ${sock.userId}`);
-          }
+          if (!sock.rooms.has(roomKey)) continue;
+          const uid  = sock.userId;
+          const team = playerTeams.get(uid);
+          if (!team) continue;
+
+          const groupInfo = playerGroups.get(uid);
+          const rolePayload = {
+            team,
+            isGm: uid === String(lobby.created_by),
+            skotiaTeammates: team === 'skotia'
+              ? skotiaUsernames.filter((name) => name !== sock.username)
+              : [],
+            groupId:      String(groupInfo?.groupId ?? ''),
+            groupNumber:  groupInfo?.groupIndex ?? null,
+            groupMembers: groupInfo?.members ?? [],
+          };
+          sock.emit('roleAssigned', rolePayload);
+          console.log(`[WS] roleAssigned ${team} → user ${uid}`);
         }
 
-        const state = await getLobbyState(lobbyId);
-        io.to(roomKey).emit('gameStarted', { ...state, countdown: 5 });
+        io.to(roomKey).emit('gameStarted', { gameId, countdown: 5 });
+        io.to(roomKey).emit('movementStart', { movement: 'A', roundNumber: 1 });
 
-        if (callback) callback({ ok: true });
+        if (callback) callback({ ok: true, gameId });
       } catch (err) {
-        await client.query('ROLLBACK').catch(() => {});
-        console.error('[WS] startGame error:', err);
+        console.error('[WS] startGame error:', err.message);
         if (callback) callback({ error: err.message });
-      } finally {
-        client.release();
       }
     });
 
@@ -443,16 +394,30 @@ function setupLobbySocket(httpServer) {
     // GM advances the game to the next movement/phase
     socket.on('gmAdvance', async ({ gameId } = {}, callback) => {
       try {
-        // When the full game state machine is built, this will advance the movement.
-        // For now, emit a movementStart placeholder so clients can react.
-        if (currentLobbyId) {
-          io.to(`lobby:${currentLobbyId}`).emit('movementStart', { gameId, advancedBy: socket.userId });
-          console.log(`[WS] gmAdvance emitted for game ${gameId} in lobby ${currentLobbyId} by user ${socket.userId}`);
+        if (!gameId) throw new Error('gameId is required');
+
+        // Verify the caller is the lobby host for this game
+        const gameRes = await pool.query(
+          `SELECT g.lobby_id, l.created_by
+           FROM games g JOIN lobbies l ON l.id = g.lobby_id
+           WHERE g.id = $1`,
+          [gameId]
+        );
+        if (gameRes.rows.length === 0) throw new Error('Game not found');
+        if (String(gameRes.rows[0].created_by) !== socket.userId) {
+          throw new Error('Only the GM can advance the game');
         }
-        if (callback) callback({ ok: true });
+
+        const result = await gameService.advanceMovement(gameId);
+        console.log(`[WS] gmAdvance game ${gameId}: → ${result.gameOver ? 'GAME OVER' : result.nextMovement}`);
+
+        // Emit the appropriate socket events (shared logic with REST route)
+        _emitAdvanceEvents(io, result);
+
+        if (callback) callback({ ok: true, ...result });
       } catch (err) {
-        console.error('[WS] gmAdvance error:', err);
-        if (callback) callback({ error: 'Server error' });
+        console.error('[WS] gmAdvance error:', err.message);
+        if (callback) callback({ error: err.message });
       }
     });
 
@@ -499,5 +464,75 @@ function getActiveSabotage(lobbyId) {
 }
 
 function getIO() { return _io; }
+
+/**
+ * Emit the correct socket events after gameService.advanceMovement() resolves.
+ * Shared between the WS gmAdvance handler and the REST POST /advance route.
+ */
+function _emitAdvanceEvents(io, result) {
+  if (!io) return;
+  const lobbyRoom = `lobby:${String(result.lobbyId)}`;
+
+  if (result.gameOver) {
+    if (result.groupResults) {
+      for (const [gId, actions] of result.groupResults) {
+        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
+      }
+    }
+    io.to(lobbyRoom).emit('roundSummary', result.summary);
+    io.to(lobbyRoom).emit('gameOver', result.gameOverData);
+    return;
+  }
+
+  if (result.nextMovement === 'B') {
+    io.to(lobbyRoom).emit('movementStart', {
+      movement:    'B',
+      roundNumber: result.roundNumber,
+    });
+    return;
+  }
+
+  if (result.nextMovement === 'C') {
+    io.to(lobbyRoom).emit('movementStart', {
+      movement:    'C',
+      roundNumber: result.roundNumber,
+    });
+    return;
+  }
+
+  if (result.nextMovement === 'A') {
+    // Voting just resolved — emit per-group results + round summary
+    if (result.groupResults) {
+      for (const [gId, actions] of result.groupResults) {
+        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
+      }
+    }
+    io.to(lobbyRoom).emit('roundSummary', result.summary);
+
+    // Per-player movementStart with new group assignment
+    if (result.newGroups) {
+      const userGroupMap = new Map();
+      for (const group of result.newGroups) {
+        for (const memberId of group.memberIds) {
+          userGroupMap.set(String(memberId), group);
+        }
+      }
+      for (const [, sock] of io.sockets.sockets) {
+        if (!sock.rooms.has(lobbyRoom)) continue;
+        const group = userGroupMap.get(sock.userId);
+        if (!group) continue;
+        sock.emit('movementStart', {
+          movement:     'A',
+          roundNumber:  result.roundNumber,
+          totalRounds:  result.totalRounds,
+          groupId:      String(group.groupId),
+          groupNumber:  group.groupIndex,
+          groupMembers: group.members,
+          teamPoints:   result.teamPoints,
+        });
+      }
+    }
+  }
+}
 
 module.exports = { setupLobbySocket, getIO, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage, broadcastPlayerKicked };

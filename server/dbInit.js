@@ -51,6 +51,10 @@ async function init() {
     ALTER TABLE lobby_players ADD COLUMN IF NOT EXISTS role    VARCHAR(20);
     ALTER TABLE lobby_players ADD COLUMN IF NOT EXISTS points  INT     NOT NULL DEFAULT 0;
     ALTER TABLE lobby_players ADD COLUMN IF NOT EXISTS is_alive BOOLEAN NOT NULL DEFAULT TRUE;
+
+    -- Expand max_players from 4–15 to 5–80
+    ALTER TABLE lobbies DROP CONSTRAINT IF EXISTS lobbies_max_players_check;
+    ALTER TABLE lobbies ADD CONSTRAINT lobbies_max_players_check CHECK (max_players >= 5 AND max_players <= 80);
   `);
 
   await pool.query(`
@@ -64,6 +68,138 @@ async function init() {
       UNIQUE (lobby_id, user_id, task_id)
     );
     CREATE INDEX IF NOT EXISTS ix_ptc_lobby_user ON player_task_completions (lobby_id, user_id);
+  `);
+
+  // --- New game tables ---
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS games (
+      id              SERIAL PRIMARY KEY,
+      lobby_id        INT NOT NULL REFERENCES lobbies(id) ON DELETE CASCADE,
+      status          VARCHAR(20) NOT NULL DEFAULT 'active'
+                        CHECK (status IN ('active', 'completed')),
+      total_rounds    INT NOT NULL DEFAULT 4,
+      current_round   INT NOT NULL DEFAULT 1,
+      winner          VARCHAR(10) CHECK (winner IN ('phos', 'skotia')),
+      win_condition   VARCHAR(20) CHECK (win_condition IN ('points', 'supermajority')),
+      created_at      TIMESTAMPTZ DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS game_teams (
+      id       SERIAL PRIMARY KEY,
+      game_id  INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+      team     VARCHAR(10) NOT NULL CHECK (team IN ('phos', 'skotia')),
+      points   INT NOT NULL DEFAULT 0,
+      UNIQUE (game_id, team)
+    );
+
+    CREATE TABLE IF NOT EXISTS game_players (
+      id        SERIAL PRIMARY KEY,
+      game_id   INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+      user_id   INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      team      VARCHAR(10) NOT NULL CHECK (team IN ('phos', 'skotia')),
+      is_marked BOOLEAN NOT NULL DEFAULT FALSE,
+      UNIQUE (game_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS game_groups (
+      id            SERIAL PRIMARY KEY,
+      game_id       INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+      round_number  INT NOT NULL,
+      group_index   INT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS game_group_members (
+      id        SERIAL PRIMARY KEY,
+      group_id  INT NOT NULL REFERENCES game_groups(id) ON DELETE CASCADE,
+      user_id   INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE (group_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS rounds (
+      id            SERIAL PRIMARY KEY,
+      game_id       INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+      round_number  INT NOT NULL,
+      status        VARCHAR(20) NOT NULL DEFAULT 'pending'
+                      CHECK (status IN ('pending', 'active', 'completed')),
+      UNIQUE (game_id, round_number)
+    );
+
+    CREATE TABLE IF NOT EXISTS movements (
+      id             SERIAL PRIMARY KEY,
+      round_id       INT NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+      movement_type  CHAR(1) NOT NULL CHECK (movement_type IN ('A', 'B', 'C')),
+      status         VARCHAR(20) NOT NULL DEFAULT 'pending'
+                       CHECK (status IN ('pending', 'active', 'completed')),
+      started_at     TIMESTAMPTZ,
+      completed_at   TIMESTAMPTZ,
+      UNIQUE (round_id, movement_type)
+    );
+
+    CREATE TABLE IF NOT EXISTS prompts (
+      id            SERIAL PRIMARY KEY,
+      phos_prompt   TEXT NOT NULL,
+      skotia_prompt TEXT NOT NULL,
+      theme_label   TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS movement_a_submissions (
+      id           SERIAL PRIMARY KEY,
+      movement_id  INT NOT NULL REFERENCES movements(id) ON DELETE CASCADE,
+      group_id     INT NOT NULL REFERENCES game_groups(id) ON DELETE CASCADE,
+      user_id      INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      word         TEXT NOT NULL,
+      submitted_at TIMESTAMPTZ DEFAULT now(),
+      UNIQUE (movement_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS movement_c_votes (
+      id           SERIAL PRIMARY KEY,
+      movement_id  INT NOT NULL REFERENCES movements(id) ON DELETE CASCADE,
+      group_id     INT NOT NULL REFERENCES game_groups(id) ON DELETE CASCADE,
+      voter_id     INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      target_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      vote         VARCHAR(10) NOT NULL CHECK (vote IN ('phos', 'skotia')),
+      submitted_at TIMESTAMPTZ DEFAULT now(),
+      UNIQUE (movement_id, voter_id, target_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS mark_events (
+      id              SERIAL PRIMARY KEY,
+      game_id         INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+      game_player_id  INT NOT NULL REFERENCES game_players(id) ON DELETE CASCADE,
+      round_number    INT NOT NULL,
+      action          VARCHAR(10) NOT NULL CHECK (action IN ('mark', 'unmark')),
+      was_correct     BOOLEAN NOT NULL,
+      created_at      TIMESTAMPTZ DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_games_lobby    ON games (lobby_id);
+    CREATE INDEX IF NOT EXISTS ix_game_players   ON game_players (game_id, user_id);
+    CREATE INDEX IF NOT EXISTS ix_game_groups    ON game_groups (game_id, round_number);
+    CREATE INDEX IF NOT EXISTS ix_ggm_group      ON game_group_members (group_id);
+    CREATE INDEX IF NOT EXISTS ix_ggm_user       ON game_group_members (user_id);
+    CREATE INDEX IF NOT EXISTS ix_movements      ON movements (round_id);
+    CREATE INDEX IF NOT EXISTS ix_mv_a_sub       ON movement_a_submissions (movement_id, group_id);
+    CREATE INDEX IF NOT EXISTS ix_mv_c_votes     ON movement_c_votes (movement_id, group_id);
+    CREATE INDEX IF NOT EXISTS ix_mark_events    ON mark_events (game_id, round_number);
+  `);
+
+  // Seed biblical prompt pairs (only if table is empty)
+  await pool.query(`
+    INSERT INTO prompts (phos_prompt, skotia_prompt, theme_label)
+    SELECT * FROM (VALUES
+      ('Fruits of the Spirit',         'Things that feel good in the moment',  'Spirit vs. Flesh'),
+      ('Names for Jesus',               'Things people worship instead of God', 'True vs. False Worship'),
+      ('Ways to serve others',          'Ways to put yourself first',           'Service vs. Self'),
+      ('Gifts from God',                'Things money can buy',                 'Grace vs. Wealth'),
+      ('Words from the Beatitudes',     'Things the world calls success',       'Kingdom vs. World'),
+      ('Qualities of the Holy Spirit',  'Things the world calls strength',      'Spirit vs. Power'),
+      ('Things Jesus said',             'Lies the world tells you',             'Truth vs. Deception'),
+      ('Characters from the Gospels',   'Famous people everyone knows',         'Sacred vs. Famous'),
+      ('Books of the Bible',            'Popular books or movies',              'Scripture vs. Culture'),
+      ('Places in the Holy Land',       'Places people dream of visiting',      'Sacred vs. Worldly')
+    ) AS seed(phos_prompt, skotia_prompt, theme_label)
+    WHERE NOT EXISTS (SELECT 1 FROM prompts LIMIT 1)
   `);
 
 }

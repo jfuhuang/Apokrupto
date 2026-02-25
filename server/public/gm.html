@@ -309,9 +309,153 @@
       text-transform: uppercase;
     }
     .section-header .caret { color: var(--muted); font-size: 0.8rem; }
+
+    /* ── Lobby Selector ── */
+    #setup-screen {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    #setup-screen.hidden { display: none; }
+
+    #setup-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 36px 40px;
+      width: 420px;
+      max-width: 92vw;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    #setup-box h2 {
+      font-size: 0.85rem;
+      letter-spacing: 4px;
+      color: var(--blue);
+      text-transform: uppercase;
+      text-align: center;
+    }
+    .setup-field { display: flex; flex-direction: column; gap: 6px; }
+    .setup-field label {
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .setup-field input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.8rem;
+      padding: 8px 12px;
+      outline: none;
+    }
+    .setup-field input:focus { border-color: var(--blue); }
+    #setup-error {
+      font-size: 0.75rem;
+      color: var(--red);
+      min-height: 1em;
+    }
+
+    #setup-lobby-step { display: none; flex-direction: column; gap: 12px; }
+    #setup-lobby-step.visible { display: flex; }
+
+    #setup-lobby-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .lobby-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      gap: 10px;
+    }
+    .lobby-option:hover { border-color: var(--blue); }
+    .lobby-option.selected { border-color: var(--blue); background: var(--blue-dim); }
+    .lobby-option-name { font-size: 0.85rem; flex: 1; }
+    .lobby-option-meta { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
+    .lobby-option-status {
+      font-size: 0.65rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 2px;
+    }
+    .status-waiting    { color: var(--blue); background: rgba(0,212,255,.1); border: 1px solid rgba(0,212,255,.25); }
+    .status-in_progress { color: var(--green); background: rgba(0,255,159,.1); border: 1px solid rgba(0,255,159,.25); }
+    .status-completed  { color: var(--muted); background: rgba(90,96,128,.1); border: 1px solid var(--border); }
+
+    .setup-mode-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 1px;
+    }
+    .setup-mode-row input[type="checkbox"] { accent-color: var(--blue); width: 14px; height: 14px; }
+
+    .setup-btn-row { display: flex; gap: 10px; }
+    .setup-btn-row button { flex: 1; }
   </style>
 </head>
 <body>
+
+  <!-- Lobby selector (shown when no lobbyId in URL) -->
+  <div id="setup-screen">
+    <div id="setup-box">
+      <h2>GM Dashboard</h2>
+
+      <!-- Step 1: login -->
+      <div id="setup-login-step" style="display:flex;flex-direction:column;gap:14px;">
+        <div class="setup-field">
+          <label>Username</label>
+          <input type="text" id="setup-username" autocomplete="username" />
+        </div>
+        <div class="setup-field">
+          <label>Password</label>
+          <input type="password" id="setup-password" autocomplete="current-password" />
+        </div>
+        <button onclick="setupLogin()">SIGN IN</button>
+      </div>
+
+      <div id="setup-error"></div>
+
+      <!-- Step 2: lobby list (shown after token validated) -->
+      <div id="setup-lobby-step">
+        <div class="setup-field">
+          <label>Select Lobby</label>
+          <div id="setup-lobby-list">
+            <span style="color:var(--muted);font-size:0.8rem;">Loading...</span>
+          </div>
+        </div>
+
+        <div class="setup-mode-row">
+          <input type="checkbox" id="setup-control-mode" checked />
+          <label for="setup-control-mode" style="cursor:pointer;">Control mode (GM controls)</label>
+        </div>
+
+        <div class="setup-btn-row">
+          <button onclick="setupBack()">BACK</button>
+          <button class="primary" id="setup-connect-btn" onclick="setupConnect()" disabled>CONNECT</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
 
   <!-- Offline banner -->
   <div id="offline-banner">Socket disconnected — data may be stale</div>
@@ -396,29 +540,126 @@
 
   <script>
     // ── URL params ──────────────────────────────────────────────────────────
-    const params   = new URLSearchParams(location.search);
-    const gameId   = params.get('gameId')   || '';
-    const lobbyId  = params.get('lobbyId')  || '';
-    const isControl = params.get('mode') === 'control';
-    let   gmToken  = params.get('token')    || '';
+    const params    = new URLSearchParams(location.search);
+    let   gameId    = params.get('gameId')  || '';
+    let   lobbyId   = params.get('lobbyId') || '';
+    let   isControl = params.get('mode') === 'control';
+    let   gmToken   = params.get('token')   || '';
 
     // ── State ───────────────────────────────────────────────────────────────
     let socket = null;
     let pollInterval = null;
     let rosterOpen = false;
+    let setupSelectedLobby = null; // { id, gameId }
 
     // ── Init ────────────────────────────────────────────────────────────────
-    if (isControl) {
-      document.getElementById('control-panel').classList.add('visible');
-      if (gmToken) {
-        // Token pre-supplied in URL
-        unlockControls();
+    if (lobbyId) {
+      // Params provided — skip lobby selector and connect directly
+      document.getElementById('setup-screen').classList.add('hidden');
+      if (isControl) {
+        document.getElementById('control-panel').classList.add('visible');
+        if (gmToken) unlockControls();
+      }
+      connectSocket();
+      fetchState();
+      pollInterval = setInterval(fetchState, 10000);
+    }
+    // else: setup-screen stays visible; user selects a lobby first
+
+    // ── Setup functions ──────────────────────────────────────────────────────
+    async function setupLogin() {
+      const username = document.getElementById('setup-username').value.trim();
+      const password = document.getElementById('setup-password').value;
+      const errEl    = document.getElementById('setup-error');
+      errEl.textContent = '';
+      if (!username || !password) { errEl.textContent = 'Enter username and password.'; return; }
+
+      try {
+        const res = await fetch('/api/users/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        gmToken = data.token;
+      } catch (err) {
+        errEl.textContent = 'Login failed: ' + err.message;
+        return;
+      }
+
+      // Login succeeded — hide login step, show lobby list
+      document.getElementById('setup-login-step').style.display = 'none';
+      const listEl = document.getElementById('setup-lobby-list');
+      listEl.innerHTML = '<span style="color:var(--muted);font-size:0.8rem;">Loading...</span>';
+      document.getElementById('setup-lobby-step').classList.add('visible');
+      document.getElementById('setup-connect-btn').disabled = true;
+      setupSelectedLobby = null;
+
+      try {
+        const res = await fetch('/api/lobbies?all=true', {
+          headers: { 'Authorization': `Bearer ${gmToken}` },
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        renderSetupLobbies(data.lobbies || []);
+      } catch (err) {
+        errEl.textContent = 'Could not load lobbies: ' + err.message;
       }
     }
 
-    connectSocket();
-    fetchState();
-    pollInterval = setInterval(fetchState, 10000);
+    function renderSetupLobbies(lobbies) {
+      const listEl = document.getElementById('setup-lobby-list');
+      if (lobbies.length === 0) {
+        listEl.innerHTML = '<span style="color:var(--muted);font-size:0.8rem;">No active lobbies found.</span>';
+        return;
+      }
+      listEl.innerHTML = lobbies.map(l => `
+        <div class="lobby-option" onclick="selectSetupLobby(${l.id}, '${escHtml(l.name)}', this)">
+          <span class="lobby-option-name">${escHtml(l.name)}</span>
+          <span class="lobby-option-meta">${l.current_players}/${l.max_players}</span>
+          <span class="lobby-option-status status-${l.status}">${l.status.replace('_',' ')}</span>
+        </div>
+      `).join('');
+    }
+
+    function selectSetupLobby(id, name, el) {
+      document.querySelectorAll('.lobby-option').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+      setupSelectedLobby = { id, name, gameId: '' }; // gameId filled in once game service exists
+      document.getElementById('setup-connect-btn').disabled = false;
+    }
+
+    function setupBack() {
+      document.getElementById('setup-lobby-step').classList.remove('visible');
+      document.getElementById('setup-login-step').style.display = 'flex';
+      document.getElementById('setup-error').textContent = '';
+      setupSelectedLobby = null;
+      gmToken = '';
+      document.getElementById('setup-connect-btn').disabled = true;
+    }
+
+    function setupConnect() {
+      if (!setupSelectedLobby) return;
+      lobbyId   = String(setupSelectedLobby.id);
+      gameId    = setupSelectedLobby.gameId || '';
+      isControl = document.getElementById('setup-control-mode').checked;
+
+      document.getElementById('setup-screen').classList.add('hidden');
+
+      if (isControl) {
+        document.getElementById('control-panel').classList.add('visible');
+        // Token already set; bypass the token-gate and unlock directly
+        unlockControls();
+      }
+
+      connectSocket();
+      fetchState();
+      pollInterval = setInterval(fetchState, 10000);
+    }
 
     // ── Socket ──────────────────────────────────────────────────────────────
     function connectSocket() {
@@ -544,15 +785,14 @@
     // ── Control panel actions ───────────────────────────────────────────────
     function unlockControls() {
       const input = document.getElementById('token-input');
-      const val = input ? input.value.trim() : gmToken;
+      const val = (input && input.value.trim()) || gmToken;
       if (!val) return;
       gmToken = val;
       document.getElementById('token-gate').style.display = 'none';
       document.getElementById('controls').classList.add('visible');
 
-      // Reconnect socket with auth token
-      if (socket) socket.disconnect();
-      connectSocket();
+      // Reconnect socket with auth token if already connected without it
+      if (socket) { socket.disconnect(); connectSocket(); }
     }
 
     function advanceMovement() {
@@ -606,6 +846,8 @@
     document.addEventListener('DOMContentLoaded', () => {
       const bi = document.getElementById('broadcast-input');
       if (bi) bi.addEventListener('keydown', e => { if (e.key === 'Enter') sendBroadcast(); });
+      const sp = document.getElementById('setup-password');
+      if (sp) sp.addEventListener('keydown', e => { if (e.key === 'Enter') setupLogin(); });
     });
   </script>
 </body>

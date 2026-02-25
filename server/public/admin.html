@@ -235,7 +235,6 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      border-right: 1px solid var(--border);
       min-width: 0;
       overflow: hidden;
     }
@@ -303,8 +302,8 @@
       text-transform: uppercase;
       letter-spacing: 1px;
     }
-    .role-deceiver { background: rgba(220,20,60,.15); color: var(--red); border: 1px solid rgba(220,20,60,.3); }
-    .role-innocent { background: rgba(0,212,255,.1); color: var(--blue); border: 1px solid rgba(0,212,255,.25); }
+    .role-skotia { background: rgba(220,20,60,.15); color: var(--red); border: 1px solid rgba(220,20,60,.3); }
+    .role-phos { background: rgba(0,212,255,.1); color: var(--blue); border: 1px solid rgba(0,212,255,.25); }
     .player-actions { display: flex; gap: 6px; }
     .kick-btn { padding: 3px 8px; font-size: 0.7rem; }
 
@@ -340,79 +339,6 @@
     .lb-name { flex: 1; }
     .lb-pts { color: var(--green); font-size: 0.8rem; }
 
-    /* Right panel */
-    .panel-right {
-      width: 340px;
-      flex-shrink: 0;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      min-width: 0;
-    }
-    @media (max-width: 900px) {
-      .detail-body { flex-direction: column; }
-      .panel-left { border-right: none; border-bottom: 1px solid var(--border); max-height: 50vh; }
-      .panel-right { width: 100%; }
-    }
-
-    .wip-section {
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border);
-    }
-    .wip-section:last-child { border-bottom: none; }
-    .wip-label {
-      font-size: 0.65rem;
-      letter-spacing: 2px;
-      color: var(--muted);
-      text-transform: uppercase;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .wip-label::after {
-      content: 'WIP';
-      background: rgba(255,215,0,.1);
-      color: var(--yellow);
-      border: 1px solid rgba(255,215,0,.25);
-      padding: 0 5px;
-      font-size: 0.6rem;
-      border-radius: 2px;
-    }
-    .map-placeholder {
-      background: var(--surface2);
-      border: 1px dashed var(--border);
-      height: 140px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--muted);
-      font-size: 0.8rem;
-      letter-spacing: 1px;
-      margin-bottom: 10px;
-    }
-    .wip-player-list { display: flex; flex-direction: column; gap: 6px; }
-    .wip-player-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 0.8rem;
-      color: var(--muted);
-    }
-
-    .select-field {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: var(--font);
-      font-size: 0.8rem;
-      padding: 6px 10px;
-      outline: none;
-      width: 100%;
-      margin-bottom: 10px;
-    }
-    .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-    .action-grid button { font-size: 0.72rem; padding: 7px 6px; }
 
     /* ── Toast ── */
     #toast {
@@ -521,32 +447,6 @@
         </div>
       </div>
 
-      <!-- Right: WIP features -->
-      <div class="panel-right">
-        <div class="panel-title">Dev Tools</div>
-
-        <!-- Section A: Location Mocking -->
-        <div class="wip-section">
-          <div class="wip-label">Location Mocking</div>
-          <div class="map-placeholder">GPS Mocking — Coming Soon</div>
-          <div class="wip-player-list" id="gps-player-list"></div>
-        </div>
-
-        <!-- Section B: Action Triggers -->
-        <div class="wip-section">
-          <div class="wip-label">Game Action Injection</div>
-          <select class="select-field" id="action-player-select" disabled>
-            <option value="">Select player...</option>
-          </select>
-          <div class="action-grid">
-            <button disabled>Complete Task</button>
-            <button disabled>Kill Player</button>
-            <button disabled>Report Body</button>
-            <button disabled>Fix Sabotage</button>
-          </div>
-          <p style="font-size:.72rem;color:var(--muted);margin-top:10px;">Game Action Injection — Coming Soon</p>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -561,8 +461,8 @@
       <input id="new-lobby-name" type="text" placeholder="e.g. Alpha Station" />
     </div>
     <div class="field">
-      <label>Max Players (4–15)</label>
-      <input id="new-lobby-max" type="number" min="4" max="15" value="8" />
+      <label>Max Players (5–80)</label>
+      <input id="new-lobby-max" type="number" min="5" max="80" value="20" />
     </div>
     <div id="modal-error"></div>
     <div class="modal-actions">
@@ -759,8 +659,8 @@
     const errEl = document.getElementById('modal-error');
     errEl.textContent = '';
     if (!name) { errEl.textContent = 'Name is required.'; return; }
-    if (max_players < 4 || max_players > 15 || isNaN(max_players)) {
-      errEl.textContent = 'Max players must be 4–15.'; return;
+    if (max_players < 5 || max_players > 80 || isNaN(max_players)) {
+      errEl.textContent = 'Max players must be 5–80.'; return;
     }
     try {
       await apiFetch('/api/lobbies', { method: 'POST', body: JSON.stringify({ name, max_players }) });
@@ -842,7 +742,6 @@
       const startBtn = document.getElementById('btn-start-game');
       startBtn.style.display = (data.status === 'waiting' && String(data.hostId) === String(myId)) ? 'inline-block' : 'none';
 
-      updateWipPlayerList(data.players);
     });
 
     socket.on('gameStarted', (data) => {
@@ -942,21 +841,6 @@
           <span class="lb-pts">${p.points || 0} pts</span>
         </div>
       `).join('');
-  }
-
-  function updateWipPlayerList(players) {
-    const el = document.getElementById('gps-player-list');
-    el.innerHTML = players.map(p => `
-      <div class="wip-player-row">
-        <span>${escHtml(p.username)}</span>
-        <button disabled style="font-size:.65rem;padding:2px 7px;">Set Position</button>
-      </div>
-    `).join('');
-
-    const sel = document.getElementById('action-player-select');
-    const current = sel.value;
-    sel.innerHTML = '<option value="">Select player...</option>' +
-      players.map(p => `<option value="${p.id}" ${String(p.id) === current ? 'selected' : ''}>${escHtml(p.username)}</option>`).join('');
   }
 
   // ── Actions ────────────────────────────────────────────────────────────────
