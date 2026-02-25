@@ -38,7 +38,8 @@ export default function MovementAScreen({
   const [currentTurnPlayerName, setCurrentTurnPlayerName] = useState('');
   const [completedCount, setCompletedCount] = useState(0);
   const [turnSecondsLeft, setTurnSecondsLeft] = useState(TURN_TIME_LIMIT);
-  const [allWords, setAllWords] = useState([]);
+  const [allWords, setAllWords] = useState([]); // [{ userId, username, word }]
+  const [submittedWords, setSubmittedWords] = useState([]); // live word reveal list
   const [deliberationSecondsLeft, setDeliberationSecondsLeft] = useState(120);
   const [submitting, setSubmitting] = useState(false);
   const [submittedIds, setSubmittedIds] = useState(new Set());
@@ -87,7 +88,7 @@ export default function MovementAScreen({
       });
 
       // Server announces whose turn it is
-      socket.on('turnStart', ({ currentPlayerId, completedCount: cc, timeLimit }) => {
+      socket.on('turnStart', ({ currentPlayerId, completedCount: cc, timeLimit, lastWord }) => {
         clearInterval(turnTimerRef.current);
 
         // The player whose turn just ended has submitted
@@ -95,6 +96,15 @@ export default function MovementAScreen({
           setSubmittedIds((prev) => new Set([...prev, String(prevTurnPlayerIdRef.current)]));
         }
         prevTurnPlayerIdRef.current = currentPlayerId;
+
+        // Append the just-submitted word to the live reveal list
+        if (lastWord) {
+          setSubmittedWords((prev) => {
+            // Avoid duplicates (e.g. if we already added our own word on submit)
+            if (prev.some((w) => String(w.userId) === String(lastWord.userId))) return prev;
+            return [...prev, lastWord];
+          });
+        }
 
         setCurrentTurnPlayerId(currentPlayerId);
         setCompletedCount(cc);
@@ -129,10 +139,18 @@ export default function MovementAScreen({
       });
 
       // All players submitted — show words for deliberation
-      socket.on('deliberationStart', ({ words }) => {
+      socket.on('deliberationStart', ({ words, lastWord }) => {
         clearInterval(turnTimerRef.current);
         // Mark everyone as submitted
         setSubmittedIds(new Set((groupMembers || []).map((m) => String(m.id))));
+        // Append final word to live reveal list
+        if (lastWord) {
+          setSubmittedWords((prev) => {
+            if (prev.some((w) => String(w.userId) === String(lastWord.userId))) return prev;
+            return [...prev, lastWord];
+          });
+        }
+        // words is now [{ userId, username, word }]
         setAllWords(words || []);
         setPhase('deliberation');
 
@@ -179,6 +197,12 @@ export default function MovementAScreen({
     clearInterval(turnTimerRef.current);
     setMyWord(finalWord);
     setSubmittedIds((prev) => new Set([...prev, String(currentUserId)]));
+    // Add our own word to the live reveal list
+    const myUsername = groupMembers?.find((m) => String(m.id) === String(currentUserId))?.username || 'You';
+    setSubmittedWords((prev) => {
+      if (prev.some((w) => String(w.userId) === String(currentUserId))) return prev;
+      return [...prev, { userId: String(currentUserId), username: myUsername, word: finalWord }];
+    });
     setPhase('waiting_others');
 
     try {
@@ -244,6 +268,28 @@ export default function MovementAScreen({
     </View>
   );
 
+  // ── Submitted Words So Far (shown during turns) ────────────────────────
+
+  const renderSubmittedSoFar = () => {
+    if (submittedWords.length === 0) return null;
+    return (
+      <View style={styles.submittedSection}>
+        <Text style={styles.submittedLabel}>SUBMITTED SO FAR</Text>
+        {submittedWords.map((entry, i) => {
+          const isMe = String(entry.userId) === String(currentUserId);
+          return (
+            <View key={i} style={styles.submittedRow}>
+              <Text style={[styles.submittedName, isMe && styles.submittedNameMe]} numberOfLines={1}>
+                {isMe ? 'You' : entry.username}
+              </Text>
+              <Text style={styles.submittedWord} numberOfLines={1}>{entry.word}</Text>
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
   // ── Phase Content ──────────────────────────────────────────────────────────
 
   const renderPhase = () => {
@@ -274,6 +320,8 @@ export default function MovementAScreen({
               <View style={[styles.progressFill, { width: `${(completedCount / total) * 100}%` }]} />
             </View>
           </View>
+
+          {renderSubmittedSoFar()}
         </View>
       );
     }
@@ -299,6 +347,8 @@ export default function MovementAScreen({
               <Text style={styles.promptText}>{prompt || '...'}</Text>
             </View>
           </View>
+
+          {renderSubmittedSoFar()}
 
           <TextInput
             style={styles.wordInput}
@@ -342,6 +392,8 @@ export default function MovementAScreen({
               <View style={[styles.progressFill, { width: `${(completedCount / total) * 100}%` }]} />
             </View>
           </View>
+
+          {renderSubmittedSoFar()}
         </View>
       );
     }
@@ -355,11 +407,17 @@ export default function MovementAScreen({
           </Text>
 
           <View style={styles.wordList}>
-            {allWords.map((word, i) => (
-              <View key={i} style={styles.wordItem}>
-                <Text style={styles.wordItemText}>{word}</Text>
-              </View>
-            ))}
+            {allWords.map((entry, i) => {
+              const isMe = String(entry.userId) === String(currentUserId);
+              return (
+                <View key={i} style={[styles.wordItem, isMe && styles.wordItemMe]}>
+                  <Text style={styles.wordItemAuthor}>
+                    {isMe ? 'You' : entry.username}
+                  </Text>
+                  <Text style={styles.wordItemText}>{entry.word}</Text>
+                </View>
+              );
+            })}
           </View>
 
           <View style={styles.deliberationTimerRow}>
@@ -474,13 +532,13 @@ const styles = StyleSheet.create({
   },
   rosterName: {
     flex: 1,
-    fontFamily: fonts.body.regular,
+    fontFamily: fonts.ui.regular,
     fontSize: 15,
     color: colors.text.secondary,
   },
   rosterNameMe: {
     color: colors.text.primary,
-    fontFamily: fonts.body.semibold || fonts.body.regular,
+    fontFamily: fonts.ui.semiBold,
   },
   rosterCheck: {
     fontFamily: fonts.accent.bold,
@@ -703,6 +761,45 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  // Submitted words so far (live reveal during turns)
+  submittedSection: {
+    gap: 8,
+  },
+  submittedLabel: {
+    fontFamily: fonts.display.bold,
+    fontSize: 8,
+    letterSpacing: 3,
+    color: colors.text.tertiary,
+  },
+  submittedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background.void,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 12,
+  },
+  submittedName: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 13,
+    color: colors.text.tertiary,
+    width: 80,
+  },
+  submittedNameMe: {
+    color: colors.primary.electricBlue,
+    fontFamily: fonts.ui.semiBold,
+  },
+  submittedWord: {
+    flex: 1,
+    fontFamily: fonts.accent.bold,
+    fontSize: 18,
+    color: colors.text.primary,
+    letterSpacing: 1,
+  },
+
   // Deliberation
   deliberationTitle: {
     ...typography.screenTitle,
@@ -728,6 +825,17 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 20,
     alignItems: 'center',
+    gap: 4,
+  },
+  wordItemMe: {
+    borderColor: 'rgba(0, 212, 255, 0.25)',
+    backgroundColor: 'rgba(0, 212, 255, 0.04)',
+  },
+  wordItemAuthor: {
+    fontFamily: fonts.display.bold,
+    fontSize: 8,
+    letterSpacing: 2,
+    color: colors.text.tertiary,
   },
   wordItemText: {
     fontFamily: fonts.accent.bold,

@@ -209,34 +209,36 @@ export default function RoundHubScreen({
             )}
           </View>
 
-          <View style={styles.groupList}>
+          <View style={styles.groupGrid}>
             {liveGroupMembers.length === 0 ? (
               <View style={styles.emptyGroup}>
                 <Text style={styles.emptyGroupText}>Group assignment pending...</Text>
               </View>
             ) : (
               liveGroupMembers.map((member) => (
-                <View
-                  key={member.id}
-                  style={[
-                    styles.memberRow,
-                    member.isMarked && styles.memberRowMarked,
-                  ]}
-                >
-                  <View style={styles.memberInfo}>
-                    <Text style={[
-                      styles.memberName,
-                      member.isMarked && { color: colors.primary.neonRed },
-                    ]}>
+                <View key={member.id} style={styles.memberCardWrapper}>
+                  <View
+                    style={[
+                      styles.memberCard,
+                      member.isMarked && styles.memberCardMarked,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.memberName,
+                        member.isMarked && { color: colors.primary.neonRed },
+                      ]}
+                      numberOfLines={1}
+                    >
                       {member.username}
                     </Text>
                     {member.isYou && <Text style={styles.youTag}>you</Text>}
+                    {member.isMarked && (
+                      <View style={styles.markBadge}>
+                        <Text style={styles.markBadgeText}>MARKED</Text>
+                      </View>
+                    )}
                   </View>
-                  {member.isMarked && (
-                    <View style={styles.markBadge}>
-                      <Text style={styles.markBadgeText}>MARKED</Text>
-                    </View>
-                  )}
                 </View>
               ))
             )}
@@ -411,36 +413,37 @@ const styles = StyleSheet.create({
     color: colors.primary.neonRed,
   },
 
-  groupList: {
-    flex: 1,
-    gap: 6,
+  groupGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 2,
+  },
+  memberCardWrapper: {
+    width: '33.33%',
+    padding: 3,
   },
 
-  // Member cards
-  memberRow: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.background.void,
+  // Compact member card
+  memberCard: {
     borderRadius: 8,
+    backgroundColor: colors.background.panel,
     borderWidth: 1,
     borderColor: colors.border.default,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+    minHeight: 60,
+    gap: 3,
   },
-  memberRowMarked: {
+  memberCardMarked: {
     backgroundColor: 'rgba(220, 20, 60, 0.12)',
     borderColor: 'rgba(255, 51, 102, 0.45)',
   },
-  memberInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   memberName: {
-    ...typography.body,
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 12,
     color: colors.text.primary,
+    textAlign: 'center',
   },
   youTag: {
     fontFamily: fonts.ui.regular,
@@ -455,14 +458,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 51, 102, 0.15)',
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.4)',
-    borderRadius: 5,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
   },
   markBadgeText: {
     fontFamily: fonts.display.bold,
-    fontSize: 8,
-    letterSpacing: 2,
+    fontSize: 7,
+    letterSpacing: 1,
     color: colors.primary.neonRed,
   },
 

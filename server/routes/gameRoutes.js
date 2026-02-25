@@ -376,15 +376,28 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
     const newCompleted = turnState.completedCount + 1;
     const io           = getIO();
 
+    // Info about the word just submitted (sent to group with turnStart/deliberationStart)
+    const lastWord = {
+      userId:   String(userId),
+      username: req.user.username,
+      word:     word.trim(),
+    };
+
     if (newCompleted >= turnState.turnOrder.length) {
-      // All submitted — fetch shuffled word list and emit deliberationStart
+      // All submitted — fetch attributed word list and emit deliberationStart
       const wordsRes = await db.query(
-        `SELECT word FROM movement_a_submissions
-         WHERE movement_id = $1 AND group_id = $2
-         ORDER BY random()`,
+        `SELECT mas.word, mas.user_id, u.username
+         FROM movement_a_submissions mas
+         JOIN users u ON u.id = mas.user_id
+         WHERE mas.movement_id = $1 AND mas.group_id = $2
+         ORDER BY mas.submitted_at ASC`,
         [movementId, groupId]
       );
-      const words = wordsRes.rows.map((r) => r.word);
+      const words = wordsRes.rows.map((r) => ({
+        userId:   String(r.user_id),
+        username: r.username,
+        word:     r.word,
+      }));
 
       setGroupTurnState(groupId, {
         ...turnState,
@@ -393,7 +406,7 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
       });
 
       if (io) {
-        io.to(`lobby:${groupId}`).emit('deliberationStart', { words });
+        io.to(`lobby:${groupId}`).emit('deliberationStart', { words, lastWord });
       }
       return res.json({ ok: true, phase: 'deliberation', words });
     }
@@ -412,6 +425,7 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
         turnIndex:       newIndex,
         completedCount:  newCompleted,
         timeLimit:       30,
+        lastWord,
       });
     }
 

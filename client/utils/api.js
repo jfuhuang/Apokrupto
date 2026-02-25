@@ -9,7 +9,12 @@ async function request(path, options = {}) {
   const baseUrl = await getApiUrl();
   const url = `${baseUrl}${path}`;
   const res = await fetch(url, options);
-  const data = await res.json();
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    data = { error: `Server returned non-JSON response (status ${res.status})` };
+  }
   return { ok: res.ok, status: res.status, data };
 }
 

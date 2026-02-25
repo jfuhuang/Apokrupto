@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
@@ -110,33 +111,37 @@ export default function VotingScreen({
     const isVoted = vote !== undefined;
 
     return (
-      <TouchableOpacity
-        key={member.id}
-        style={[
-          styles.memberCard,
-          isPhosVote && styles.memberCardPhos,
-          isSkotiaVote && styles.memberCardSkotia,
-        ]}
-        onPress={() => toggleVote(member.id)}
-        disabled={phase !== 'voting'}
-        activeOpacity={0.75}
-      >
-        <Text style={[
-          styles.memberName,
-          isPhosVote && { color: colors.primary.electricBlue },
-          isSkotiaVote && { color: colors.primary.neonRed },
-        ]}>
-          {member.username}
-        </Text>
-        {member.isMarked && (
-          <View style={styles.currentMarkBadge}>
-            <Text style={styles.currentMarkText}>MARKED</Text>
-          </View>
-        )}
-        {!isVoted && (
-          <Text style={styles.tapHint}>tap to vote</Text>
-        )}
-      </TouchableOpacity>
+      <View key={member.id} style={styles.cardWrapper}>
+        <TouchableOpacity
+          style={[
+            styles.memberCard,
+            isPhosVote && styles.memberCardPhos,
+            isSkotiaVote && styles.memberCardSkotia,
+          ]}
+          onPress={() => toggleVote(member.id)}
+          disabled={phase !== 'voting'}
+          activeOpacity={0.75}
+        >
+          <Text
+            style={[
+              styles.memberName,
+              isPhosVote && { color: colors.primary.electricBlue },
+              isSkotiaVote && { color: colors.primary.neonRed },
+            ]}
+            numberOfLines={1}
+          >
+            {member.username}
+          </Text>
+          {member.isMarked && (
+            <View style={styles.currentMarkBadge}>
+              <Text style={styles.currentMarkText}>MARKED</Text>
+            </View>
+          )}
+          {!isVoted && (
+            <Text style={styles.tapHint}>tap to vote</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -187,9 +192,12 @@ export default function VotingScreen({
               </Text>
             </View>
 
-            <View style={styles.cardList}>
+            <ScrollView
+              contentContainerStyle={styles.cardGrid}
+              showsVerticalScrollIndicator={false}
+            >
               {others.map(renderVoteCard)}
-            </View>
+            </ScrollView>
 
             {phase === 'voting' && (
               <View style={styles.footer}>
@@ -260,26 +268,28 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  // Card list fills remaining vertical space, no scroll
-  cardList: {
-    flex: 1,
-    marginHorizontal: 18,
-    marginTop: 10,
-    marginBottom: 4,
-    gap: 10,
+  // 2-column wrapping grid like LobbyScreen player cards
+  cardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 10,
+  },
+  cardWrapper: {
+    width: '50%',
+    padding: 4,
   },
 
-  // Vote card — takes equal flex share, column layout
+  // Vote card — compact, centered content
   memberCard: {
-    flex: 1,
-    flexDirection: 'column',
-    justifyContent: 'center',
-    backgroundColor: colors.background.void,
-    borderRadius: 10,
+    backgroundColor: colors.background.panel,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border.default,
-    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
     paddingVertical: 10,
+    minHeight: 60,
     gap: 4,
   },
   memberCardPhos: {
@@ -291,11 +301,12 @@ const styles = StyleSheet.create({
     borderColor: colors.primary.neonRed,
   },
   memberName: {
-    ...typography.body,
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 13,
     color: colors.text.primary,
+    textAlign: 'center',
   },
   currentMarkBadge: {
-    alignSelf: 'flex-start',
     backgroundColor: 'rgba(255, 51, 102, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.35)',

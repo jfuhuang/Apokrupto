@@ -18,6 +18,7 @@ const MOVEMENT_LABELS = { A: 'DEDUCTION', B: 'TASKS', C: 'VOTING' };
 
 export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, onLobbyGone }) {
   const [players, setPlayers] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [gameState, setGameState] = useState(null); // { round, totalRounds, movement, status }
   const [teamPoints, setTeamPoints] = useState({ phos: 0, skotia: 0 });
   const [broadcastText, setBroadcastText] = useState('');
@@ -36,6 +37,7 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
       if (!res.ok) return;
       const data = await res.json();
       if (data.players) setPlayers(data.players);
+      if (data.groups) setGroups(data.groups);
       if (data.gameState) setGameState(data.gameState);
       if (data.teamPoints) setTeamPoints(data.teamPoints);
     } catch (err) {
@@ -214,6 +216,39 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
               <Text style={styles.broadcastBtnText}>SEND</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Groups for current round (projector view) */}
+          {groups.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>GROUPS — ROUND {gameState?.round ?? '?'}</Text>
+              {groups.map((group) => (
+                <View key={group.groupId} style={styles.groupCard}>
+                  <Text style={styles.groupHeader}>GROUP {group.groupIndex}</Text>
+                  <View style={styles.groupMembers}>
+                    {group.members.map((m) => (
+                      <View key={m.id} style={styles.groupMemberRow}>
+                        <View
+                          style={[
+                            styles.groupTeamDot,
+                            { backgroundColor: m.team === 'skotia' ? colors.primary.neonRed : colors.primary.electricBlue },
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.groupMemberName,
+                            { color: m.team === 'skotia' ? colors.primary.neonRed : colors.primary.electricBlue },
+                          ]}
+                        >
+                          {m.username}
+                        </Text>
+                        {m.isMarked && <View style={styles.markDot} />}
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Skotia list (visible to GM only) */}
           <View style={styles.section}>
@@ -444,5 +479,38 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: colors.primary.neonRed,
+  },
+  groupCard: {
+    backgroundColor: colors.background.void,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    padding: 12,
+    gap: 8,
+  },
+  groupHeader: {
+    fontFamily: fonts.display.bold,
+    fontSize: 11,
+    letterSpacing: 2,
+    color: colors.accent.amber,
+  },
+  groupMembers: {
+    gap: 4,
+  },
+  groupMemberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 3,
+  },
+  groupTeamDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  groupMemberName: {
+    ...typography.body,
+    flex: 1,
+    fontSize: 14,
   },
 });
