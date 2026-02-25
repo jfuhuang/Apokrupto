@@ -159,8 +159,8 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
     }
 
     const players = parseInt(maxPlayers);
-    if (isNaN(players) || players < 4 || players > 15) {
-      Alert.alert('Error', 'Max players must be between 4 and 15');
+    if (isNaN(players) || players < 5 || players > 100 || players % 5 !== 0) {
+      Alert.alert('Error', 'Max players must be a multiple of 5 between 5 and 100');
       return;
     }
 

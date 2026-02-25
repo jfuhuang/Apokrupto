@@ -123,7 +123,7 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
       await fetch(`${baseUrl}/api/games/${gameId}/broadcast`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: broadcastText.trim() }),
+        body: JSON.stringify({ message: broadcastText.trim(), lobbyId }),
       });
       setBroadcastText('');
     } catch (err) {

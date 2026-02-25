@@ -67,7 +67,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
     try {
       const { ok, data } = await fetchCurrentLobby(token);
       if (ok && data.lobby) {
-        onRejoinGame(data.lobby.role);
+        onRejoinGame(data.lobby.team || null, data.lobby.isGm || false);
       }
     } catch (err) {
       console.error('[LobbyScreen] rejoin error:', err);

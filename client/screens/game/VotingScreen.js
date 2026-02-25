@@ -151,7 +151,7 @@ export default function VotingScreen({
       ) : (
         <View style={styles.previewList}>
           {markResults.map((r) => (
-            <View key={r.playerId} style={styles.previewRow}>
+            <View key={r.userId} style={styles.previewRow}>
               <Text style={styles.previewName}>{r.username}</Text>
               <Text style={[
                 styles.previewAction,

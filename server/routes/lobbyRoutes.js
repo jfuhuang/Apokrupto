@@ -57,14 +57,31 @@ router.get('/current', async (req, res) => {
     const userId = req.user.sub;
 
     const result = await pool.query(`
-      SELECT lp.lobby_id as id, l.name, l.status, lp.role
+      SELECT lp.lobby_id as id, l.name, l.status, lp.role,
+             gp.team,
+             (l.created_by = $1::int) as is_gm,
+             g.id as game_id
       FROM lobby_players lp
       JOIN lobbies l ON l.id = lp.lobby_id
+      LEFT JOIN games g ON g.lobby_id = l.id AND g.status = 'active'
+      LEFT JOIN game_players gp ON gp.game_id = g.id AND gp.user_id = $1
       WHERE lp.user_id = $1 AND l.status IN ('waiting', 'in_progress')
       LIMIT 1
     `, [userId]);
 
-    res.json({ lobby: result.rows[0] || null });
+    if (!result.rows[0]) return res.json({ lobby: null });
+    const row = result.rows[0];
+    res.json({
+      lobby: {
+        id:     row.id,
+        name:   row.name,
+        status: row.status,
+        role:   row.role,
+        team:   row.team || null,
+        isGm:   row.is_gm === true || row.is_gm === 't',
+        gameId: row.game_id ? String(row.game_id) : null,
+      },
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -150,8 +167,8 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Name and max_players are required' });
     }
     
-    if (max_players < 5 || max_players > 80 || max_players % 5 !== 0) {
-      return res.status(400).json({ error: 'Max players must be a multiple of 5 between 5 and 80' });
+    if (max_players < 5 || max_players > 100 || max_players % 5 !== 0) {
+      return res.status(400).json({ error: 'Max players must be a multiple of 5 between 5 and 100' });
     }
     
     // Create lobby

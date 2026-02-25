@@ -509,10 +509,10 @@ function _emitAdvanceEvents(result) {
   const lobbyRoom = `lobby:${String(result.lobbyId)}`;
 
   if (result.gameOver) {
-    // Emit per-group votingComplete results
+    // Emit per-group votingComplete results (roundSummary embedded for client convenience)
     if (result.groupResults) {
       for (const [gId, actions] of result.groupResults) {
-        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
+        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions, roundSummary: result.summary });
       }
     }
     io.to(lobbyRoom).emit('roundSummary', result.summary);
@@ -540,7 +540,7 @@ function _emitAdvanceEvents(result) {
     // Voting just ended — emit per-group results + round summary
     if (result.groupResults) {
       for (const [gId, actions] of result.groupResults) {
-        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
+        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions, roundSummary: result.summary });
       }
     }
     io.to(lobbyRoom).emit('roundSummary', result.summary);

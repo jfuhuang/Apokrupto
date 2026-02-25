@@ -100,7 +100,35 @@ export default function RoundHubScreen({
       socket.on('connect_error', () => setSocketConnected(false));
     };
 
+    // On mount, fetch current game state in case the initial movementStart event
+    // was emitted before this screen was mounted (race between game start and
+    // countdown + roleReveal screens). If a movement is already active, navigate
+    // immediately using the group info already in props.
+    const checkActiveMovement = async () => {
+      if (!gameId) return;
+      try {
+        const baseUrl = await getApiUrl();
+        const res = await fetch(`${baseUrl}/api/games/${gameId}/state`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const state = await res.json();
+        if (state.currentMovement && onMovementReady) {
+          // Use group info from server state; fall back to props if not available
+          onMovementReady(
+            state.currentMovement,
+            state.groupId || null,
+            state.groupMembers || null,
+            state.groupIndex ?? null
+          );
+        }
+      } catch (err) {
+        console.warn('[RoundHub] Could not fetch game state:', err.message);
+      }
+    };
+
     connect().catch(console.error);
+    checkActiveMovement();
 
     return () => {
       if (socketRef.current) {

@@ -22,6 +22,7 @@ const TURN_TIME_LIMIT = 30;
 export default function MovementAScreen({
   token,
   gameId,
+  lobbyId,
   groupId,
   currentUserId,
   currentTeam,
@@ -77,7 +78,10 @@ export default function MovementAScreen({
       socketRef.current = socket;
 
       socket.on('connect', () => {
+        // Join group room for turn-level events (turnStart, deliberationStart)
         socket.emit('joinRoom', { lobbyId: groupId });
+        // Join lobby room to receive GM advance signals (movementStart)
+        if (lobbyId) socket.emit('joinRoom', { lobbyId });
       });
 
       // Server announces whose turn it is
@@ -128,7 +132,15 @@ export default function MovementAScreen({
         }, 1000);
       });
 
-      // GM advanced to next movement
+      // GM advanced to next movement — server emits movementStart to the lobby room
+      // when advancing past Movement A (to B or C). movementAComplete kept for
+      // backward compatibility if the server ever emits it directly.
+      socket.on('movementStart', ({ movement }) => {
+        if (movement !== 'A') {
+          clearInterval(deliberationTimerRef.current);
+          if (onMovementComplete) onMovementComplete();
+        }
+      });
       socket.on('movementAComplete', () => {
         clearInterval(deliberationTimerRef.current);
         if (onMovementComplete) onMovementComplete();
@@ -147,7 +159,7 @@ export default function MovementAScreen({
         socketRef.current = null;
       }
     };
-  }, [gameId, groupId, token, currentUserId]);
+  }, [gameId, groupId, lobbyId, token, currentUserId]);
 
   const handleSubmit = async (word) => {
     const finalWord = (word ?? wordInput).trim();

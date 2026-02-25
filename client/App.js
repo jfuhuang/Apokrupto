@@ -400,6 +400,7 @@ export default function App() {
           <MovementAScreen
             token={token}
             gameId={gameId}
+            lobbyId={currentLobbyId}
             groupId={currentGroupId}
             currentUserId={userId}
             currentTeam={currentTeam}
