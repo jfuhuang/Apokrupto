@@ -167,9 +167,10 @@ export default function App() {
 
   // ── Pre-game ──────────────────────────────────────────────────────────────
 
-  const handleTeamAssigned = (team, teammates = []) => {
+  const handleTeamAssigned = (team, teammates = [], gmFlag = false) => {
     setCurrentTeam(team);
     setSkotiaTeammates(teammates);
+    setIsGm(gmFlag);
   };
 
   const handleGameStarted = () => setCurrentScreen('countdown');
