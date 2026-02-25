@@ -177,21 +177,51 @@ router.get('/:gameId/gm-state', auth, async (req, res) => {
     if (gameRes.rows.length === 0) return res.json(empty);
     const game = gameRes.rows[0];
 
-    const playersRes = await db.query(
-      `SELECT u.id, u.username, gp.team, gp.is_marked
-       FROM game_players gp
-       JOIN users u ON u.id = gp.user_id
-       WHERE gp.game_id = $1
-       ORDER BY gp.team, u.username`,
-      [gameId]
-    );
+    const [playersRes, ptsRes, groupsRes] = await Promise.all([
+      db.query(
+        `SELECT u.id, u.username, gp.team, gp.is_marked
+         FROM game_players gp
+         JOIN users u ON u.id = gp.user_id
+         WHERE gp.game_id = $1
+         ORDER BY gp.team, u.username`,
+        [gameId]
+      ),
+      db.query(
+        'SELECT team, points FROM game_teams WHERE game_id = $1',
+        [gameId]
+      ),
+      game.current_round
+        ? db.query(
+            `SELECT gg.id AS group_id, gg.group_index,
+                    ggm.user_id, u.username, gp.team, gp.is_marked
+             FROM game_groups gg
+             JOIN game_group_members ggm ON ggm.group_id = gg.id
+             JOIN users u ON u.id = ggm.user_id
+             JOIN game_players gp ON gp.game_id = gg.game_id AND gp.user_id = ggm.user_id
+             WHERE gg.game_id = $1 AND gg.round_number = $2
+             ORDER BY gg.group_index, u.username`,
+            [gameId, game.current_round]
+          )
+        : Promise.resolve({ rows: [] }),
+    ]);
 
-    const ptsRes = await db.query(
-      'SELECT team, points FROM game_teams WHERE game_id = $1',
-      [gameId]
-    );
     const teamPoints = { phos: 0, skotia: 0 };
     ptsRes.rows.forEach((r) => { teamPoints[r.team] = r.points; });
+
+    // Build groups array from flat rows
+    const groupMap = new Map();
+    groupsRes.rows.forEach((row) => {
+      if (!groupMap.has(row.group_id)) {
+        groupMap.set(row.group_id, { groupId: String(row.group_id), groupIndex: row.group_index, members: [] });
+      }
+      groupMap.get(row.group_id).members.push({
+        id:       String(row.user_id),
+        username: row.username,
+        team:     row.team,
+        isMarked: row.is_marked,
+      });
+    });
+    const groups = Array.from(groupMap.values()).sort((a, b) => a.groupIndex - b.groupIndex);
 
     res.json({
       players: playersRes.rows.map((p) => ({
@@ -200,6 +230,7 @@ router.get('/:gameId/gm-state', auth, async (req, res) => {
         team:     p.team,
         isMarked: p.is_marked,
       })),
+      groups,
       gameState: {
         round:       game.current_round,
         totalRounds: game.total_rounds,

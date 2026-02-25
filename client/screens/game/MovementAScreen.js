@@ -41,10 +41,12 @@ export default function MovementAScreen({
   const [allWords, setAllWords] = useState([]);
   const [deliberationSecondsLeft, setDeliberationSecondsLeft] = useState(120);
   const [submitting, setSubmitting] = useState(false);
+  const [submittedIds, setSubmittedIds] = useState(new Set());
 
   const socketRef = useRef(null);
   const turnTimerRef = useRef(null);
   const deliberationTimerRef = useRef(null);
+  const prevTurnPlayerIdRef = useRef(null);
 
   // Fetch prompt on mount (server returns team-specific prompt via JWT)
   useEffect(() => {
@@ -87,10 +89,19 @@ export default function MovementAScreen({
       // Server announces whose turn it is
       socket.on('turnStart', ({ currentPlayerId, completedCount: cc, timeLimit }) => {
         clearInterval(turnTimerRef.current);
+
+        // The player whose turn just ended has submitted
+        if (prevTurnPlayerIdRef.current) {
+          setSubmittedIds((prev) => new Set([...prev, String(prevTurnPlayerIdRef.current)]));
+        }
+        prevTurnPlayerIdRef.current = currentPlayerId;
+
         setCurrentTurnPlayerId(currentPlayerId);
         setCompletedCount(cc);
 
-        const name = groupMembers?.find((m) => String(m.id) === String(currentPlayerId))?.username || 'Someone';
+        const name =
+          groupMembers?.find((m) => String(m.id) === String(currentPlayerId))?.username ||
+          'Someone';
         setCurrentTurnPlayerName(name);
 
         const limit = timeLimit || TURN_TIME_LIMIT;
@@ -120,6 +131,8 @@ export default function MovementAScreen({
       // All players submitted — show words for deliberation
       socket.on('deliberationStart', ({ words }) => {
         clearInterval(turnTimerRef.current);
+        // Mark everyone as submitted
+        setSubmittedIds(new Set((groupMembers || []).map((m) => String(m.id))));
         setAllWords(words || []);
         setPhase('deliberation');
 
@@ -133,8 +146,6 @@ export default function MovementAScreen({
       });
 
       // GM advanced to next movement — server emits movementStart to the lobby room
-      // when advancing past Movement A (to B or C). movementAComplete kept for
-      // backward compatibility if the server ever emits it directly.
       socket.on('movementStart', ({ movement }) => {
         if (movement !== 'A') {
           clearInterval(deliberationTimerRef.current);
@@ -167,6 +178,7 @@ export default function MovementAScreen({
     setSubmitting(true);
     clearInterval(turnTimerRef.current);
     setMyWord(finalWord);
+    setSubmittedIds((prev) => new Set([...prev, String(currentUserId)]));
     setPhase('waiting_others');
 
     try {
@@ -185,25 +197,79 @@ export default function MovementAScreen({
 
   const total = groupMembers?.length || 5;
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Group Roster (always visible) ─────────────────────────────────────────
+
+  const renderGroupRoster = () => (
+    <View style={styles.roster}>
+      {(groupMembers || []).map((member) => {
+        const memberId = String(member.id);
+        const isMe = memberId === String(currentUserId);
+        const hasSubmitted = submittedIds.has(memberId);
+        const isCurrentTurn =
+          memberId === String(currentTurnPlayerId) &&
+          phase !== 'deliberation';
+
+        return (
+          <View
+            key={memberId}
+            style={[
+              styles.rosterItem,
+              isCurrentTurn && styles.rosterItemActive,
+              hasSubmitted && styles.rosterItemDone,
+            ]}
+          >
+            <View
+              style={[
+                styles.rosterDot,
+                isCurrentTurn && styles.rosterDotActive,
+                hasSubmitted && styles.rosterDotDone,
+              ]}
+            />
+            <Text
+              style={[styles.rosterName, isMe && styles.rosterNameMe]}
+              numberOfLines={1}
+            >
+              {member.username}
+              {isMe ? ' (you)' : ''}
+            </Text>
+            {hasSubmitted && (
+              <Text style={styles.rosterCheck}>✓</Text>
+            )}
+            {isCurrentTurn && !hasSubmitted && (
+              <Text style={styles.rosterChoosingDot}>•••</Text>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+
+  // ── Phase Content ──────────────────────────────────────────────────────────
 
   const renderPhase = () => {
     if (phase === 'waiting_turn') {
       return (
         <View style={styles.phaseContainer}>
-          <Text style={styles.promptLabel}>YOUR PROMPT</Text>
-          <View style={styles.promptBox}>
-            <Text style={styles.promptText}>{prompt || '...'}</Text>
+          <View style={styles.promptSection}>
+            <Text style={styles.promptLabel}>YOUR PROMPT</Text>
+            <View style={styles.promptBox}>
+              <Text style={styles.promptText}>{prompt || '...'}</Text>
+            </View>
+            <Text style={styles.promptHint}>Think of your word while you wait.</Text>
           </View>
-          <Text style={styles.promptHint}>Think of your word while you wait.</Text>
 
           <View style={styles.turnIndicator}>
-            <Text style={styles.turnIndicatorName}>{currentTurnPlayerName} is choosing...</Text>
-            <Text style={styles.turnTimer}>{turnSecondsLeft}s</Text>
+            <View style={styles.turnIndicatorLeft}>
+              <Text style={styles.turnIndicatorLabel}>CURRENT TURN</Text>
+              <Text style={styles.turnIndicatorName}>{currentTurnPlayerName}</Text>
+            </View>
+            <View style={styles.turnTimerBadge}>
+              <Text style={styles.turnTimer}>{turnSecondsLeft}s</Text>
+            </View>
           </View>
 
           <View style={styles.progressRow}>
-            <Text style={styles.progressText}>{completedCount} of {total} chosen</Text>
+            <Text style={styles.progressText}>{completedCount} / {total} submitted</Text>
             <View style={styles.progressBar}>
               <View style={[styles.progressFill, { width: `${(completedCount / total) * 100}%` }]} />
             </View>
@@ -218,16 +284,20 @@ export default function MovementAScreen({
           style={styles.phaseContainer}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <Text style={styles.yourTurnLabel}>YOUR TURN</Text>
-          <View style={[styles.timerCircle, turnSecondsLeft <= 10 && styles.timerCircleUrgent]}>
-            <Text style={[styles.timerValue, turnSecondsLeft <= 10 && { color: colors.primary.neonRed }]}>
-              {turnSecondsLeft}
-            </Text>
+          <View style={styles.myTurnHeader}>
+            <Text style={styles.yourTurnLabel}>YOUR TURN</Text>
+            <View style={[styles.timerCircle, turnSecondsLeft <= 10 && styles.timerCircleUrgent]}>
+              <Text style={[styles.timerValue, turnSecondsLeft <= 10 && styles.timerValueUrgent]}>
+                {turnSecondsLeft}
+              </Text>
+            </View>
           </View>
 
-          <Text style={styles.promptLabel}>YOUR PROMPT</Text>
-          <View style={styles.promptBox}>
-            <Text style={styles.promptText}>{prompt || '...'}</Text>
+          <View style={styles.promptSection}>
+            <Text style={styles.promptLabel}>YOUR PROMPT</Text>
+            <View style={[styles.promptBox, styles.promptBoxActive]}>
+              <Text style={styles.promptText}>{prompt || '...'}</Text>
+            </View>
           </View>
 
           <TextInput
@@ -259,21 +329,19 @@ export default function MovementAScreen({
     if (phase === 'waiting_others') {
       return (
         <View style={styles.phaseContainer}>
-          <Text style={styles.myWordLabel}>YOU CHOSE</Text>
-          <Text style={styles.myWordDisplay}>{myWord || '—'}</Text>
+          <View style={styles.myWordSection}>
+            <Text style={styles.myWordLabel}>YOU CHOSE</Text>
+            <Text style={styles.myWordDisplay}>{myWord || '—'}</Text>
+          </View>
 
           <Text style={styles.waitingLabel}>Waiting for the group...</Text>
 
           <View style={styles.progressRow}>
-            <Text style={styles.progressText}>{completedCount} of {total} chosen</Text>
+            <Text style={styles.progressText}>{completedCount} / {total} submitted</Text>
             <View style={styles.progressBar}>
               <View style={[styles.progressFill, { width: `${(completedCount / total) * 100}%` }]} />
             </View>
           </View>
-
-          {currentTurnPlayerName ? (
-            <Text style={styles.turnIndicatorName}>{currentTurnPlayerName} is choosing...</Text>
-          ) : null}
         </View>
       );
     }
@@ -317,11 +385,14 @@ export default function MovementAScreen({
           <Text style={styles.headerLabel}>MOVEMENT A — DEDUCTION</Text>
           <Text style={styles.headerRound}>ROUND {roundNumber}</Text>
         </View>
+
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {renderGroupRoster()}
+          <View style={styles.divider} />
           {renderPhase()}
         </ScrollView>
       </SafeAreaView>
@@ -360,16 +431,88 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flexGrow: 1,
-    justifyContent: 'center',
+    paddingBottom: 32,
   },
-  phaseContainer: {
-    flex: 1,
-    padding: 24,
+
+  // ── Group Roster ──────────────────────────────────────────────────────────
+  roster: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 4,
+    gap: 8,
+  },
+  rosterItem: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: colors.background.void,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+  },
+  rosterItemActive: {
+    borderColor: colors.primary.electricBlue,
+    backgroundColor: 'rgba(0, 212, 255, 0.06)',
+  },
+  rosterItemDone: {
+    borderColor: colors.border.subtle,
+    opacity: 0.6,
+  },
+  rosterDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.background.frost,
+  },
+  rosterDotActive: {
+    backgroundColor: colors.primary.electricBlue,
+  },
+  rosterDotDone: {
+    backgroundColor: colors.accent.neonGreen,
+  },
+  rosterName: {
+    flex: 1,
+    fontFamily: fonts.body.regular,
+    fontSize: 15,
+    color: colors.text.secondary,
+  },
+  rosterNameMe: {
+    color: colors.text.primary,
+    fontFamily: fonts.body.semibold || fonts.body.regular,
+  },
+  rosterCheck: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 14,
+    color: colors.accent.neonGreen,
+  },
+  rosterChoosingDot: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 14,
+    color: colors.primary.electricBlue,
+    letterSpacing: 2,
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: colors.border.subtle,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+
+  // ── Phase container ───────────────────────────────────────────────────────
+  phaseContainer: {
+    padding: 20,
     gap: 20,
   },
 
-  // Waiting turn
+  // Prompt section (shared between waiting_turn and my_turn)
+  promptSection: {
+    gap: 10,
+    alignItems: 'center',
+  },
   promptLabel: {
     fontFamily: fonts.display.bold,
     fontSize: 9,
@@ -385,6 +528,10 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
   },
+  promptBoxActive: {
+    borderColor: colors.primary.electricBlue,
+    backgroundColor: 'rgba(0, 212, 255, 0.05)',
+  },
   promptText: {
     ...typography.h2,
     color: colors.text.primary,
@@ -395,30 +542,47 @@ const styles = StyleSheet.create({
     color: colors.text.muted,
     textAlign: 'center',
   },
+
+  // Turn indicator (waiting_turn)
   turnIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
     backgroundColor: colors.background.void,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.border.default,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    width: '100%',
+    paddingVertical: 14,
+  },
+  turnIndicatorLeft: {
+    flex: 1,
+    gap: 2,
+  },
+  turnIndicatorLabel: {
+    fontFamily: fonts.display.bold,
+    fontSize: 8,
+    letterSpacing: 2,
+    color: colors.text.tertiary,
   },
   turnIndicatorName: {
-    ...typography.body,
-    color: colors.text.secondary,
-    flex: 1,
+    fontFamily: fonts.accent.bold,
+    fontSize: 16,
+    color: colors.text.primary,
+  },
+  turnTimerBadge: {
+    backgroundColor: 'rgba(255, 166, 61, 0.15)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   turnTimer: {
     fontFamily: fonts.accent.bold,
-    fontSize: 20,
+    fontSize: 22,
     color: colors.accent.amber,
   },
+
+  // Progress bar (waiting_turn and waiting_others)
   progressRow: {
-    width: '100%',
     gap: 8,
   },
   progressText: {
@@ -439,9 +603,14 @@ const styles = StyleSheet.create({
   },
 
   // My turn
+  myTurnHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   yourTurnLabel: {
     fontFamily: fonts.display.bold,
-    fontSize: 13,
+    fontSize: 18,
     letterSpacing: 4,
     color: colors.primary.electricBlue,
     textShadowColor: colors.shadow.electricBlue,
@@ -449,9 +618,9 @@ const styles = StyleSheet.create({
     textShadowRadius: 10,
   },
   timerCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     borderWidth: 2,
     borderColor: colors.primary.electricBlue,
     justifyContent: 'center',
@@ -464,9 +633,12 @@ const styles = StyleSheet.create({
   },
   timerValue: {
     fontFamily: fonts.accent.bold,
-    fontSize: 28,
+    fontSize: 24,
     color: colors.primary.electricBlue,
     letterSpacing: 1,
+  },
+  timerValueUrgent: {
+    color: colors.primary.neonRed,
   },
   wordInput: {
     width: '100%',
@@ -506,6 +678,10 @@ const styles = StyleSheet.create({
   },
 
   // Waiting others
+  myWordSection: {
+    alignItems: 'center',
+    gap: 6,
+  },
   myWordLabel: {
     fontFamily: fonts.display.bold,
     fontSize: 9,
@@ -534,6 +710,7 @@ const styles = StyleSheet.create({
     textShadowColor: colors.shadow.electricBlue,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 16,
+    textAlign: 'center',
   },
   deliberationHint: {
     ...typography.body,
@@ -541,7 +718,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   wordList: {
-    width: '100%',
     gap: 10,
   },
   wordItem: {
@@ -562,6 +738,7 @@ const styles = StyleSheet.create({
   deliberationTimerRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 12,
   },
   deliberationTimerLabel: {

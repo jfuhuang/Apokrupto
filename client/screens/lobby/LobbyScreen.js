@@ -313,6 +313,9 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
             <Text style={styles.playerCountHeader}>
               {players.length}/{lobbyInfo?.maxPlayers ?? '?'} players
             </Text>
+            <Text style={styles.playerCountHeader}>
+              {isHost ? 'You are the host' : 'Waiting for host to start the game'}
+            </Text>
           </View>
 
           {/* Right: connection dot + logout */}

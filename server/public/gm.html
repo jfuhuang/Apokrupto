@@ -94,8 +94,8 @@
     #scoreboard {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      flex: 1;
-      min-height: 280px;
+      flex-shrink: 0;
+      min-height: 200px;
     }
     .team-card {
       display: flex;
@@ -310,6 +310,82 @@
     }
     .section-header .caret { color: var(--muted); font-size: 0.8rem; }
 
+    /* ── Groups grid ── */
+    #groups-section {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      display: none;
+    }
+    #groups-section.visible { display: block; }
+
+    .groups-header {
+      font-size: 0.65rem;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .groups-header-label { color: var(--muted); }
+    .groups-round-badge {
+      color: var(--text);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 2px 10px;
+      letter-spacing: 2px;
+    }
+
+    .groups-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+      gap: 10px;
+    }
+
+    .group-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .group-card-title {
+      font-size: 0.6rem;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+      padding-bottom: 5px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2px;
+    }
+    .group-member {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.8rem;
+      line-height: 1.3;
+    }
+    .group-member-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .group-member-dot.phos   { background: var(--blue); }
+    .group-member-dot.skotia { background: var(--red);  }
+    .group-member-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .group-member-name.skotia { color: var(--red); }
+    .group-member-mark {
+      font-size: 0.6rem;
+      color: var(--red);
+      letter-spacing: 1px;
+      flex-shrink: 0;
+    }
+
     /* ── Lobby Selector ── */
     #setup-screen {
       position: fixed;
@@ -486,6 +562,17 @@
       <span class="team-name">ΣΚΟΤΊΑ</span>
       <span class="team-points" id="skotia-pts">0</span>
       <span class="team-count" id="skotia-count">— players</span>
+    </div>
+  </div>
+
+  <!-- Groups section (shown when game has groups) -->
+  <div id="groups-section">
+    <div class="groups-header">
+      <span class="groups-header-label">Groups</span>
+      <span class="groups-round-badge" id="groups-round-badge">—</span>
+    </div>
+    <div id="groups-grid" class="groups-grid">
+      <span style="color:var(--muted);font-size:0.75rem;">No group data yet</span>
     </div>
   </div>
 
@@ -708,7 +795,7 @@
     }
 
     // ── Apply game state to DOM ─────────────────────────────────────────────
-    function applyState({ players = [], gameState = {}, teamPoints = {} } = {}) {
+    function applyState({ players = [], groups = [], gameState = {}, teamPoints = {} } = {}) {
       // Scores
       setText('phos-pts',    teamPoints.phos   ?? 0);
       setText('skotia-pts',  teamPoints.skotia ?? 0);
@@ -726,11 +813,38 @@
       const movLabel = { A: 'MOV A — DEDUCTION', B: 'MOV B — TASKS', C: 'MOV C — VOTING' };
       setText('movement-badge', movLabel[gameState.movement] || '—');
 
+      // Groups (always shown when data exists)
+      if (groups.length > 0) {
+        setText('groups-round-badge', round ? `ROUND ${round}` : '—');
+        document.getElementById('groups-section').classList.add('visible');
+        renderGroups(groups);
+      }
+
       // Roster (control mode)
       if (isControl) {
         renderRoster('phos-list',   phosPlayers,   'phos-row');
         renderRoster('skotia-list', skotiaPlayers, 'skotia-row');
       }
+    }
+
+    function renderGroups(groups) {
+      const el = document.getElementById('groups-grid');
+      if (!groups || groups.length === 0) {
+        el.innerHTML = '<span style="color:var(--muted);font-size:0.75rem;">No group data yet</span>';
+        return;
+      }
+      el.innerHTML = groups.map(g => `
+        <div class="group-card">
+          <div class="group-card-title">Group ${g.groupIndex}</div>
+          ${g.members.map(m => `
+            <div class="group-member">
+              <div class="group-member-dot ${m.team}"></div>
+              <span class="group-member-name${m.team === 'skotia' ? ' skotia' : ''}">${escHtml(m.username)}</span>
+              ${m.isMarked ? '<span class="group-member-mark" title="Marked">●</span>' : ''}
+            </div>
+          `).join('')}
+        </div>
+      `).join('');
     }
 
     function renderRoster(containerId, players, rowClass) {
