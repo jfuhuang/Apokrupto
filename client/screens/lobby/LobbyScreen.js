@@ -164,8 +164,8 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
         if (onRoleAssigned) onRoleAssigned(team, skotiaTeammates || [], isGm || false);
       });
 
-      socket.on('gameStarted', () => {
-        if (onGameStarted) onGameStarted();
+      socket.on('gameStarted', ({ gameId } = {}) => {
+        if (onGameStarted) onGameStarted(gameId || null);
       });
 
       socket.on('playerKicked', ({ userId }) => {

@@ -173,7 +173,10 @@ export default function App() {
     setIsGm(gmFlag);
   };
 
-  const handleGameStarted = () => setCurrentScreen('countdown');
+  const handleGameStarted = (gId) => {
+    if (gId) setGameId(gId);
+    setCurrentScreen('countdown');
+  };
 
   const handleCountdownComplete = () => setCurrentScreen('roleReveal');
 

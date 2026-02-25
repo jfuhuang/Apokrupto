@@ -443,6 +443,7 @@
         <div class="panel-footer">
           <button class="primary" id="btn-add-dummy">+ Add Dummy</button>
           <button class="success" id="btn-start-game" style="display:none">&#9654; Start Game</button>
+          <button class="danger" id="btn-force-end" style="display:none">&#9632; Force End</button>
           <div id="game-over-banner" style="display:none;color:var(--yellow);font-size:.85rem;align-self:center"></div>
         </div>
       </div>
@@ -684,10 +685,12 @@
     document.getElementById('game-over-banner').style.display = 'none';
     document.getElementById('game-over-banner').textContent = '';
 
-    // Show/hide Start Game button
+    // Show/hide Start Game / Force End buttons
     const startBtn = document.getElementById('btn-start-game');
+    const forceEndBtn = document.getElementById('btn-force-end');
     const myId = getUserIdFromToken(state.token);
     startBtn.style.display = (status === 'waiting' && String(hostId) === String(myId)) ? 'inline-block' : 'none';
+    forceEndBtn.style.display = (status === 'in_progress') ? 'inline-block' : 'none';
 
     showScreen('detail');
     connectSocket(id);
@@ -737,10 +740,12 @@
       document.getElementById('detail-players').textContent =
         `${data.players.length} / ${data.maxPlayers}`;
 
-      // Show Start Game button only if waiting + we are host
+      // Show Start Game / Force End buttons based on status
       const myId = getUserIdFromToken(state.token);
-      const startBtn = document.getElementById('btn-start-game');
-      startBtn.style.display = (data.status === 'waiting' && String(data.hostId) === String(myId)) ? 'inline-block' : 'none';
+      document.getElementById('btn-start-game').style.display =
+        (data.status === 'waiting' && String(data.hostId) === String(myId)) ? 'inline-block' : 'none';
+      document.getElementById('btn-force-end').style.display =
+        (data.status === 'in_progress') ? 'inline-block' : 'none';
 
     });
 
@@ -866,6 +871,18 @@
     try {
       await apiFetch(`/api/lobbies/${state.currentLobby.id}/add-dummy`, { method: 'POST' });
       showToast('Dummy added', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  document.getElementById('btn-force-end').addEventListener('click', async () => {
+    if (!state.currentLobby) return;
+    if (!confirm('Force-end this game? This cannot be undone.')) return;
+    try {
+      await apiFetch(`/api/lobbies/${state.currentLobby.id}/force-end`, { method: 'POST' });
+      showToast('Game ended', 'success');
+      document.getElementById('btn-force-end').style.display = 'none';
     } catch (err) {
       showToast(err.message, 'error');
     }

@@ -618,7 +618,7 @@
         return;
       }
       listEl.innerHTML = lobbies.map(l => `
-        <div class="lobby-option" onclick="selectSetupLobby(${l.id}, '${escHtml(l.name)}', this)">
+        <div class="lobby-option" onclick="selectSetupLobby(${l.id}, '${escHtml(l.name)}', ${l.game_id || 'null'}, this)">
           <span class="lobby-option-name">${escHtml(l.name)}</span>
           <span class="lobby-option-meta">${l.current_players}/${l.max_players}</span>
           <span class="lobby-option-status status-${l.status}">${l.status.replace('_',' ')}</span>
@@ -626,10 +626,10 @@
       `).join('');
     }
 
-    function selectSetupLobby(id, name, el) {
+    function selectSetupLobby(id, name, gId, el) {
       document.querySelectorAll('.lobby-option').forEach(o => o.classList.remove('selected'));
       el.classList.add('selected');
-      setupSelectedLobby = { id, name, gameId: '' }; // gameId filled in once game service exists
+      setupSelectedLobby = { id, name, gameId: gId ? String(gId) : '' };
       document.getElementById('setup-connect-btn').disabled = false;
     }
 

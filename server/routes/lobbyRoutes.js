@@ -33,12 +33,14 @@ router.get('/', async (req, res) => {
         l.created_at,
         l.status,
         u.username as host_username,
-        COUNT(lp.user_id) as current_players
+        COUNT(lp.user_id) as current_players,
+        g.id as game_id
       FROM lobbies l
       LEFT JOIN users u ON l.created_by = u.id
       LEFT JOIN lobby_players lp ON l.id = lp.lobby_id
+      LEFT JOIN games g ON g.lobby_id = l.id AND g.status = 'active'
       ${showAll ? '' : "WHERE l.status = 'waiting'"}
-      GROUP BY l.id, u.username
+      GROUP BY l.id, u.username, g.id
       ORDER BY l.created_at DESC
     `);
 
@@ -556,7 +558,7 @@ router.post('/:id/sabotage/fix', async (req, res) => {
     const requesterId = String(req.user.sub);
     const isAdmin = ADMIN_USERNAMES.has(req.user.username);
 
-    if (String(userId) === requesterId) {
+    if (String(userId) === requesterId && !isAdmin) {
       return res.status(400).json({ error: 'Cannot kick yourself' });
     }
 
@@ -623,5 +625,37 @@ router.post('/:id/sabotage/fix', async (req, res) => {
     }
   });
 }
+
+// Force-end an in-progress game — admin only
+router.post('/:id/force-end', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { getIO } = require('../websocket/lobbySocket');
+
+    // Mark any active game for this lobby as completed
+    await pool.query(
+      `UPDATE games SET status = 'completed', winner = NULL, win_condition = 'force_ended'
+       WHERE lobby_id = $1 AND status = 'active'`,
+      [id]
+    );
+
+    // Reset lobby status to waiting so it can be reused
+    await pool.query(
+      `UPDATE lobbies SET status = 'waiting' WHERE id = $1`,
+      [id]
+    );
+
+    const io = getIO();
+    if (io) {
+      io.to(`lobby:${id}`).emit('gameOver', { winner: null, reason: 'Force ended by admin' });
+    }
+
+    console.log(`[admin] force-end lobby ${id} by ${req.user.username}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[force-end] error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 module.exports = router;
