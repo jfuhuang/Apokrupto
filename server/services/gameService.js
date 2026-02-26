@@ -113,7 +113,130 @@ async function _autoAdvanceTurn(groupId, expectedIndex) {
       });
     }
     scheduleTurnTimeout(groupId, newIndex);
+    scheduleBotSubmitIfNeeded(groupId); // auto-submit if next player is a bot
   }
+}
+
+// ---------------------------------------------------------------------------
+// Bot auto-submit helpers (testing / dummy players only)
+// ---------------------------------------------------------------------------
+const BOT_WORDS = [
+  'faith', 'hope', 'grace', 'truth', 'light', 'water', 'peace', 'bread',
+  'love', 'fire', 'stone', 'road', 'mountain', 'river', 'shield', 'crown',
+  'vessel', 'spirit', 'lamb', 'vine', 'seed', 'harvest', 'scroll', 'temple',
+  'altar', 'covenant', 'mercy', 'glory', 'power', 'wisdom',
+];
+
+async function _isBotUser(userId) {
+  const res = await pool.query(
+    'SELECT 1 FROM users WHERE id = $1 AND password_hash IS NULL',
+    [userId]
+  );
+  return res.rows.length > 0;
+}
+
+async function _doBotSubmit(groupId, expectedIndex) {
+  const state = getGroupTurnState(groupId);
+  if (!state || state.currentIndex !== expectedIndex) return; // already advanced
+
+  const { gameId } = state;
+  const botUserId = String(state.turnOrder[expectedIndex]);
+
+  const movRes = await pool.query(
+    `SELECT m.id
+     FROM movements m
+     JOIN rounds r ON r.id = m.round_id
+     WHERE r.game_id = $1 AND r.status = 'active'
+       AND m.movement_type = 'A' AND m.status = 'active'`,
+    [gameId]
+  );
+  if (movRes.rows.length === 0) return;
+  const movementId = movRes.rows[0].id;
+
+  const word = BOT_WORDS[Math.floor(Math.random() * BOT_WORDS.length)];
+
+  await pool.query(
+    `INSERT INTO movement_a_submissions (movement_id, group_id, user_id, word)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (movement_id, user_id) DO UPDATE SET word = EXCLUDED.word`,
+    [movementId, groupId, botUserId, word]
+  );
+
+  clearTurnTimeout(groupId);
+
+  // Re-check in case HTTP submit arrived during our DB round-trip
+  const fresh = getGroupTurnState(groupId);
+  if (!fresh || fresh.currentIndex !== expectedIndex) return;
+
+  const newIndex     = expectedIndex + 1;
+  const newCompleted = state.completedCount + 1;
+
+  const { getIO } = require('../websocket/lobbySocket');
+  const io = getIO();
+
+  const userRes = await pool.query('SELECT username FROM users WHERE id = $1', [botUserId]);
+  const lastWord = { userId: botUserId, username: userRes.rows[0]?.username ?? 'Bot', word };
+
+  if (newCompleted >= state.turnOrder.length) {
+    const wordsRes = await pool.query(
+      `SELECT mas.word, mas.user_id, u.username
+       FROM movement_a_submissions mas
+       JOIN users u ON u.id = mas.user_id
+       WHERE mas.movement_id = $1 AND mas.group_id = $2
+       ORDER BY mas.submitted_at ASC`,
+      [movementId, groupId]
+    );
+    const words = wordsRes.rows.map((r) => ({
+      userId:   String(r.user_id),
+      username: r.username,
+      word:     r.word,
+    }));
+    setGroupTurnState(groupId, { ...state, currentIndex: newIndex, completedCount: newCompleted });
+    if (io) io.to(`lobby:${groupId}`).emit('deliberationStart', { words, lastWord });
+  } else {
+    const now = Date.now();
+    setGroupTurnState(groupId, {
+      ...state,
+      currentIndex:   newIndex,
+      completedCount: newCompleted,
+      turnStartedAt:  now,
+    });
+    const nextPlayerId = String(state.turnOrder[newIndex]);
+    if (io) {
+      io.to(`lobby:${groupId}`).emit('turnStart', {
+        currentPlayerId: nextPlayerId,
+        turnIndex:       newIndex,
+        completedCount:  newCompleted,
+        timeLimit:       30,
+        lastWord,
+      });
+    }
+    scheduleTurnTimeout(groupId, newIndex);
+    scheduleBotSubmitIfNeeded(groupId); // chain: next player might also be a bot
+  }
+}
+
+/**
+ * If the current player in a group is a bot, schedule an automatic word
+ * submission after a short random delay (1–3 s). Call this after any
+ * event that advances the turn pointer: startTurns, _autoAdvanceTurn,
+ * and the HTTP submit route.
+ */
+async function scheduleBotSubmitIfNeeded(groupId) {
+  const state = getGroupTurnState(groupId);
+  if (!state || state.currentIndex >= state.turnOrder.length) return;
+
+  const currentPlayerId = String(state.turnOrder[state.currentIndex]);
+  const isBot = await _isBotUser(currentPlayerId);
+  if (!isBot) return;
+
+  const currentIndex = state.currentIndex;
+  const delay = 1000 + Math.floor(Math.random() * 2000); // 1–3 s
+  setTimeout(() => {
+    _doBotSubmit(String(groupId), currentIndex).catch((err) => {
+      console.error('[BotSubmit] error:', err.message);
+    });
+  }, delay);
 }
 
 // Called after _initTurnState to stamp turnStartedAt and schedule the first
@@ -127,6 +250,7 @@ function startTurns(groups) {
     if (!state) continue;
     setGroupTurnState(gid, { ...state, turnStartedAt: now });
     scheduleTurnTimeout(gid, 0);
+    scheduleBotSubmitIfNeeded(gid); // auto-submit if first player is a bot
   }
 }
 
@@ -814,4 +938,5 @@ module.exports = {
   clearTurnTimeout,
   scheduleTurnTimeout,
   startTurns,
+  scheduleBotSubmitIfNeeded,
 };

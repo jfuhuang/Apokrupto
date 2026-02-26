@@ -11,6 +11,7 @@ const {
   setGroupTurnState,
   clearTurnTimeout,
   scheduleTurnTimeout,
+  scheduleBotSubmitIfNeeded,
 } = require('../services/gameService');
 const { getIO } = require('../websocket/lobbySocket');
 
@@ -436,6 +437,7 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
       });
     }
     scheduleTurnTimeout(groupId, newIndex);
+    scheduleBotSubmitIfNeeded(groupId); // auto-submit if next player is a bot
 
     res.json({ ok: true, phase: 'waiting', nextPlayerId, completedCount: newCompleted });
   } catch (err) {

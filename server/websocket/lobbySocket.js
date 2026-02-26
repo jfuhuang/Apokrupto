@@ -42,11 +42,21 @@ async function getLobbyState(lobbyId) {
 
   const connected = lobbyConnections.get(String(lobbyId)) || new Set();
 
+  // Bot users (password_hash IS NULL) have no real socket — always show as connected
+  const botRes = await pool.query(
+    `SELECT u.id::text AS id
+     FROM lobby_players lp
+     JOIN users u ON lp.user_id = u.id
+     WHERE lp.lobby_id = $1 AND u.password_hash IS NULL`,
+    [lobbyId]
+  );
+  const botIds = new Set(botRes.rows.map((r) => r.id));
+
   const players = playersResult.rows.map((p) => ({
     id: p.id,
     username: p.username,
     isHost: p.id === lobby.created_by,
-    isConnected: connected.has(String(p.id)),
+    isConnected: connected.has(String(p.id)) || botIds.has(String(p.id)),
   }));
 
   const totalInnocentPoints = playersResult.rows
