@@ -439,6 +439,7 @@ function setupLobbySocket(httpServer) {
           throw new Error('Only the GM can advance the game');
         }
 
+        gameService.clearDeliberationTimer(gameId); // cancel auto-advance if pending
         const result = await gameService.advanceMovement(gameId);
         console.log(`[WS] gmAdvance game ${gameId}: → ${result.gameOver ? 'GAME OVER' : result.nextMovement}`);
 
@@ -570,4 +571,4 @@ function _emitAdvanceEvents(io, result) {
   }
 }
 
-module.exports = { setupLobbySocket, getIO, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage, broadcastPlayerKicked };
+module.exports = { setupLobbySocket, getIO, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage, broadcastPlayerKicked, emitAdvanceEvents: _emitAdvanceEvents };

@@ -12,6 +12,8 @@ const {
   clearTurnTimeout,
   scheduleTurnTimeout,
   scheduleBotSubmitIfNeeded,
+  notifyGroupDeliberationReady,
+  clearDeliberationTimer,
 } = require('../services/gameService');
 const { getIO } = require('../websocket/lobbySocket');
 
@@ -127,6 +129,7 @@ router.post('/:gameId/advance', auth, async (req, res) => {
       return res.status(403).json({ error: 'Only the GM can advance the game' });
     }
 
+    clearDeliberationTimer(gameId); // cancel auto-advance if pending
     const result = await advanceMovement(gameId);
     _emitAdvanceEvents(result);
 
@@ -414,6 +417,7 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
       if (io) {
         io.to(`lobby:${groupId}`).emit('deliberationStart', { words, lastWord });
       }
+      notifyGroupDeliberationReady(gameId);
       return res.json({ ok: true, phase: 'deliberation', words });
     }
 

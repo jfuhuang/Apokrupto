@@ -94,6 +94,7 @@ async function _autoAdvanceTurn(groupId, expectedIndex) {
     }));
     setGroupTurnState(groupId, { ...state, currentIndex: newIndex, completedCount: newCompleted });
     if (io) io.to(`lobby:${groupId}`).emit('deliberationStart', { words });
+    notifyGroupDeliberationReady(state.gameId);
   } else {
     // More turns — advance to next player
     const now = Date.now();
@@ -193,6 +194,7 @@ async function _doBotSubmit(groupId, expectedIndex) {
     }));
     setGroupTurnState(groupId, { ...state, currentIndex: newIndex, completedCount: newCompleted });
     if (io) io.to(`lobby:${groupId}`).emit('deliberationStart', { words, lastWord });
+    notifyGroupDeliberationReady(state.gameId);
   } else {
     const now = Date.now();
     setGroupTurnState(groupId, {
@@ -255,6 +257,62 @@ function startTurns(groups) {
 }
 
 // ---------------------------------------------------------------------------
+// Deliberation auto-advance
+// After ALL groups in a round have finished word submissions (deliberationStart),
+// a 120 s server-side timer automatically advances the game past Movement A.
+// Cancelled immediately if the GM manually advances first.
+// ---------------------------------------------------------------------------
+const _deliberationGroupsReady = new Map(); // gameId → { ready: N, total: M }
+const _deliberationTimers       = new Map(); // gameId → timeoutId
+
+const DELIBERATION_DURATION_MS = 120_000; // must match client DELIBERATION_SECONDS (120)
+
+function clearDeliberationTimer(gameId) {
+  const key = String(gameId);
+  const tid = _deliberationTimers.get(key);
+  if (tid) {
+    clearTimeout(tid);
+    _deliberationTimers.delete(key);
+  }
+  _deliberationGroupsReady.delete(key);
+}
+
+function _scheduleDeliberationAutoAdvance(gameId) {
+  const key = String(gameId);
+  if (_deliberationTimers.has(key)) return; // already scheduled
+  const tid = setTimeout(async () => {
+    _deliberationTimers.delete(key);
+    _deliberationGroupsReady.delete(key);
+    try {
+      // Lazy-require to avoid circular dependency at module load time
+      const { getIO, emitAdvanceEvents } = require('../websocket/lobbySocket');
+      const result = await advanceMovement(key);
+      console.log(`[DeliberationTimer] Auto-advanced game ${key} → ${result.gameOver ? 'GAME OVER' : result.nextMovement}`);
+      emitAdvanceEvents(getIO(), result);
+    } catch (err) {
+      console.error('[DeliberationTimer] auto-advance error:', err.message);
+    }
+  }, DELIBERATION_DURATION_MS);
+  _deliberationTimers.set(key, tid);
+  console.log(`[DeliberationTimer] Game ${key}: all groups ready — auto-advance in ${DELIBERATION_DURATION_MS / 1000}s`);
+}
+
+/**
+ * Called once per group when that group emits deliberationStart.
+ * Schedules the auto-advance once every group in the round has signalled ready.
+ */
+function notifyGroupDeliberationReady(gameId) {
+  const key   = String(gameId);
+  const entry = _deliberationGroupsReady.get(key);
+  if (!entry) return;
+  entry.ready += 1;
+  console.log(`[DeliberationTimer] Game ${key}: ${entry.ready}/${entry.total} groups in deliberation`);
+  if (entry.ready >= entry.total) {
+    _scheduleDeliberationAutoAdvance(key);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 function shuffle(arr) {
@@ -308,6 +366,9 @@ async function _assignGroups(client, gameId, roundNumber, phosIds, skotiaIds) {
 // Initialise in-memory turn state for a set of groups at Movement A start.
 // Each group gets a random turn order and a randomly-selected prompt.
 async function _initTurnState(groups, gameId) {
+  // Reset deliberation counter so we wait for all groups this round
+  _deliberationGroupsReady.set(String(gameId), { ready: 0, total: groups.length });
+
   const promptRes = await pool.query(
     'SELECT id FROM prompts ORDER BY random() LIMIT $1',
     [groups.length]
@@ -939,4 +1000,6 @@ module.exports = {
   scheduleTurnTimeout,
   startTurns,
   scheduleBotSubmitIfNeeded,
+  notifyGroupDeliberationReady,
+  clearDeliberationTimer,
 };
