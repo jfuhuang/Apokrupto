@@ -13,9 +13,122 @@ const POINTS = {
 
 // ---------------------------------------------------------------------------
 // In-memory turn state for Movement A
-// groupTurnState[groupId] = { turnOrder, currentIndex, completedCount, promptId }
+// groupTurnState[groupId] = { turnOrder, currentIndex, completedCount, promptId, gameId, turnStartedAt }
 // ---------------------------------------------------------------------------
 const groupTurnState = new Map();
+
+// Per-group server-side auto-advance timers
+const _turnTimers = new Map(); // groupId → timeoutId
+
+function clearTurnTimeout(groupId) {
+  const tid = _turnTimers.get(String(groupId));
+  if (tid) {
+    clearTimeout(tid);
+    _turnTimers.delete(String(groupId));
+  }
+}
+
+function scheduleTurnTimeout(groupId, currentIndex) {
+  clearTurnTimeout(groupId);
+  const tid = setTimeout(() => {
+    _autoAdvanceTurn(String(groupId), currentIndex).catch((err) => {
+      console.error('[TurnTimer] auto-advance error:', err.message);
+    });
+  }, 33000); // 33s = 30s player window + 3s network buffer
+  _turnTimers.set(String(groupId), tid);
+}
+
+// Auto-advance when a player's 33s runs out without a submission
+async function _autoAdvanceTurn(groupId, expectedIndex) {
+  const state = getGroupTurnState(groupId);
+  if (!state || state.currentIndex !== expectedIndex) return; // already advanced
+
+  const { gameId } = state;
+  const skippedUserId = String(state.turnOrder[expectedIndex]);
+
+  // Check Movement A is still active
+  const movRes = await pool.query(
+    `SELECT m.id
+     FROM movements m
+     JOIN rounds r ON r.id = m.round_id
+     WHERE r.game_id = $1 AND r.status = 'active'
+       AND m.movement_type = 'A' AND m.status = 'active'`,
+    [gameId]
+  );
+  if (movRes.rows.length === 0) return;
+  const movementId = movRes.rows[0].id;
+
+  // Record a skip marker (DO NOTHING if player already submitted)
+  await pool.query(
+    `INSERT INTO movement_a_submissions (movement_id, group_id, user_id, word)
+     VALUES ($1, $2, $3, '—')
+     ON CONFLICT (movement_id, user_id) DO NOTHING`,
+    [movementId, groupId, skippedUserId]
+  );
+
+  // Re-check in case HTTP submit arrived during our DB round-trip
+  const fresh = getGroupTurnState(groupId);
+  if (!fresh || fresh.currentIndex !== expectedIndex) return;
+
+  const newIndex     = expectedIndex + 1;
+  const newCompleted = state.completedCount + 1;
+
+  // Lazy-load io to avoid circular dependency at module load time
+  const { getIO } = require('../websocket/lobbySocket');
+  const io = getIO();
+
+  if (newCompleted >= state.turnOrder.length) {
+    // Last player — fetch all words and emit deliberationStart
+    const wordsRes = await pool.query(
+      `SELECT mas.word, mas.user_id, u.username
+       FROM movement_a_submissions mas
+       JOIN users u ON u.id = mas.user_id
+       WHERE mas.movement_id = $1 AND mas.group_id = $2
+       ORDER BY mas.submitted_at ASC`,
+      [movementId, groupId]
+    );
+    const words = wordsRes.rows.map((r) => ({
+      userId:   String(r.user_id),
+      username: r.username,
+      word:     r.word,
+    }));
+    setGroupTurnState(groupId, { ...state, currentIndex: newIndex, completedCount: newCompleted });
+    if (io) io.to(`lobby:${groupId}`).emit('deliberationStart', { words });
+  } else {
+    // More turns — advance to next player
+    const now = Date.now();
+    setGroupTurnState(groupId, {
+      ...state,
+      currentIndex:   newIndex,
+      completedCount: newCompleted,
+      turnStartedAt:  now,
+    });
+    const nextPlayerId = String(state.turnOrder[newIndex]);
+    if (io) {
+      io.to(`lobby:${groupId}`).emit('turnStart', {
+        currentPlayerId: nextPlayerId,
+        turnIndex:       newIndex,
+        completedCount:  newCompleted,
+        timeLimit:       30,
+      });
+    }
+    scheduleTurnTimeout(groupId, newIndex);
+  }
+}
+
+// Called after _initTurnState to stamp turnStartedAt and schedule the first
+// per-group auto-advance timer. Does NOT emit turnStart — clients get that
+// via joinRoom (so they receive it after navigating to MovementAScreen).
+function startTurns(groups) {
+  const now = Date.now();
+  for (const group of groups) {
+    const gid   = String(group.groupId);
+    const state = getGroupTurnState(gid);
+    if (!state) continue;
+    setGroupTurnState(gid, { ...state, turnStartedAt: now });
+    scheduleTurnTimeout(gid, 0);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -70,7 +183,7 @@ async function _assignGroups(client, gameId, roundNumber, phosIds, skotiaIds) {
 
 // Initialise in-memory turn state for a set of groups at Movement A start.
 // Each group gets a random turn order and a randomly-selected prompt.
-async function _initTurnState(groups) {
+async function _initTurnState(groups, gameId) {
   const promptRes = await pool.query(
     'SELECT id FROM prompts ORDER BY random() LIMIT $1',
     [groups.length]
@@ -85,6 +198,8 @@ async function _initTurnState(groups) {
       currentIndex:   0,
       completedCount: 0,
       promptId,
+      gameId:         String(gameId),
+      turnStartedAt:  null,
     });
   });
 }
@@ -199,7 +314,7 @@ async function startGame(gameId) {
     await client.query('COMMIT');
 
     // Initialise in-memory turn state (after commit — reads from DB are fine now)
-    await _initTurnState(groups);
+    await _initTurnState(groups, gameId);
 
     // Build convenience maps for the caller
     const playerTeams = new Map();
@@ -406,7 +521,7 @@ async function advanceMovement(gameId) {
     await client.query('COMMIT');
 
     // Initialise turn state for new groups
-    await _initTurnState(newGroups);
+    await _initTurnState(newGroups, gameId);
 
     return {
       nextMovement: 'A',
@@ -696,4 +811,7 @@ module.exports = {
   getPlayerState,
   getGroupTurnState,
   setGroupTurnState,
+  clearTurnTimeout,
+  scheduleTurnTimeout,
+  startTurns,
 };

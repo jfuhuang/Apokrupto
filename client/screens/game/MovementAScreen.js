@@ -48,6 +48,10 @@ export default function MovementAScreen({
   const turnTimerRef = useRef(null);
   const deliberationTimerRef = useRef(null);
   const prevTurnPlayerIdRef = useRef(null);
+  const wordInputRef = useRef(''); // mirrors wordInput state to avoid stale closure in timer
+
+  // Keep ref in sync with state so the interval callback always has the latest value
+  useEffect(() => { wordInputRef.current = wordInput; }, [wordInput]);
 
   // Fetch prompt on mount (server returns team-specific prompt via JWT)
   useEffect(() => {
@@ -130,9 +134,9 @@ export default function MovementAScreen({
           setTurnSecondsLeft(secs);
           if (secs <= 0) {
             clearInterval(turnTimerRef.current);
-            // If it's still our turn and we haven't submitted, auto-submit blank
+            // If it's still our turn, auto-submit whatever was typed (or '—' as placeholder)
             if (String(currentPlayerId) === String(currentUserId)) {
-              handleSubmit('');
+              handleSubmit(wordInputRef.current.trim() || '—');
             }
           }
         }, 1000);

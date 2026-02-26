@@ -9,6 +9,8 @@ const {
   getPlayerState,
   getGroupTurnState,
   setGroupTurnState,
+  clearTurnTimeout,
+  scheduleTurnTimeout,
 } = require('../services/gameService');
 const { getIO } = require('../websocket/lobbySocket');
 
@@ -371,6 +373,9 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
       [movementId, groupId, userId, word.trim()]
     );
 
+    // Cancel the existing auto-advance timer for this turn
+    clearTurnTimeout(groupId);
+
     // Advance turn state
     const newIndex     = turnState.currentIndex + 1;
     const newCompleted = turnState.completedCount + 1;
@@ -411,11 +416,13 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
       return res.json({ ok: true, phase: 'deliberation', words });
     }
 
-    // More turns to go
+    // More turns to go — stamp start time and schedule next auto-advance
+    const now = Date.now();
     setGroupTurnState(groupId, {
       ...turnState,
       currentIndex:   newIndex,
       completedCount: newCompleted,
+      turnStartedAt:  now,
     });
 
     const nextPlayerId = String(turnState.turnOrder[newIndex]);
@@ -428,6 +435,7 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
         lastWord,
       });
     }
+    scheduleTurnTimeout(groupId, newIndex);
 
     res.json({ ok: true, phase: 'waiting', nextPlayerId, completedCount: newCompleted });
   } catch (err) {

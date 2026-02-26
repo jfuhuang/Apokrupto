@@ -226,6 +226,23 @@ function setupLobbySocket(httpServer) {
         lobbyConnections.get(roomKey).add(socket.userId);
         console.log(`[WS] User ${socket.userId} joined room lobby:${roomKey}`);
 
+        // If this is a group room with an active Movement A turn, send the
+        // current turn state directly to the joining socket so MovementAScreen
+        // knows immediately whose turn it is (without waiting for a submission).
+        const turnState = gameService.getGroupTurnState(roomKey);
+        if (turnState && turnState.currentIndex < turnState.turnOrder.length) {
+          const elapsed = turnState.turnStartedAt
+            ? Math.floor((Date.now() - turnState.turnStartedAt) / 1000)
+            : 0;
+          const remaining = Math.max(3, 30 - elapsed);
+          socket.emit('turnStart', {
+            currentPlayerId: String(turnState.turnOrder[turnState.currentIndex]),
+            turnIndex:       turnState.currentIndex,
+            completedCount:  turnState.completedCount,
+            timeLimit:       remaining,
+          });
+        }
+
         const state = await getLobbyState(lobbyId);
 
         if (!state) {
@@ -263,7 +280,7 @@ function setupLobbySocket(httpServer) {
 
         // Create game record + start it (assigns teams, groups, round 1 Movement A)
         const gameId = await gameService.createGame(lobbyId, 4);
-        const { playerTeams, playerGroups, skotiaPlayers } =
+        const { playerTeams, playerGroups, skotiaPlayers, groups } =
           await gameService.startGame(gameId);
 
         console.log(
@@ -298,6 +315,10 @@ function setupLobbySocket(httpServer) {
 
         io.to(roomKey).emit('gameStarted', { gameId, countdown: 5 });
         io.to(roomKey).emit('movementStart', { movement: 'A', roundNumber: 1 });
+
+        // Stamp turnStartedAt and schedule server-side auto-advance timers.
+        // Clients receive the initial turnStart via joinRoom when MovementAScreen mounts.
+        gameService.startTurns(groups);
 
         if (callback) callback({ ok: true, gameId });
       } catch (err) {
@@ -531,6 +552,10 @@ function _emitAdvanceEvents(io, result) {
           teamPoints:   result.teamPoints,
         });
       }
+
+      // Stamp turnStartedAt and schedule auto-advance timers for new groups.
+      // Clients get initial turnStart via joinRoom when MovementAScreen mounts.
+      gameService.startTurns(result.newGroups);
     }
   }
 }
