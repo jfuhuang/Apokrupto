@@ -40,7 +40,7 @@ export default function MovementAScreen({
   const [turnSecondsLeft, setTurnSecondsLeft] = useState(TURN_TIME_LIMIT);
   const [allWords, setAllWords] = useState([]); // [{ userId, username, word }]
   const [submittedWords, setSubmittedWords] = useState([]); // live word reveal list
-  const [deliberationSecondsLeft, setDeliberationSecondsLeft] = useState(120);
+  const [deliberationSecondsLeft, setDeliberationSecondsLeft] = useState(null); // null = waiting for server time
   const [submitting, setSubmitting] = useState(false);
   const [submittedIds, setSubmittedIds] = useState(new Set());
 
@@ -142,29 +142,33 @@ export default function MovementAScreen({
         }, 1000);
       });
 
-      // All players submitted — show words for deliberation
+      // All players submitted — show words for deliberation.
+      // Timer comes separately via deliberationReady (game-level, not per-group).
       socket.on('deliberationStart', ({ words, lastWord }) => {
         clearInterval(turnTimerRef.current);
-        // Mark everyone as submitted
         setSubmittedIds(new Set((groupMembers || []).map((m) => String(m.id))));
-        // Append final word to live reveal list
         if (lastWord) {
           setSubmittedWords((prev) => {
             if (prev.some((w) => String(w.userId) === String(lastWord.userId))) return prev;
             return [...prev, lastWord];
           });
         }
-        // words is now [{ userId, username, word }]
         setAllWords(words || []);
         setPhase('deliberation');
+        // deliberationSecondsLeft stays null until deliberationReady arrives
+      });
 
-        let secs = 120;
-        setDeliberationSecondsLeft(secs);
-        deliberationTimerRef.current = setInterval(() => {
-          secs -= 1;
-          setDeliberationSecondsLeft(secs);
-          if (secs <= 0) clearInterval(deliberationTimerRef.current);
-        }, 1000);
+      // Server broadcasts the authoritative end time once ALL groups are done.
+      // Drives a timer computed from the absolute timestamp so all clients are in sync.
+      socket.on('deliberationReady', ({ deliberationEndsAt }) => {
+        clearInterval(deliberationTimerRef.current);
+        const tick = () => {
+          const secsLeft = Math.max(0, Math.round((deliberationEndsAt - Date.now()) / 1000));
+          setDeliberationSecondsLeft(secsLeft);
+          if (secsLeft <= 0) clearInterval(deliberationTimerRef.current);
+        };
+        tick(); // immediate update
+        deliberationTimerRef.current = setInterval(tick, 1000);
       });
 
       // GM advanced to next movement — server emits movementStart to the lobby room
@@ -426,12 +430,16 @@ export default function MovementAScreen({
 
           <View style={styles.deliberationTimerRow}>
             <Text style={styles.deliberationTimerLabel}>Time remaining</Text>
-            <Text style={[
-              styles.deliberationTimerValue,
-              deliberationSecondsLeft <= 30 && { color: colors.accent.amber },
-            ]}>
-              {Math.floor(deliberationSecondsLeft / 60)}:{String(deliberationSecondsLeft % 60).padStart(2, '0')}
-            </Text>
+            {deliberationSecondsLeft === null ? (
+              <Text style={[styles.deliberationTimerValue, { color: colors.text.muted }]}>—:——</Text>
+            ) : (
+              <Text style={[
+                styles.deliberationTimerValue,
+                deliberationSecondsLeft <= 30 && { color: colors.accent.amber },
+              ]}>
+                {Math.floor(deliberationSecondsLeft / 60)}:{String(deliberationSecondsLeft % 60).padStart(2, '0')}
+              </Text>
+            )}
           </View>
         </View>
       );

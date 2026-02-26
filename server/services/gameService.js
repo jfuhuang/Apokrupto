@@ -264,8 +264,9 @@ function startTurns(groups) {
 // ---------------------------------------------------------------------------
 const _deliberationGroupsReady = new Map(); // gameId → { ready: N, total: M }
 const _deliberationTimers       = new Map(); // gameId → timeoutId
+const _deliberationEndTimes     = new Map(); // gameId → deliberationEndsAt (epoch ms)
 
-const DELIBERATION_DURATION_MS = 120_000; // must match client DELIBERATION_SECONDS (120)
+const DELIBERATION_DURATION_MS = 120_000;
 
 function clearDeliberationTimer(gameId) {
   const key = String(gameId);
@@ -275,16 +276,41 @@ function clearDeliberationTimer(gameId) {
     _deliberationTimers.delete(key);
   }
   _deliberationGroupsReady.delete(key);
+  _deliberationEndTimes.delete(key);
+}
+
+/** Returns the epoch-ms timestamp at which deliberation ends, or null. */
+function getDeliberationEndsAt(gameId) {
+  return _deliberationEndTimes.get(String(gameId)) ?? null;
 }
 
 function _scheduleDeliberationAutoAdvance(gameId) {
   const key = String(gameId);
   if (_deliberationTimers.has(key)) return; // already scheduled
+
+  const deliberationEndsAt = Date.now() + DELIBERATION_DURATION_MS;
+  _deliberationEndTimes.set(key, deliberationEndsAt);
+
+  // Fetch lobbyId and immediately notify all clients of the authoritative end time.
+  // Lazy-require to avoid circular dependency at module load time.
+  pool.query('SELECT lobby_id FROM games WHERE id = $1', [gameId])
+    .then((res) => {
+      const lobbyId = res.rows[0]?.lobby_id;
+      if (!lobbyId) return;
+      const { getIO } = require('../websocket/lobbySocket');
+      const io = getIO();
+      if (io) {
+        io.to(`lobby:${String(lobbyId)}`).emit('deliberationReady', { deliberationEndsAt });
+        console.log(`[DeliberationTimer] Game ${key}: deliberationReady emitted, ends at ${new Date(deliberationEndsAt).toISOString()}`);
+      }
+    })
+    .catch((err) => console.error('[DeliberationTimer] lobbyId fetch error:', err.message));
+
   const tid = setTimeout(async () => {
     _deliberationTimers.delete(key);
     _deliberationGroupsReady.delete(key);
+    _deliberationEndTimes.delete(key);
     try {
-      // Lazy-require to avoid circular dependency at module load time
       const { getIO, emitAdvanceEvents } = require('../websocket/lobbySocket');
       const result = await advanceMovement(key);
       console.log(`[DeliberationTimer] Auto-advanced game ${key} → ${result.gameOver ? 'GAME OVER' : result.nextMovement}`);
@@ -294,7 +320,6 @@ function _scheduleDeliberationAutoAdvance(gameId) {
     }
   }, DELIBERATION_DURATION_MS);
   _deliberationTimers.set(key, tid);
-  console.log(`[DeliberationTimer] Game ${key}: all groups ready — auto-advance in ${DELIBERATION_DURATION_MS / 1000}s`);
 }
 
 /**
@@ -1002,4 +1027,5 @@ module.exports = {
   scheduleBotSubmitIfNeeded,
   notifyGroupDeliberationReady,
   clearDeliberationTimer,
+  getDeliberationEndsAt,
 };

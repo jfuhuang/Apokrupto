@@ -106,6 +106,12 @@ export async function fetchGameState(token, lobbyId) {
   });
 }
 
+export async function fetchPlayerGameState(token, gameId) {
+  return request(`/api/games/${gameId}/state`, {
+    headers: authHeader(token),
+  });
+}
+
 export async function submitSabotagefix(token, lobbyId) {
   return request(`/api/lobbies/${lobbyId}/sabotage/fix`, {
     method: 'POST',

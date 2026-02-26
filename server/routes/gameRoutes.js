@@ -14,6 +14,7 @@ const {
   scheduleBotSubmitIfNeeded,
   notifyGroupDeliberationReady,
   clearDeliberationTimer,
+  getDeliberationEndsAt,
 } = require('../services/gameService');
 const { getIO } = require('../websocket/lobbySocket');
 
@@ -151,7 +152,7 @@ router.get('/:gameId/state', auth, async (req, res) => {
   try {
     const state = await getPlayerState(gameId, userId);
     if (!state) return res.status(404).json({ error: 'Player not found in this game' });
-    res.json(state);
+    res.json({ ...state, deliberationEndsAt: getDeliberationEndsAt(gameId) });
   } catch (err) {
     console.error('[GET /games/:id/state]', err.message);
     res.status(500).json({ error: 'Server error' });

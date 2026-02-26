@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
@@ -35,7 +35,7 @@ import GameOverScreen from './screens/game/GameOverScreen';
 import DevMenuScreen from './screens/dev/DevMenuScreen';
 import TaskScreen from './screens/tasks/TaskScreen';
 import { colors } from './theme/colors';
-import { fetchCurrentLobby } from './utils/api';
+import { fetchCurrentLobby, fetchPlayerGameState } from './utils/api';
 
 function parseJwt(token) {
   try {
@@ -98,6 +98,101 @@ export default function App() {
 
   useEffect(() => {
     checkExistingToken();
+  }, []);
+
+  // ── Server sync (10 s polling safety net) ────────────────────────────────
+  // Screens where we deliberately do NOT force-navigate:
+  //   transitional  → let the animation/timer finish naturally
+  //   pre-game      → no game state to sync against
+  const SYNC_SKIP_SCREENS = [
+    'loading', 'welcome', 'login', 'register', 'lobbyList',
+    'countdown', 'roleReveal', 'roundSummary', 'gameOver', 'devMenu',
+  ];
+
+  // "Latest callback ref" pattern — updated on every render so the stable
+  // interval always calls a closure that has access to fresh state & setters.
+  const syncCallbackRef = useRef(null);
+  useEffect(() => {
+    syncCallbackRef.current = async () => {
+      if (!token || SYNC_SKIP_SCREENS.includes(currentScreen)) return;
+      try {
+        // Step 1 — lobby/game membership check
+        const { ok: lobbyOk, data: lobbyData } = await fetchCurrentLobby(token);
+        if (!lobbyOk) return;
+
+        const lobby = lobbyData.lobby;
+
+        // No active lobby → kick to lobby list
+        if (!lobby) {
+          if (currentScreen !== 'lobbyList') {
+            setCurrentLobbyId(null);
+            resetGameState();
+            setCurrentScreen('lobbyList');
+          }
+          return;
+        }
+
+        setCurrentLobbyId(lobby.id);
+
+        if (lobby.status === 'waiting') {
+          if (currentScreen !== 'lobby') setCurrentScreen('lobby');
+          return;
+        }
+
+        if (lobby.status === 'completed') {
+          if (currentScreen !== 'gameOver') setCurrentScreen('gameOver');
+          return;
+        }
+
+        // lobby.status === 'in_progress'
+        const gId = lobby.gameId || gameId;
+        if (!gId) return;
+        setGameId(gId);
+        setIsGm(lobby.isGm || false);
+
+        if (lobby.isGm) {
+          if (currentScreen !== 'gmDashboard') setCurrentScreen('gmDashboard');
+          return;
+        }
+
+        // Step 2 — per-player game state
+        const { ok: stateOk, data: state } = await fetchPlayerGameState(token, gId);
+        if (!stateOk) return;
+
+        // Sync all relevant state fields before any navigation
+        if (state.team)                  setCurrentTeam(state.team);
+        if (state.isMarked !== undefined) setIsMarked(state.isMarked);
+        if (state.teamPoints)            setTeamPoints(state.teamPoints);
+        if (state.currentRound)          setCurrentRound(state.currentRound);
+        if (state.totalRounds)           setTotalRounds(state.totalRounds);
+        if (state.groupId) {
+          setCurrentGroupId(String(state.groupId));
+          setCurrentGroupNumber(state.groupIndex ?? null);
+        }
+        if (state.groupMembers)          setCurrentGroupMembers(state.groupMembers);
+
+        // Map server movement → expected client screen
+        const targetScreen =
+          state.currentMovement === 'A' ? 'movementA' :
+          state.currentMovement === 'B' ? 'movementB' :
+          state.currentMovement === 'C' ? 'movementC' :
+          'roundHub';
+
+        if (currentScreen !== targetScreen) {
+          console.log(`[GameSync] ${currentScreen} → ${targetScreen} (movement: ${state.currentMovement})`);
+          setCurrentMovement(state.currentMovement);
+          setCurrentScreen(targetScreen);
+        }
+      } catch (err) {
+        console.warn('[GameSync] poll error:', err.message);
+      }
+    };
+  }); // intentionally no deps — re-runs after every render to stay fresh
+
+  // Stable interval: created once, always calls the latest callback
+  useEffect(() => {
+    const id = setInterval(() => { syncCallbackRef.current?.(); }, 10_000);
+    return () => clearInterval(id);
   }, []);
 
   const checkExistingToken = async () => {
