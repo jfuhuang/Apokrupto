@@ -1,10 +1,59 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { io } from 'socket.io-client';
+import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
 
-export default function RoundSummaryScreen({ roundNumber, totalRounds, summary, isLastRound, onContinue }) {
+export default function RoundSummaryScreen({
+  roundNumber,
+  totalRounds,
+  summary,
+  isLastRound,
+  token,
+  lobbyId,
+  onContinue,
+  onRoundSetup,
+  onGameOver,
+}) {
+  const socketRef = useRef(null);
+
+  useEffect(() => {
+    if (!token || !lobbyId) return;
+    let socket;
+    const connect = async () => {
+      const baseUrl = await getApiUrl();
+      socket = io(baseUrl, {
+        auth: { token },
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+      });
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        socket.emit('joinRoom', { lobbyId });
+      });
+
+      // GM started next round — update App.js state and navigate to RoundHub
+      socket.on('roundSetup', (data) => {
+        if (onRoundSetup) onRoundSetup(data);
+      });
+
+      // Game ended (final round or supermajority hit after this summary)
+      socket.on('gameOver', (result) => {
+        if (onGameOver) onGameOver(result);
+      });
+    };
+    connect().catch(console.error);
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, [token, lobbyId]);
+
   const marksApplied = summary?.marksApplied ?? 0;
   const unmarksApplied = summary?.unmarksApplied ?? 0;
   const phosPoints = summary?.phosPoints ?? 0;
@@ -54,9 +103,14 @@ export default function RoundSummaryScreen({ roundNumber, totalRounds, summary, 
             </View>
           )}
 
-          <TouchableOpacity style={styles.continueBtn} onPress={onContinue} activeOpacity={0.8}>
-            <Text style={styles.continueBtnText}>
-              {isLastRound ? 'SEE RESULTS' : 'NEXT ROUND'}
+          <TouchableOpacity
+            style={[styles.continueBtn, !isLastRound && styles.continueBtnDisabled]}
+            onPress={isLastRound ? onContinue : undefined}
+            disabled={!isLastRound}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.continueBtnText, !isLastRound && styles.continueBtnTextDisabled]}>
+              {isLastRound ? 'SEE RESULTS' : 'WAITING FOR GM...'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -194,10 +248,21 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 6,
   },
+  continueBtnDisabled: {
+    backgroundColor: colors.background.panel,
+    shadowOpacity: 0,
+    elevation: 0,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
   continueBtnText: {
     fontFamily: fonts.display.bold,
     fontSize: 14,
     letterSpacing: 3,
     color: colors.background.space,
+  },
+  continueBtnTextDisabled: {
+    color: colors.text.disabled,
+    fontSize: 11,
   },
 });

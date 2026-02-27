@@ -9,6 +9,7 @@ import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
+import { TASKS } from '../../data/tasks';
 
 const MOVEMENT_LABELS = { A: 'DEDUCTION', B: 'TASKS', C: 'VOTING' };
 const MOVEMENT_SEQUENCE = ['A', 'B', 'C'];
@@ -28,6 +29,8 @@ export default function RoundHubScreen({
   onStartTask,
   onMovementReady,
   onGameStateUpdate,
+  onRoundSummary,
+  onRoundSetup,
   onGameOver,
   onLobbyGone,
 }) {
@@ -36,6 +39,7 @@ export default function RoundHubScreen({
   const [liveGroupMembers, setLiveGroupMembers] = useState(currentGroupMembers || []);
   const [liveTeamPoints, setLiveTeamPoints] = useState(teamPoints || { phos: 0, skotia: 0 });
   const [activeMovement, setActiveMovement] = useState(null);
+  const [completedMovements, setCompletedMovements] = useState(new Set());
 
   const socketRef = useRef(null);
 
@@ -74,15 +78,38 @@ export default function RoundHubScreen({
         if (onGameStateUpdate) onGameStateUpdate(state);
       });
 
-      socket.on('movementStart', ({ movement, groupId, groupMembers, groupNumber }) => {
+      socket.on('movementStart', ({ movement, groupId, groupMembers, groupNumber: gn }) => {
         setActiveMovement(movement);
         setStatusMessage(`Movement ${movement} — ${MOVEMENT_LABELS[movement]} beginning...`);
         if (groupMembers) setLiveGroupMembers(groupMembers);
-        if (onMovementReady) onMovementReady(movement, groupId, groupMembers, groupNumber ?? null);
+        if (onMovementReady) onMovementReady(movement, groupId, groupMembers, gn ?? null);
       });
 
-      socket.on('taskAssigned', (task) => {
-        if (movementBMode && onStartTask) onStartTask(task);
+      socket.on('movementComplete', ({ movement }) => {
+        setCompletedMovements((prev) => new Set([...prev, movement]));
+        setActiveMovement(null);
+        setStatusMessage(`Movement ${movement} complete. Waiting for Game Master...`);
+      });
+
+      socket.on('roundSummary', (summary) => {
+        if (onRoundSummary) onRoundSummary(summary);
+      });
+
+      socket.on('roundSetup', ({ roundNumber, groupId, groupNumber: gn, groupMembers, teamPoints: tp }) => {
+        setLiveGroupMembers(groupMembers || []);
+        if (tp) setLiveTeamPoints(tp);
+        setCompletedMovements(new Set());
+        setActiveMovement(null);
+        setStatusMessage('Waiting for Game Master...');
+        if (onRoundSetup) onRoundSetup({ roundNumber, groupId, groupNumber: gn, groupMembers, teamPoints: tp });
+      });
+
+      socket.on('taskAssigned', ({ taskId }) => {
+        if (movementBMode && onStartTask) {
+          const task = TASKS.find((t) => t.id === taskId);
+          if (task) onStartTask(task);
+          else console.warn('[RoundHub] Unknown taskId from server:', taskId);
+        }
       });
 
       socket.on('announcement', ({ message }) => {
@@ -113,8 +140,12 @@ export default function RoundHubScreen({
         });
         if (!res.ok) return;
         const state = await res.json();
+        // Restore completed movements indicator from server state
+        if (state.completedMovements && state.completedMovements.length > 0) {
+          setCompletedMovements(new Set(state.completedMovements));
+        }
+        // Navigate immediately if a movement is already active (reconnect case)
         if (state.currentMovement && onMovementReady) {
-          // Use group info from server state; fall back to props if not available
           onMovementReady(
             state.currentMovement,
             state.groupId || null,
@@ -153,19 +184,28 @@ export default function RoundHubScreen({
           </View>
 
           <View style={styles.movementIndicator}>
-            {MOVEMENT_SEQUENCE.map((m) => (
-              <View
-                key={m}
-                style={[styles.movementPip, activeMovement === m && styles.movementPipActive]}
-              >
-                <Text style={[
-                  styles.movementPipLabel,
-                  activeMovement === m && { color: colors.primary.electricBlue },
-                ]}>
-                  {m}
-                </Text>
-              </View>
-            ))}
+            {MOVEMENT_SEQUENCE.map((m) => {
+              const isDone   = completedMovements.has(m);
+              const isActive = activeMovement === m;
+              return (
+                <View
+                  key={m}
+                  style={[
+                    styles.movementPip,
+                    isDone   && styles.movementPipDone,
+                    isActive && styles.movementPipActive,
+                  ]}
+                >
+                  <Text style={[
+                    styles.movementPipLabel,
+                    isDone   && { color: colors.accent.neonGreen },
+                    isActive && { color: colors.primary.electricBlue },
+                  ]}>
+                    {m}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
 
           <View style={styles.headerRight}>
@@ -299,6 +339,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.panel,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  movementPipDone: {
+    borderColor: colors.accent.neonGreen,
+    backgroundColor: 'rgba(57, 255, 20, 0.12)',
   },
   movementPipActive: {
     borderColor: colors.primary.electricBlue,

@@ -49,6 +49,7 @@ export default function MovementAScreen({
   const deliberationTimerRef = useRef(null);
   const prevTurnPlayerIdRef = useRef(null);
   const wordInputRef = useRef(''); // mirrors wordInput state to avoid stale closure in timer
+  const submittedRef = useRef(false); // true after this player submits; prevents double auto-submit
 
   // Keep ref in sync with state so the interval callback always has the latest value
   useEffect(() => { wordInputRef.current = wordInput; }, [wordInput]);
@@ -94,17 +95,18 @@ export default function MovementAScreen({
       // Server announces whose turn it is
       socket.on('turnStart', ({ currentPlayerId, completedCount: cc, timeLimit, lastWord }) => {
         clearInterval(turnTimerRef.current);
+        submittedRef.current = false; // reset for this new turn
 
-        // The player whose turn just ended has submitted
+        // The player whose turn just ended has submitted (fallback for reconnect)
         if (prevTurnPlayerIdRef.current) {
           setSubmittedIds((prev) => new Set([...prev, String(prevTurnPlayerIdRef.current)]));
         }
         prevTurnPlayerIdRef.current = currentPlayerId;
 
-        // Append the just-submitted word to the live reveal list
+        // Append the just-submitted word to the live reveal list (fallback for reconnect;
+        // normally wordSubmitted handles this before turnStart fires)
         if (lastWord) {
           setSubmittedWords((prev) => {
-            // Avoid duplicates (e.g. if we already added our own word on submit)
             if (prev.some((w) => String(w.userId) === String(lastWord.userId))) return prev;
             return [...prev, lastWord];
           });
@@ -127,19 +129,33 @@ export default function MovementAScreen({
           setPhase('waiting_turn');
         }
 
-        // Countdown for current turn
+        // Countdown for current turn.
+        // After a player submits early the timer keeps running (showing "next turn in Xs").
+        // submittedRef prevents auto-submit from firing again.
         let secs = limit;
         turnTimerRef.current = setInterval(() => {
           secs -= 1;
           setTurnSecondsLeft(secs);
           if (secs <= 0) {
             clearInterval(turnTimerRef.current);
-            // If it's still our turn, auto-submit whatever was typed (or '—' as placeholder)
-            if (String(currentPlayerId) === String(currentUserId)) {
+            // Auto-submit only if it's still our turn and we haven't submitted yet
+            if (String(currentPlayerId) === String(currentUserId) && !submittedRef.current) {
               handleSubmit(wordInputRef.current.trim() || '—');
             }
           }
         }, 1000);
+      });
+
+      // Server notifies the group immediately when a player submits their word
+      // (fires before the 30-second window expires so everyone can see the word)
+      socket.on('wordSubmitted', ({ userId: submittedUserId, username: submittedUsername, word: submittedWord }) => {
+        setSubmittedIds((prev) => new Set([...prev, String(submittedUserId)]));
+        setSubmittedWords((prev) => {
+          if (prev.some((w) => String(w.userId) === String(submittedUserId))) return prev;
+          return [...prev, { userId: String(submittedUserId), username: submittedUsername, word: submittedWord }];
+        });
+        // Mark as "done" in prevTurnPlayerIdRef so turnStart's fallback doesn't double-add
+        prevTurnPlayerIdRef.current = String(submittedUserId);
       });
 
       // All players submitted — show words for deliberation.
@@ -171,9 +187,19 @@ export default function MovementAScreen({
         deliberationTimerRef.current = setInterval(tick, 1000);
       });
 
-      // GM advanced to next movement — server emits movementStart to the lobby room
+      // Deliberation timer fired — server marks A complete, clients return to RoundHub
+      socket.on('movementComplete', ({ movement }) => {
+        if (movement === 'A') {
+          clearInterval(turnTimerRef.current);
+          clearInterval(deliberationTimerRef.current);
+          if (onMovementComplete) onMovementComplete();
+        }
+      });
+
+      // Fallback: GM force-advanced past A without waiting for deliberation timer
       socket.on('movementStart', ({ movement }) => {
         if (movement !== 'A') {
+          clearInterval(turnTimerRef.current);
           clearInterval(deliberationTimerRef.current);
           if (onMovementComplete) onMovementComplete();
         }
@@ -202,7 +228,8 @@ export default function MovementAScreen({
     const finalWord = (word ?? wordInput).trim();
     if (submitting) return;
     setSubmitting(true);
-    clearInterval(turnTimerRef.current);
+    submittedRef.current = true; // prevent auto-submit from triggering again
+    // Do NOT clear the turn timer — let it keep counting so waiting_others shows "next turn in Xs"
     setMyWord(finalWord);
     setSubmittedIds((prev) => new Set([...prev, String(currentUserId)]));
     // Add our own word to the live reveal list
@@ -392,7 +419,11 @@ export default function MovementAScreen({
             <Text style={styles.myWordDisplay}>{myWord || '—'}</Text>
           </View>
 
-          <Text style={styles.waitingLabel}>Waiting for the group...</Text>
+          <Text style={styles.waitingLabel}>
+            {turnSecondsLeft > 0
+              ? `Next turn in ${turnSecondsLeft}s`
+              : 'Starting next turn...'}
+          </Text>
 
           <View style={styles.progressRow}>
             <Text style={styles.progressText}>{completedCount} / {total} submitted</Text>

@@ -107,6 +107,7 @@ export default function App() {
   const SYNC_SKIP_SCREENS = [
     'loading', 'welcome', 'login', 'register', 'lobbyList',
     'countdown', 'roleReveal', 'roundSummary', 'gameOver', 'devMenu',
+    'task',
   ];
 
   // "Latest callback ref" pattern — updated on every render so the stable
@@ -313,8 +314,13 @@ export default function App() {
 
   const handleTaskComplete = () => setCurrentScreen('roundHub');
 
-  // Movement C (voting) always ends a round; summary data comes from server
-  const handleMovementCComplete = (summary) => {
+  // Movement C voting timer (or GM force) ended — return to RoundHub for GM to resolve
+  const handleMovementCComplete = () => {
+    setCurrentScreen('roundHub');
+  };
+
+  // RoundHubScreen received roundSummary event — navigate to summary screen
+  const handleRoundSummary = (summary) => {
     setRoundSummary(summary || null);
     setCurrentScreen('roundSummary');
   };
@@ -329,11 +335,22 @@ export default function App() {
     if (gm !== undefined) setIsGm(gm);
   };
 
+  // Called from RoundSummaryScreen roundSetup socket event or button (last round only)
+  const handleRoundSetup = ({ roundNumber, groupId, groupNumber, groupMembers, teamPoints: tp }) => {
+    if (roundNumber) setCurrentRound(roundNumber);
+    if (groupId) setCurrentGroupId(String(groupId));
+    if (groupNumber != null) setCurrentGroupNumber(groupNumber);
+    if (groupMembers) setCurrentGroupMembers(groupMembers);
+    if (tp) setTeamPoints(tp);
+    setRoundSummary(null);
+    setCurrentScreen('roundHub');
+  };
+
   const handleRoundSummaryContinue = () => {
+    // Button fallback (only enabled on last round → goes to gameOver)
     if (currentRound >= totalRounds) {
       setCurrentScreen('gameOver');
     } else {
-      setCurrentRound((r) => r + 1);
       setRoundSummary(null);
       setCurrentScreen('roundHub');
     }
@@ -473,6 +490,7 @@ export default function App() {
       case 'roundHub':
         return (
           <RoundHubScreen
+            key="roundHub"
             token={token}
             gameId={gameId}
             lobbyId={currentLobbyId}
@@ -485,6 +503,8 @@ export default function App() {
             teamPoints={teamPoints}
             onMovementReady={handleMovementReady}
             onGameStateUpdate={handleGameStateUpdate}
+            onRoundSummary={handleRoundSummary}
+            onRoundSetup={handleRoundSetup}
             onGameOver={handleGameOver}
             onLobbyGone={handleLobbyGone}
           />
@@ -508,6 +528,7 @@ export default function App() {
       case 'movementB':
         return (
           <RoundHubScreen
+            key="movementB"
             token={token}
             gameId={gameId}
             lobbyId={currentLobbyId}
@@ -522,6 +543,8 @@ export default function App() {
             onStartTask={handleStartTask}
             onMovementReady={handleMovementReady}
             onGameStateUpdate={handleGameStateUpdate}
+            onRoundSummary={handleRoundSummary}
+            onRoundSetup={handleRoundSetup}
             onGameOver={handleGameOver}
             onLobbyGone={handleLobbyGone}
           />
@@ -544,6 +567,7 @@ export default function App() {
           <VotingScreen
             token={token}
             gameId={gameId}
+            lobbyId={currentLobbyId}
             groupId={currentGroupId}
             currentUserId={userId}
             currentTeam={currentTeam}
@@ -560,7 +584,11 @@ export default function App() {
             totalRounds={totalRounds}
             summary={roundSummary}
             isLastRound={currentRound >= totalRounds}
+            token={token}
+            lobbyId={currentLobbyId}
             onContinue={handleRoundSummaryContinue}
+            onRoundSetup={handleRoundSetup}
+            onGameOver={handleGameOver}
           />
         );
 

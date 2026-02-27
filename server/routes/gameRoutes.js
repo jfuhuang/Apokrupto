@@ -11,12 +11,19 @@ const {
   setGroupTurnState,
   clearTurnTimeout,
   scheduleTurnTimeout,
+  clearRevealTimeout,
+  scheduleRevealTimeout,
+  clearAllGroupTimersForGame,
   scheduleBotSubmitIfNeeded,
   notifyGroupDeliberationReady,
   clearDeliberationTimer,
   getDeliberationEndsAt,
+  clearMovementBTimer,
+  clearVotingTimer,
+  emitGmTurnUpdate,
+  getMovementATurnInfo,
 } = require('../services/gameService');
-const { getIO } = require('../websocket/lobbySocket');
+const { getIO, emitAdvanceEvents } = require('../websocket/lobbySocket');
 
 // ---------------------------------------------------------------------------
 // POST /api/games
@@ -97,9 +104,8 @@ router.post('/:gameId/start', auth, async (req, res) => {
         sock.emit('roleAssigned', rolePayload);
       }
 
-      // Broadcast gameStarted + movementStart to the lobby room
+      // Broadcast gameStarted; movementStart A is NOT emitted — GM must activate it
       io.to(roomKey).emit('gameStarted', { gameId, countdown: 5 });
-      io.to(roomKey).emit('movementStart', { movement: 'A', roundNumber: 1 });
     }
 
     res.json({ ok: true, gameId, groupCount: groups.length });
@@ -130,9 +136,12 @@ router.post('/:gameId/advance', auth, async (req, res) => {
       return res.status(403).json({ error: 'Only the GM can advance the game' });
     }
 
-    clearDeliberationTimer(gameId); // cancel auto-advance if pending
+    clearDeliberationTimer(gameId);       // cancel deliberation auto-advance if pending
+    clearMovementBTimer(gameId);          // cancel Movement B auto-advance if pending
+    clearVotingTimer(gameId);             // cancel voting timer if pending
+    clearAllGroupTimersForGame(gameId);   // cancel any pending turn/reveal timers
     const result = await advanceMovement(gameId);
-    _emitAdvanceEvents(result);
+    emitAdvanceEvents(getIO(), result);
 
     res.json({ ok: true, ...result });
   } catch (err) {
@@ -176,7 +185,7 @@ router.get('/:gameId/gm-state', auth, async (req, res) => {
       `SELECT g.id, g.status, g.total_rounds, g.current_round,
               m.movement_type AS movement
        FROM games g
-       LEFT JOIN rounds r    ON r.game_id = g.id AND r.status = 'active'
+       LEFT JOIN rounds r    ON r.game_id = g.id AND r.status IN ('active', 'summarizing')
        LEFT JOIN movements m ON m.round_id = r.id AND m.status = 'active'
        WHERE g.id = $1`,
       [gameId]
@@ -245,6 +254,7 @@ router.get('/:gameId/gm-state', auth, async (req, res) => {
         status:      game.status,
       },
       teamPoints,
+      movATurnInfo: game.movement === 'A' ? getMovementATurnInfo(gameId) : null,
     });
   } catch (err) {
     if (err.code === '42P01') return res.json(empty); // table not found
@@ -378,73 +388,95 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
       [movementId, groupId, userId, word.trim()]
     );
 
-    // Cancel the existing auto-advance timer for this turn
+    // Cancel the existing auto-advance (skip) timer — player submitted in time
     clearTurnTimeout(groupId);
 
-    // Advance turn state
     const newIndex     = turnState.currentIndex + 1;
     const newCompleted = turnState.completedCount + 1;
     const io           = getIO();
 
-    // Info about the word just submitted (sent to group with turnStart/deliberationStart)
     const lastWord = {
       userId:   String(userId),
       username: req.user.username,
       word:     word.trim(),
     };
 
-    if (newCompleted >= turnState.turnOrder.length) {
-      // All submitted — fetch attributed word list and emit deliberationStart
-      const wordsRes = await db.query(
-        `SELECT mas.word, mas.user_id, u.username
-         FROM movement_a_submissions mas
-         JOIN users u ON u.id = mas.user_id
-         WHERE mas.movement_id = $1 AND mas.group_id = $2
-         ORDER BY mas.submitted_at ASC`,
-        [movementId, groupId]
-      );
-      const words = wordsRes.rows.map((r) => ({
-        userId:   String(r.user_id),
-        username: r.username,
-        word:     r.word,
-      }));
+    // Calculate how much of the 30-second turn window remains.
+    // The next turn (or deliberation) starts after this delay so all groups
+    // advance in sync regardless of how fast individual players type.
+    const elapsed     = turnState.turnStartedAt ? Date.now() - turnState.turnStartedAt : 0;
+    const revealDelay = Math.max(1000, 30000 - elapsed);
 
-      setGroupTurnState(groupId, {
-        ...turnState,
-        currentIndex:   newIndex,
-        completedCount: newCompleted,
+    // Immediately notify the group that this player submitted (word reveal)
+    if (io) {
+      io.to(`lobby:${groupId}`).emit('wordSubmitted', {
+        ...lastWord,
+        nextTurnInSeconds: Math.ceil(revealDelay / 1000),
       });
-
-      if (io) {
-        io.to(`lobby:${groupId}`).emit('deliberationStart', { words, lastWord });
-      }
-      notifyGroupDeliberationReady(gameId);
-      return res.json({ ok: true, phase: 'deliberation', words });
     }
 
-    // More turns to go — stamp start time and schedule next auto-advance
-    const now = Date.now();
-    setGroupTurnState(groupId, {
-      ...turnState,
-      currentIndex:   newIndex,
-      completedCount: newCompleted,
-      turnStartedAt:  now,
+    // Capture variables for the async callback
+    const capturedTurnState = turnState;
+    const capturedGameId    = gameId;
+    const capturedMovId     = movementId;
+
+    // After the reveal window expires, advance to the next turn or deliberation
+    scheduleRevealTimeout(groupId, revealDelay, async () => {
+      const freshState = getGroupTurnState(groupId);
+      // Bail out if another operation already advanced the turn index
+      if (!freshState || freshState.currentIndex !== capturedTurnState.currentIndex) return;
+
+      const io2 = getIO();
+
+      if (newCompleted >= capturedTurnState.turnOrder.length) {
+        // All players submitted — fetch word list and start deliberation
+        const wordsRes = await db.query(
+          `SELECT mas.word, mas.user_id, u.username
+           FROM movement_a_submissions mas
+           JOIN users u ON u.id = mas.user_id
+           WHERE mas.movement_id = $1 AND mas.group_id = $2
+           ORDER BY mas.submitted_at ASC`,
+          [capturedMovId, groupId]
+        );
+        const words = wordsRes.rows.map((r) => ({
+          userId:   String(r.user_id),
+          username: r.username,
+          word:     r.word,
+        }));
+        setGroupTurnState(groupId, {
+          ...freshState,
+          currentIndex:   newIndex,
+          completedCount: newCompleted,
+        });
+        if (io2) io2.to(`lobby:${groupId}`).emit('deliberationStart', { words, lastWord });
+        emitGmTurnUpdate(capturedGameId, capturedTurnState.lobbyId, newIndex, capturedTurnState.turnOrder.length, 'deliberation', Date.now(), io2);
+        notifyGroupDeliberationReady(capturedGameId);
+      } else {
+        // More turns — advance to next player
+        const now = Date.now();
+        setGroupTurnState(groupId, {
+          ...freshState,
+          currentIndex:   newIndex,
+          completedCount: newCompleted,
+          turnStartedAt:  now,
+        });
+        const nextPlayerId = String(capturedTurnState.turnOrder[newIndex]);
+        if (io2) {
+          io2.to(`lobby:${groupId}`).emit('turnStart', {
+            currentPlayerId: nextPlayerId,
+            turnIndex:       newIndex,
+            completedCount:  newCompleted,
+            timeLimit:       30,
+            lastWord,
+          });
+        }
+        emitGmTurnUpdate(capturedGameId, capturedTurnState.lobbyId, newIndex, capturedTurnState.turnOrder.length, 'active', now, io2);
+        scheduleTurnTimeout(groupId, newIndex);
+        scheduleBotSubmitIfNeeded(groupId);
+      }
     });
 
-    const nextPlayerId = String(turnState.turnOrder[newIndex]);
-    if (io) {
-      io.to(`lobby:${groupId}`).emit('turnStart', {
-        currentPlayerId: nextPlayerId,
-        turnIndex:       newIndex,
-        completedCount:  newCompleted,
-        timeLimit:       30,
-        lastWord,
-      });
-    }
-    scheduleTurnTimeout(groupId, newIndex);
-    scheduleBotSubmitIfNeeded(groupId); // auto-submit if next player is a bot
-
-    res.json({ ok: true, phase: 'waiting', nextPlayerId, completedCount: newCompleted });
+    res.json({ ok: true, phase: 'waiting', completedCount: newCompleted });
   } catch (err) {
     console.error('[POST movement-a/submit]', err.message);
     res.status(500).json({ error: 'Server error' });
@@ -558,80 +590,5 @@ router.post('/:gameId/broadcast', auth, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
-// ---------------------------------------------------------------------------
-// Internal helper: emit socket events after advanceMovement
-// ---------------------------------------------------------------------------
-function _emitAdvanceEvents(result) {
-  const io = getIO();
-  if (!io) return;
-
-  const lobbyRoom = `lobby:${String(result.lobbyId)}`;
-
-  if (result.gameOver) {
-    // Emit per-group votingComplete results (roundSummary embedded for client convenience)
-    if (result.groupResults) {
-      for (const [gId, actions] of result.groupResults) {
-        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions, roundSummary: result.summary });
-      }
-    }
-    io.to(lobbyRoom).emit('roundSummary', result.summary);
-    io.to(lobbyRoom).emit('gameOver', result.gameOverData);
-    return;
-  }
-
-  if (result.nextMovement === 'B') {
-    io.to(lobbyRoom).emit('movementStart', {
-      movement:    'B',
-      roundNumber: result.roundNumber,
-    });
-    return;
-  }
-
-  if (result.nextMovement === 'C') {
-    io.to(lobbyRoom).emit('movementStart', {
-      movement:    'C',
-      roundNumber: result.roundNumber,
-    });
-    return;
-  }
-
-  if (result.nextMovement === 'A') {
-    // Voting just ended — emit per-group results + round summary
-    if (result.groupResults) {
-      for (const [gId, actions] of result.groupResults) {
-        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions, roundSummary: result.summary });
-      }
-    }
-    io.to(lobbyRoom).emit('roundSummary', result.summary);
-
-    // Emit per-player movementStart with new group info
-    if (result.newGroups) {
-      // Build userId → group map
-      const userGroupMap = new Map();
-      for (const group of result.newGroups) {
-        for (const memberId of group.memberIds) {
-          userGroupMap.set(String(memberId), group);
-        }
-      }
-
-      for (const [, sock] of io.sockets.sockets) {
-        if (!sock.rooms.has(lobbyRoom)) continue;
-        const group = userGroupMap.get(sock.userId);
-        if (!group) continue;
-
-        sock.emit('movementStart', {
-          movement:     'A',
-          roundNumber:  result.roundNumber,
-          totalRounds:  result.totalRounds,
-          groupId:      String(group.groupId),
-          groupNumber:  group.groupIndex,
-          groupMembers: group.members,
-          teamPoints:   result.teamPoints,
-        });
-      }
-    }
-  }
-}
 
 module.exports = router;

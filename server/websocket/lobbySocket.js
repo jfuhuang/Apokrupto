@@ -253,6 +253,35 @@ function setupLobbySocket(httpServer) {
           });
         }
 
+        // If Movement B is active, re-emit this player's task assignment on reconnect.
+        // If no assignment is in memory (e.g. server restarted), assign a fresh random task.
+        try {
+          const mbRes = await pool.query(
+            `SELECT g.id FROM games g
+             JOIN rounds r ON r.game_id = g.id AND r.status = 'active'
+             JOIN movements m ON m.round_id = r.id AND m.status = 'active'
+               AND m.movement_type = 'B'
+             WHERE g.lobby_id = $1 AND g.status = 'active'`,
+            [lobbyId]
+          );
+          if (mbRes.rows.length > 0) {
+            const mbGameId = String(mbRes.rows[0].id);
+            let taskId = gameService.getMovementBAssignment(mbGameId, socket.userId);
+            if (!taskId) {
+              // Assignment missing (server restarted or player connected after A→B) — assign fresh
+              const { TASKS } = require('../data/tasks');
+              const randomTask = TASKS[Math.floor(Math.random() * TASKS.length)];
+              taskId = randomTask.id;
+              gameService.storeMovementBAssignment(mbGameId, socket.userId, taskId);
+              console.log(`[MovementB] Assigned fresh task "${taskId}" to user ${socket.userId}`);
+            }
+            socket.emit('taskAssigned', { taskId });
+            console.log(`[MovementB] Re-emitted task "${taskId}" to reconnecting user ${socket.userId}`);
+          }
+        } catch (err) {
+          console.error('[MovementB] reconnect task lookup error:', err.message);
+        }
+
         const state = await getLobbyState(lobbyId);
 
         if (!state) {
@@ -324,11 +353,7 @@ function setupLobbySocket(httpServer) {
         }
 
         io.to(roomKey).emit('gameStarted', { gameId, countdown: 5 });
-        io.to(roomKey).emit('movementStart', { movement: 'A', roundNumber: 1 });
-
-        // Stamp turnStartedAt and schedule server-side auto-advance timers.
-        // Clients receive the initial turnStart via joinRoom when MovementAScreen mounts.
-        gameService.startTurns(groups);
+        // movementStart for A is NOT emitted here — GM must advance to activate it.
 
         if (callback) callback({ ok: true, gameId });
       } catch (err) {
@@ -439,9 +464,12 @@ function setupLobbySocket(httpServer) {
           throw new Error('Only the GM can advance the game');
         }
 
-        gameService.clearDeliberationTimer(gameId); // cancel auto-advance if pending
+        gameService.clearDeliberationTimer(gameId);     // cancel deliberation auto-advance if pending
+        gameService.clearMovementBTimer(gameId);        // cancel Movement B auto-advance if pending
+        gameService.clearVotingTimer(gameId);           // cancel voting timer if pending
+        gameService.clearAllGroupTimersForGame(gameId); // cancel per-group turn/reveal timers
         const result = await gameService.advanceMovement(gameId);
-        console.log(`[WS] gmAdvance game ${gameId}: → ${result.gameOver ? 'GAME OVER' : result.nextMovement}`);
+        console.log(`[WS] gmAdvance game ${gameId}: step=${result.step}`);
 
         // Emit the appropriate socket events (shared logic with REST route)
         _emitAdvanceEvents(io, result);
@@ -500,75 +528,125 @@ function getIO() { return _io; }
 /**
  * Emit the correct socket events after gameService.advanceMovement() resolves.
  * Shared between the WS gmAdvance handler and the REST POST /advance route.
+ * Uses result.step (new 9-step state machine) to decide what to emit.
  */
 function _emitAdvanceEvents(io, result) {
-  if (!io) return;
+  if (!io || !result) return;
   const lobbyRoom = `lobby:${String(result.lobbyId)}`;
 
-  if (result.gameOver) {
-    if (result.groupResults) {
-      for (const [gId, actions] of result.groupResults) {
-        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
-      }
-    }
-    io.to(lobbyRoom).emit('roundSummary', result.summary);
-    io.to(lobbyRoom).emit('gameOver', result.gameOverData);
-    return;
-  }
-
-  if (result.nextMovement === 'B') {
-    io.to(lobbyRoom).emit('movementStart', {
-      movement:    'B',
-      roundNumber: result.roundNumber,
-    });
-    return;
-  }
-
-  if (result.nextMovement === 'C') {
-    io.to(lobbyRoom).emit('movementStart', {
-      movement:    'C',
-      roundNumber: result.roundNumber,
-    });
-    return;
-  }
-
-  if (result.nextMovement === 'A') {
-    // Voting just resolved — emit per-group results + round summary
-    if (result.groupResults) {
-      for (const [gId, actions] of result.groupResults) {
-        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
-      }
-    }
-    io.to(lobbyRoom).emit('roundSummary', result.summary);
-
-    // Per-player movementStart with new group assignment
-    if (result.newGroups) {
-      const userGroupMap = new Map();
-      for (const group of result.newGroups) {
-        for (const memberId of group.memberIds) {
-          userGroupMap.set(String(memberId), group);
-        }
-      }
+  // ── activateA: GM started Movement A ──────────────────────────────────────
+  if (result.step === 'activateA') {
+    if (result.playerGroupMap && result.groups) {
       for (const [, sock] of io.sockets.sockets) {
         if (!sock.rooms.has(lobbyRoom)) continue;
-        const group = userGroupMap.get(sock.userId);
+        const group = result.playerGroupMap.get(sock.userId);
         if (!group) continue;
         sock.emit('movementStart', {
           movement:     'A',
           roundNumber:  result.roundNumber,
-          totalRounds:  result.totalRounds,
           groupId:      String(group.groupId),
           groupNumber:  group.groupIndex,
           groupMembers: group.members,
-          teamPoints:   result.teamPoints,
         });
       }
-
-      // Stamp turnStartedAt and schedule auto-advance timers for new groups.
-      // Clients get initial turnStart via joinRoom when MovementAScreen mounts.
-      gameService.startTurns(result.newGroups);
+      // Start per-group turn timers; clients get initial turnStart via joinRoom
+      gameService.startTurns(result.groups);
     }
+    return;
   }
+
+  // ── completeA: deliberation timer (or GM force) finished A ────────────────
+  if (result.step === 'completeA') {
+    io.to(lobbyRoom).emit('movementComplete', { movement: 'A' });
+    return;
+  }
+
+  // ── activateB: GM started Movement B + task assignments ───────────────────
+  if (result.step === 'activateB') {
+    io.to(lobbyRoom).emit('movementStart', { movement: 'B', roundNumber: result.roundNumber });
+    const { TASKS } = require('../data/tasks');
+    for (const [, sock] of io.sockets.sockets) {
+      if (!sock.rooms.has(lobbyRoom)) continue;
+      const randomTask = TASKS[Math.floor(Math.random() * TASKS.length)];
+      gameService.storeMovementBAssignment(result.gameId, sock.userId, randomTask.id);
+      sock.emit('taskAssigned', { taskId: randomTask.id });
+      console.log(`[MovementB] Assigned task "${randomTask.id}" to user ${sock.userId}`);
+    }
+    gameService.scheduleMovementBAutoAdvance(result.gameId);
+    return;
+  }
+
+  // ── completeB: B timer (or GM force) finished B ───────────────────────────
+  if (result.step === 'completeB') {
+    io.to(lobbyRoom).emit('movementComplete', { movement: 'B' });
+    return;
+  }
+
+  // ── activateC: GM started voting + voting timer ───────────────────────────
+  if (result.step === 'activateC') {
+    io.to(lobbyRoom).emit('movementStart', { movement: 'C', roundNumber: result.roundNumber });
+    io.to(lobbyRoom).emit('votingReady', { votingEndsAt: result.votingEndsAt });
+    gameService.scheduleVotingTimer(result.gameId, result.votingEndsAt);
+    return;
+  }
+
+  // ── completeC: voting timer (or GM force) finished C ─────────────────────
+  if (result.step === 'completeC') {
+    io.to(lobbyRoom).emit('movementComplete', { movement: 'C' });
+    return;
+  }
+
+  // ── summarizeRound: GM resolved votes → show round summary ───────────────
+  if (result.step === 'summarizeRound') {
+    if (result.groupResults) {
+      for (const [gId, actions] of result.groupResults) {
+        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
+      }
+    }
+    io.to(lobbyRoom).emit('roundSummary', result.summary);
+    return;
+  }
+
+  // ── nextRound: GM starts new round — per-player group assignments ─────────
+  if (result.step === 'nextRound') {
+    const userGroupMap = new Map();
+    for (const group of (result.newGroups || [])) {
+      for (const memberId of group.memberIds) {
+        userGroupMap.set(String(memberId), group);
+      }
+    }
+    for (const [, sock] of io.sockets.sockets) {
+      if (!sock.rooms.has(lobbyRoom)) continue;
+      const group = userGroupMap.get(sock.userId);
+      if (!group) continue;
+      sock.emit('roundSetup', {
+        roundNumber:  result.roundNumber,
+        totalRounds:  result.totalRounds,
+        groupId:      String(group.groupId),
+        groupNumber:  group.groupIndex,
+        groupMembers: group.members,
+        teamPoints:   result.teamPoints,
+      });
+    }
+    // NOTE: startTurns is NOT called here — GM must activate A first
+    return;
+  }
+
+  // ── gameOver: supermajority hit during summarize, or final round ──────────
+  if (result.step === 'gameOver') {
+    if (result.groupResults) {
+      for (const [gId, actions] of result.groupResults) {
+        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
+      }
+    }
+    if (result.summary) {
+      io.to(lobbyRoom).emit('roundSummary', result.summary);
+    }
+    io.to(lobbyRoom).emit('gameOver', result.gameOverData);
+    return;
+  }
+
+  console.warn('[emitAdvanceEvents] Unknown step:', result.step);
 }
 
 module.exports = { setupLobbySocket, getIO, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage, broadcastPlayerKicked, emitAdvanceEvents: _emitAdvanceEvents };

@@ -15,6 +15,7 @@ import { typography, fonts } from '../../theme/typography';
 export default function VotingScreen({
   token,
   gameId,
+  lobbyId,
   groupId,
   currentUserId,
   currentTeam,
@@ -26,9 +27,10 @@ export default function VotingScreen({
   const [myVotes, setMyVotes] = useState({});        // { [playerId]: 'phos' | 'skotia' }
   const [markResults, setMarkResults] = useState([]); // [{ playerId, username, action }]
   const [submitting, setSubmitting] = useState(false);
+  const [votingSecondsLeft, setVotingSecondsLeft] = useState(null);
 
   const socketRef = useRef(null);
-  const previewTimerRef = useRef(null);
+  const votingTimerRef = useRef(null);
 
   const others = (groupMembers || []).filter((m) => String(m.id) !== String(currentUserId));
 
@@ -45,15 +47,35 @@ export default function VotingScreen({
       socketRef.current = socket;
 
       socket.on('connect', () => {
-        socket.emit('joinRoom', { lobbyId: groupId });
+        socket.emit('joinRoom', { lobbyId: groupId }); // group room for votingComplete
+        if (lobbyId) socket.emit('joinRoom', { lobbyId }); // lobby room for movementComplete + votingReady
       });
 
-      socket.on('votingComplete', ({ markResults: results, roundSummary }) => {
+      // Server sends authoritative voting end time when GM activates C
+      socket.on('votingReady', ({ votingEndsAt }) => {
+        clearInterval(votingTimerRef.current);
+        const tick = () => {
+          const secsLeft = Math.max(0, Math.round((votingEndsAt - Date.now()) / 1000));
+          setVotingSecondsLeft(secsLeft);
+          if (secsLeft <= 0) clearInterval(votingTimerRef.current);
+        };
+        tick();
+        votingTimerRef.current = setInterval(tick, 1000);
+      });
+
+      // Per-group mark results (show preview, but navigation is driven by movementComplete)
+      socket.on('votingComplete', ({ markResults: results }) => {
         setMarkResults(results || []);
         setPhase('preview');
-        previewTimerRef.current = setTimeout(() => {
-          if (onMovementComplete) onMovementComplete(roundSummary || null);
-        }, 3000);
+        // Navigation happens via movementComplete C — NOT a timer here
+      });
+
+      // Voting timer expired (or GM force-advanced C) — return to RoundHub
+      socket.on('movementComplete', ({ movement }) => {
+        if (movement === 'C') {
+          clearInterval(votingTimerRef.current);
+          if (onMovementComplete) onMovementComplete();
+        }
       });
 
       socket.on('connect_error', (err) => console.warn('[Voting] Socket error:', err.message));
@@ -62,13 +84,13 @@ export default function VotingScreen({
     connect().catch(console.error);
 
     return () => {
-      clearTimeout(previewTimerRef.current);
+      clearInterval(votingTimerRef.current);
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
       }
     };
-  }, [gameId, groupId, token]);
+  }, [gameId, groupId, lobbyId, token]);
 
   // Tap cycles: unset → phos (blue) → skotia (red) → phos → ...
   const toggleVote = (playerId) => {
@@ -201,9 +223,16 @@ export default function VotingScreen({
 
             {phase === 'voting' && (
               <View style={styles.footer}>
-                <Text style={styles.footerCount}>
-                  {votedCount} / {others.length} voted
-                </Text>
+                <View style={styles.footerLeft}>
+                  <Text style={styles.footerCount}>
+                    {votedCount} / {others.length} voted
+                  </Text>
+                  {votingSecondsLeft !== null && (
+                    <Text style={styles.footerTimer}>
+                      {votingSecondsLeft}s left
+                    </Text>
+                  )}
+                </View>
                 <TouchableOpacity
                   style={[styles.submitBtn, !allVoted && styles.submitBtnDisabled]}
                   onPress={handleSubmit}
@@ -337,10 +366,19 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border.subtle,
     gap: 12,
   },
+  footerLeft: {
+    flex: 1,
+    gap: 2,
+  },
   footerCount: {
     ...typography.small,
     color: colors.text.tertiary,
-    flex: 1,
+  },
+  footerTimer: {
+    fontFamily: 'Orbitron_700Bold',
+    fontSize: 11,
+    letterSpacing: 1,
+    color: colors.primary.neonRed,
   },
   submitBtn: {
     paddingVertical: 12,

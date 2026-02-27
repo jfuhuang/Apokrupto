@@ -13,18 +13,65 @@ const POINTS = {
 
 // ---------------------------------------------------------------------------
 // In-memory turn state for Movement A
-// groupTurnState[groupId] = { turnOrder, currentIndex, completedCount, promptId, gameId, turnStartedAt }
+// groupTurnState[groupId] = { turnOrder, currentIndex, completedCount, promptId, gameId, lobbyId, turnStartedAt }
 // ---------------------------------------------------------------------------
 const groupTurnState = new Map();
 
 // Per-group server-side auto-advance timers
 const _turnTimers = new Map(); // groupId → timeoutId
 
+// Per-group reveal timers: fire after the full 30s window to advance to the next turn
+const _turnRevealTimers = new Map(); // groupId → timeoutId
+
 function clearTurnTimeout(groupId) {
   const tid = _turnTimers.get(String(groupId));
   if (tid) {
     clearTimeout(tid);
     _turnTimers.delete(String(groupId));
+  }
+}
+
+function clearRevealTimeout(groupId) {
+  const tid = _turnRevealTimers.get(String(groupId));
+  if (tid) {
+    clearTimeout(tid);
+    _turnRevealTimers.delete(String(groupId));
+  }
+}
+
+function scheduleRevealTimeout(groupId, delayMs, fn) {
+  clearRevealTimeout(groupId);
+  const tid = setTimeout(() => {
+    _turnRevealTimers.delete(String(groupId));
+    fn();
+  }, delayMs);
+  _turnRevealTimers.set(String(groupId), tid);
+}
+
+/**
+ * Emit movementATurnUpdate to the GM (lobby room) so the dashboard can show
+ * a live turn-slot countdown.  Called every time a new turn slot begins or
+ * deliberation starts.
+ */
+function _emitGmTurnUpdate(gameId, lobbyId, turnIndex, totalTurns, phase, slotStartedAt, io) {
+  if (!io || !lobbyId) return;
+  io.to(`lobby:${lobbyId}`).emit('movementATurnUpdate', {
+    turnIndex,
+    totalTurns,
+    timeLimit: 30,
+    phase,           // 'active' | 'deliberation'
+    slotStartedAt: slotStartedAt ?? Date.now(),
+  });
+}
+
+/** Cancel all per-group turn and reveal timers for every group in a game. */
+function clearAllGroupTimersForGame(gameId) {
+  const key = String(gameId);
+  for (const [groupId, state] of groupTurnState.entries()) {
+    if (state && String(state.gameId) === key) {
+      clearTurnTimeout(groupId);
+      clearRevealTimeout(groupId);
+    }
   }
 }
 
@@ -94,6 +141,7 @@ async function _autoAdvanceTurn(groupId, expectedIndex) {
     }));
     setGroupTurnState(groupId, { ...state, currentIndex: newIndex, completedCount: newCompleted });
     if (io) io.to(`lobby:${groupId}`).emit('deliberationStart', { words });
+    _emitGmTurnUpdate(state.gameId, state.lobbyId, newIndex, state.turnOrder.length, 'deliberation', Date.now(), io);
     notifyGroupDeliberationReady(state.gameId);
   } else {
     // More turns — advance to next player
@@ -113,6 +161,7 @@ async function _autoAdvanceTurn(groupId, expectedIndex) {
         timeLimit:       30,
       });
     }
+    _emitGmTurnUpdate(state.gameId, state.lobbyId, newIndex, state.turnOrder.length, 'active', now, io);
     scheduleTurnTimeout(groupId, newIndex);
     scheduleBotSubmitIfNeeded(groupId); // auto-submit if next player is a bot
   }
@@ -178,44 +227,68 @@ async function _doBotSubmit(groupId, expectedIndex) {
   const userRes = await pool.query('SELECT username FROM users WHERE id = $1', [botUserId]);
   const lastWord = { userId: botUserId, username: userRes.rows[0]?.username ?? 'Bot', word };
 
-  if (newCompleted >= state.turnOrder.length) {
-    const wordsRes = await pool.query(
-      `SELECT mas.word, mas.user_id, u.username
-       FROM movement_a_submissions mas
-       JOIN users u ON u.id = mas.user_id
-       WHERE mas.movement_id = $1 AND mas.group_id = $2
-       ORDER BY mas.submitted_at ASC`,
-      [movementId, groupId]
-    );
-    const words = wordsRes.rows.map((r) => ({
-      userId:   String(r.user_id),
-      username: r.username,
-      word:     r.word,
-    }));
-    setGroupTurnState(groupId, { ...state, currentIndex: newIndex, completedCount: newCompleted });
-    if (io) io.to(`lobby:${groupId}`).emit('deliberationStart', { words, lastWord });
-    notifyGroupDeliberationReady(state.gameId);
-  } else {
-    const now = Date.now();
-    setGroupTurnState(groupId, {
-      ...state,
-      currentIndex:   newIndex,
-      completedCount: newCompleted,
-      turnStartedAt:  now,
+  // Calculate remaining time in the 30-second turn window, then schedule the advance
+  const elapsed     = fresh.turnStartedAt ? Date.now() - fresh.turnStartedAt : 0;
+  const revealDelay = Math.max(1000, 30000 - elapsed);
+
+  // Notify the group immediately that this player submitted
+  if (io) {
+    io.to(`lobby:${groupId}`).emit('wordSubmitted', {
+      ...lastWord,
+      nextTurnInSeconds: Math.ceil(revealDelay / 1000),
     });
-    const nextPlayerId = String(state.turnOrder[newIndex]);
-    if (io) {
-      io.to(`lobby:${groupId}`).emit('turnStart', {
-        currentPlayerId: nextPlayerId,
-        turnIndex:       newIndex,
-        completedCount:  newCompleted,
-        timeLimit:       30,
-        lastWord,
-      });
-    }
-    scheduleTurnTimeout(groupId, newIndex);
-    scheduleBotSubmitIfNeeded(groupId); // chain: next player might also be a bot
   }
+
+  // Advance to next turn / deliberation after the reveal window expires
+  const capturedGameId = state.gameId;
+  scheduleRevealTimeout(groupId, revealDelay, async () => {
+    const freshState = getGroupTurnState(groupId);
+    if (!freshState || freshState.currentIndex !== expectedIndex) return;
+
+    const { getIO: getIO2 } = require('../websocket/lobbySocket');
+    const io2 = getIO2();
+
+    if (newCompleted >= state.turnOrder.length) {
+      const wordsRes = await pool.query(
+        `SELECT mas.word, mas.user_id, u.username
+         FROM movement_a_submissions mas
+         JOIN users u ON u.id = mas.user_id
+         WHERE mas.movement_id = $1 AND mas.group_id = $2
+         ORDER BY mas.submitted_at ASC`,
+        [movementId, groupId]
+      );
+      const words = wordsRes.rows.map((r) => ({
+        userId:   String(r.user_id),
+        username: r.username,
+        word:     r.word,
+      }));
+      setGroupTurnState(groupId, { ...freshState, currentIndex: newIndex, completedCount: newCompleted });
+      if (io2) io2.to(`lobby:${groupId}`).emit('deliberationStart', { words, lastWord });
+      _emitGmTurnUpdate(capturedGameId, freshState.lobbyId, newIndex, state.turnOrder.length, 'deliberation', Date.now(), io2);
+      notifyGroupDeliberationReady(capturedGameId);
+    } else {
+      const now = Date.now();
+      setGroupTurnState(groupId, {
+        ...freshState,
+        currentIndex:   newIndex,
+        completedCount: newCompleted,
+        turnStartedAt:  now,
+      });
+      const nextPlayerId = String(state.turnOrder[newIndex]);
+      if (io2) {
+        io2.to(`lobby:${groupId}`).emit('turnStart', {
+          currentPlayerId: nextPlayerId,
+          turnIndex:       newIndex,
+          completedCount:  newCompleted,
+          timeLimit:       30,
+          lastWord,
+        });
+      }
+      _emitGmTurnUpdate(capturedGameId, freshState.lobbyId, newIndex, state.turnOrder.length, 'active', now, io2);
+      scheduleTurnTimeout(groupId, newIndex);
+      scheduleBotSubmitIfNeeded(groupId); // chain: next player might also be a bot
+    }
+  });
 }
 
 /**
@@ -246,6 +319,9 @@ async function scheduleBotSubmitIfNeeded(groupId) {
 // via joinRoom (so they receive it after navigating to MovementAScreen).
 function startTurns(groups) {
   const now = Date.now();
+  const { getIO } = require('../websocket/lobbySocket');
+  const io = getIO();
+  let gmEmitted = false;
   for (const group of groups) {
     const gid   = String(group.groupId);
     const state = getGroupTurnState(gid);
@@ -253,6 +329,11 @@ function startTurns(groups) {
     setGroupTurnState(gid, { ...state, turnStartedAt: now });
     scheduleTurnTimeout(gid, 0);
     scheduleBotSubmitIfNeeded(gid); // auto-submit if first player is a bot
+    // Emit GM turn update once per game (all groups are in sync)
+    if (!gmEmitted && state.lobbyId) {
+      _emitGmTurnUpdate(state.gameId, state.lobbyId, 0, state.turnOrder.length, 'active', now, io);
+      gmEmitted = true;
+    }
   }
 }
 
@@ -267,6 +348,51 @@ const _deliberationTimers       = new Map(); // gameId → timeoutId
 const _deliberationEndTimes     = new Map(); // gameId → deliberationEndsAt (epoch ms)
 
 const DELIBERATION_DURATION_MS = 120_000;
+
+// ---------------------------------------------------------------------------
+// In-memory state for Movement B
+// ---------------------------------------------------------------------------
+const _movementBAssignments = new Map(); // gameId → Map<userId, taskId>
+const _movementBTimers       = new Map(); // gameId → timeoutId
+const MOVEMENT_B_DURATION_MS = 300_000;  // 5 minutes
+
+// ---------------------------------------------------------------------------
+// In-memory state for voting timer (Movement C)
+// ---------------------------------------------------------------------------
+const _votingTimers   = new Map(); // gameId → timeoutId
+const _votingEndTimes = new Map(); // gameId → votingEndsAt (epoch ms)
+const VOTING_DURATION_MS = 3 * 60 * 1000; // 3 minutes
+
+function clearVotingTimer(gameId) {
+  const key = String(gameId);
+  const tid = _votingTimers.get(key);
+  if (tid) { clearTimeout(tid); _votingTimers.delete(key); }
+  _votingEndTimes.delete(key);
+}
+
+function getVotingEndsAt(gameId) {
+  return _votingEndTimes.get(String(gameId)) ?? null;
+}
+
+function scheduleVotingTimer(gameId, votingEndsAt) {
+  const key = String(gameId);
+  if (_votingTimers.has(key)) return; // already scheduled
+  _votingEndTimes.set(key, votingEndsAt);
+  const delay = Math.max(0, votingEndsAt - Date.now());
+  const tid = setTimeout(async () => {
+    _votingTimers.delete(key);
+    _votingEndTimes.delete(key);
+    try {
+      const { getIO, emitAdvanceEvents } = require('../websocket/lobbySocket');
+      const result = await advanceMovement(key);
+      console.log(`[VotingTimer] Auto-advanced game ${key} → ${result.step}`);
+      emitAdvanceEvents(getIO(), result);
+    } catch (err) {
+      console.error('[VotingTimer] auto-advance error:', err.message);
+    }
+  }, delay);
+  _votingTimers.set(key, tid);
+}
 
 function clearDeliberationTimer(gameId) {
   const key = String(gameId);
@@ -313,7 +439,7 @@ function _scheduleDeliberationAutoAdvance(gameId) {
     try {
       const { getIO, emitAdvanceEvents } = require('../websocket/lobbySocket');
       const result = await advanceMovement(key);
-      console.log(`[DeliberationTimer] Auto-advanced game ${key} → ${result.gameOver ? 'GAME OVER' : result.nextMovement}`);
+      console.log(`[DeliberationTimer] Auto-advanced game ${key} → step=${result.step}`);
       emitAdvanceEvents(getIO(), result);
     } catch (err) {
       console.error('[DeliberationTimer] auto-advance error:', err.message);
@@ -337,9 +463,100 @@ function notifyGroupDeliberationReady(gameId) {
   }
 }
 
+/**
+ * Store which task was assigned to a player for Movement B.
+ */
+function storeMovementBAssignment(gameId, userId, taskId) {
+  const key = String(gameId);
+  if (!_movementBAssignments.has(key)) _movementBAssignments.set(key, new Map());
+  _movementBAssignments.get(key).set(String(userId), taskId);
+}
+
+/**
+ * Retrieve a player's assigned task for Movement B (returns null if not found).
+ */
+function getMovementBAssignment(gameId, userId) {
+  return _movementBAssignments.get(String(gameId))?.get(String(userId)) ?? null;
+}
+
+/**
+ * Cancel the Movement B auto-advance timer and clear stored assignments.
+ * Called when the GM manually advances or the timer fires.
+ */
+function clearMovementBTimer(gameId) {
+  const key = String(gameId);
+  const tid = _movementBTimers.get(key);
+  if (tid) { clearTimeout(tid); _movementBTimers.delete(key); }
+  _movementBAssignments.delete(key);
+}
+
+/**
+ * Schedule the 5-minute auto-advance from Movement B → C.
+ * Idempotent — a second call is a no-op if the timer is already running.
+ */
+function scheduleMovementBAutoAdvance(gameId) {
+  const key = String(gameId);
+  if (_movementBTimers.has(key)) return;
+  const tid = setTimeout(async () => {
+    _movementBTimers.delete(key);
+    _movementBAssignments.delete(key);
+    try {
+      const { getIO, emitAdvanceEvents } = require('../websocket/lobbySocket');
+      const result = await advanceMovement(key);
+      console.log(`[MovementBTimer] Auto-advanced game ${key} → step=${result.step}`);
+      emitAdvanceEvents(getIO(), result);
+    } catch (err) {
+      console.error('[MovementBTimer] auto-advance error:', err.message);
+    }
+  }, MOVEMENT_B_DURATION_MS);
+  _movementBTimers.set(key, tid);
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Read all groups for a given round and enrich each with member details.
+ * Returns { groups: [...], playerGroupMap: Map<userId, group> }.
+ * Uses the supplied DB client (may be inside a transaction).
+ */
+async function _getGroupsWithMembers(client, gameId, roundNumber) {
+  const groupsRes = await client.query(
+    `SELECT id AS group_id, group_index FROM game_groups
+     WHERE game_id = $1 AND round_number = $2 ORDER BY group_index`,
+    [gameId, roundNumber]
+  );
+  const userRes = await client.query(
+    `SELECT u.id, u.username, gp.is_marked
+     FROM users u
+     JOIN game_players gp ON gp.user_id = u.id AND gp.game_id = $1`,
+    [gameId]
+  );
+  const userMap = {};
+  userRes.rows.forEach((r) => {
+    userMap[String(r.id)] = { username: r.username, isMarked: r.is_marked };
+  });
+
+  const groups = [];
+  const playerGroupMap = new Map();
+  for (const groupRow of groupsRes.rows) {
+    const membersRes = await client.query(
+      'SELECT user_id FROM game_group_members WHERE group_id = $1',
+      [groupRow.group_id]
+    );
+    const memberIds = membersRes.rows.map((r) => String(r.user_id));
+    const members = memberIds.map((id) => ({
+      id,
+      username: userMap[id]?.username ?? id,
+      isMarked: userMap[id]?.isMarked ?? false,
+    }));
+    const group = { groupId: groupRow.group_id, groupIndex: groupRow.group_index, memberIds, members };
+    groups.push(group);
+    for (const memberId of memberIds) playerGroupMap.set(memberId, group);
+  }
+  return { groups, playerGroupMap };
+}
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -390,7 +607,7 @@ async function _assignGroups(client, gameId, roundNumber, phosIds, skotiaIds) {
 
 // Initialise in-memory turn state for a set of groups at Movement A start.
 // Each group gets a random turn order and a randomly-selected prompt.
-async function _initTurnState(groups, gameId) {
+async function _initTurnState(groups, gameId, lobbyId) {
   // Reset deliberation counter so we wait for all groups this round
   _deliberationGroupsReady.set(String(gameId), { ready: 0, total: groups.length });
 
@@ -409,6 +626,7 @@ async function _initTurnState(groups, gameId) {
       completedCount: 0,
       promptId,
       gameId:         String(gameId),
+      lobbyId:        String(lobbyId),
       turnStartedAt:  null,
     });
   });
@@ -473,9 +691,6 @@ async function startGame(gameId) {
     if (players.length < 5) {
       throw new Error('Need at least 5 players to start');
     }
-    if (players.length % 5 !== 0) {
-      throw new Error(`Player count must be divisible by 5 (got ${players.length})`);
-    }
 
     const userIds = players.map((p) => String(p.user_id));
     const userIdToUsername = {};
@@ -500,7 +715,7 @@ async function startGame(gameId) {
     // Build groups for round 1
     const groups = await _assignGroups(client, gameId, 1, phosIds, skotiaIds);
 
-    // Round 1, Movement A (active immediately)
+    // Round 1, Movement A (pending — GM must activate it)
     const roundRes = await client.query(
       "INSERT INTO rounds (game_id, round_number, status) VALUES ($1, 1, 'active') RETURNING id",
       [gameId]
@@ -508,7 +723,7 @@ async function startGame(gameId) {
     const roundId = roundRes.rows[0].id;
 
     await client.query(
-      "INSERT INTO movements (round_id, movement_type, status, started_at) VALUES ($1, 'A', 'active', now())",
+      "INSERT INTO movements (round_id, movement_type, status) VALUES ($1, 'A', 'pending')",
       [roundId]
     );
 
@@ -523,8 +738,7 @@ async function startGame(gameId) {
 
     await client.query('COMMIT');
 
-    // Initialise in-memory turn state (after commit — reads from DB are fine now)
-    await _initTurnState(groups, gameId);
+    // NOTE: _initTurnState is NOT called here — it is called when GM activates Movement A.
 
     // Build convenience maps for the caller
     const playerTeams = new Map();
@@ -562,23 +776,32 @@ async function startGame(gameId) {
 }
 
 // ---------------------------------------------------------------------------
-// advanceMovement — state machine: A→B, B→C, C→(next round or game over)
+// advanceMovement — 9-step GM-gated state machine
+//
+// Steps (in order within a round):
+//   activateA     → A pending → active (GM starts Movement A)
+//   completeA     → A active → completed (deliberation timer or GM force)
+//   activateB     → A done, create B active (GM starts Movement B)
+//   completeB     → B active → completed (B timer or GM force)
+//   activateC     → B done, create C active + voting timer (GM starts voting)
+//   completeC     → C active → completed (voting timer or GM force)
+//   summarizeRound→ All done, resolve votes (GM triggers summary)
+//   nextRound     → round summarizing, more rounds (GM starts next round)
+//   gameOver      → round summarizing, last round OR supermajority
 // ---------------------------------------------------------------------------
 async function advanceMovement(gameId) {
   const client = await pool.connect();
   try {
-    // Read current state BEFORE transaction
-    const stateRes = await client.query(
+    // ── Phase 1: read current state (no transaction) ──────────────────────
+    const gameRes = await client.query(
       `SELECT g.current_round, g.total_rounds, g.lobby_id,
-              r.id AS round_id, r.round_number,
-              m.id AS movement_id, m.movement_type
+              r.id AS round_id, r.round_number, r.status AS round_status
        FROM games g
-       JOIN rounds r    ON r.game_id = g.id AND r.status = 'active'
-       JOIN movements m ON m.round_id = r.id AND m.status = 'active'
+       LEFT JOIN rounds r ON r.game_id = g.id AND r.status IN ('active', 'summarizing')
        WHERE g.id = $1`,
       [gameId]
     );
-    if (stateRes.rows.length === 0) throw new Error('No active movement found for this game');
+    if (gameRes.rows.length === 0) throw new Error('Game not found');
 
     const {
       current_round: currentRound,
@@ -586,163 +809,225 @@ async function advanceMovement(gameId) {
       lobby_id:      lobbyId,
       round_id:      roundId,
       round_number:  roundNumber,
-      movement_id:   movementId,
-      movement_type: movementType,
-    } = stateRes.rows[0];
+      round_status:  roundStatus,
+    } = gameRes.rows[0];
 
+    if (!roundId) throw new Error('No active or summarizing round found for this game');
+
+    const movementsRes = await client.query(
+      'SELECT id, movement_type, status FROM movements WHERE round_id = $1 ORDER BY created_at',
+      [roundId]
+    );
+    const movByType = {};
+    for (const m of movementsRes.rows) movByType[m.movement_type] = m;
+    const movA = movByType['A'];
+    const movB = movByType['B'];
+    const movC = movByType['C'];
+
+    // ── Phase 2: execute the applicable step in a transaction ─────────────
     await client.query('BEGIN');
 
-    // Complete the current movement
-    await client.query(
-      "UPDATE movements SET status = 'completed', completed_at = now() WHERE id = $1",
-      [movementId]
-    );
+    // ── activateA: Movement A pending → GM activates it ───────────────────
+    if (movA && movA.status === 'pending') {
+      await client.query(
+        "UPDATE movements SET status = 'active', started_at = now() WHERE id = $1",
+        [movA.id]
+      );
+      const groupsData = await _getGroupsWithMembers(client, gameId, roundNumber);
+      await client.query('COMMIT');
+      // Init in-memory turn state now that A is active (re-initialises each round)
+      await _initTurnState(groupsData.groups, gameId, lobbyId);
+      return {
+        step: 'activateA',
+        roundNumber,
+        lobbyId: String(lobbyId),
+        gameId:  String(gameId),
+        groups:        groupsData.groups,
+        playerGroupMap: groupsData.playerGroupMap,
+      };
+    }
 
-    // ---- A → B ----
-    if (movementType === 'A') {
+    // ── completeA: A active (turns or deliberation) → GM or timer completes ──
+    if (movA && movA.status === 'active' && !movB) {
+      await client.query(
+        "UPDATE movements SET status = 'completed', completed_at = now() WHERE id = $1",
+        [movA.id]
+      );
+      await client.query('COMMIT');
+      return { step: 'completeA', lobbyId: String(lobbyId), gameId: String(gameId) };
+    }
+
+    // ── activateB: A completed, no B yet → GM creates B ──────────────────
+    if (movA && movA.status === 'completed' && !movB) {
       await client.query(
         "INSERT INTO movements (round_id, movement_type, status, started_at) VALUES ($1, 'B', 'active', now())",
         [roundId]
       );
-      // Skotia passive bonus for entering task phase
       await client.query(
         "UPDATE game_teams SET points = points + $1 WHERE game_id = $2 AND team = 'skotia'",
         [POINTS.SKOTIA_PASSIVE, gameId]
       );
       await client.query('COMMIT');
-      return { nextMovement: 'B', roundNumber, lobbyId };
+      return { step: 'activateB', roundNumber, lobbyId: String(lobbyId), gameId: String(gameId) };
     }
 
-    // ---- B → C ----
-    if (movementType === 'B') {
+    // ── completeB: B active → GM or timer completes ───────────────────────
+    if (movB && movB.status === 'active' && !movC) {
+      await client.query(
+        "UPDATE movements SET status = 'completed', completed_at = now() WHERE id = $1",
+        [movB.id]
+      );
+      await client.query('COMMIT');
+      return { step: 'completeB', lobbyId: String(lobbyId), gameId: String(gameId) };
+    }
+
+    // ── activateC: B completed, no C yet → GM creates C + voting timer ───
+    if (movB && movB.status === 'completed' && !movC) {
+      const votingEndsAt = Date.now() + VOTING_DURATION_MS;
       await client.query(
         "INSERT INTO movements (round_id, movement_type, status, started_at) VALUES ($1, 'C', 'active', now())",
         [roundId]
       );
       await client.query('COMMIT');
-      return { nextMovement: 'C', roundNumber, lobbyId };
-    }
-
-    // ---- C → resolve voting, then decide ----
-    const votingResult = await _resolveVoting(client, gameId, roundNumber);
-
-    const supermajority = await _checkSupermajority(client, gameId);
-
-    if (supermajority) {
-      await client.query("UPDATE rounds SET status = 'completed' WHERE id = $1", [roundId]);
-      const gameOverData = await _endGame(client, gameId, 'phos', 'supermajority');
-      await client.query('COMMIT');
       return {
-        gameOver:     true,
-        winner:       'phos',
-        condition:    'supermajority',
-        summary:      _buildSummary(votingResult, roundNumber),
-        groupResults: votingResult.groupResults,
-        gameOverData,
-        lobbyId,
+        step: 'activateC',
+        roundNumber,
+        lobbyId: String(lobbyId),
+        gameId:  String(gameId),
+        votingEndsAt,
       };
     }
 
-    if (roundNumber >= totalRounds) {
-      // Final round — compare team points
-      const ptsRes = await client.query(
-        'SELECT team, points FROM game_teams WHERE game_id = $1',
+    // ── completeC: C active → voting timer or GM force ────────────────────
+    if (movC && movC.status === 'active') {
+      await client.query(
+        "UPDATE movements SET status = 'completed', completed_at = now() WHERE id = $1",
+        [movC.id]
+      );
+      await client.query('COMMIT');
+      return { step: 'completeC', lobbyId: String(lobbyId), gameId: String(gameId) };
+    }
+
+    // ── summarizeRound: all 3 done, round still 'active' → GM resolves ───
+    if (movC && movC.status === 'completed' && roundStatus === 'active') {
+      const votingResult = await _resolveVoting(client, gameId, roundNumber);
+      const supermajority = await _checkSupermajority(client, gameId);
+
+      if (supermajority) {
+        await client.query("UPDATE rounds SET status = 'completed' WHERE id = $1", [roundId]);
+        const gameOverData = await _endGame(client, gameId, 'phos', 'supermajority');
+        await client.query('COMMIT');
+        return {
+          step:         'gameOver',
+          summary:      _buildSummary(votingResult, roundNumber),
+          groupResults: votingResult.groupResults,
+          gameOverData,
+          lobbyId: String(lobbyId),
+          gameId:  String(gameId),
+        };
+      }
+
+      await client.query("UPDATE rounds SET status = 'summarizing' WHERE id = $1", [roundId]);
+      await client.query('COMMIT');
+      return {
+        step:         'summarizeRound',
+        roundNumber,
+        lobbyId: String(lobbyId),
+        gameId:  String(gameId),
+        summary:      _buildSummary(votingResult, roundNumber),
+        groupResults: votingResult.groupResults,
+      };
+    }
+
+    // ── nextRound / gameOver: round is 'summarizing' → GM starts next ────
+    if (roundStatus === 'summarizing') {
+      if (roundNumber >= totalRounds) {
+        // Final round — compare points
+        const ptsRes = await client.query(
+          'SELECT team, points FROM game_teams WHERE game_id = $1', [gameId]
+        );
+        const pts = { phos: 0, skotia: 0 };
+        ptsRes.rows.forEach((r) => { pts[r.team] = r.points; });
+        const winner = pts.phos >= pts.skotia ? 'phos' : 'skotia';
+
+        await client.query("UPDATE rounds SET status = 'completed' WHERE id = $1", [roundId]);
+        const gameOverData = await _endGame(client, gameId, winner, 'points');
+        await client.query('COMMIT');
+        return {
+          step: 'gameOver',
+          gameOverData,
+          lobbyId: String(lobbyId),
+          gameId:  String(gameId),
+        };
+      }
+
+      // More rounds — create next round with A pending
+      await client.query("UPDATE rounds SET status = 'completed' WHERE id = $1", [roundId]);
+      const nextRound = roundNumber + 1;
+      await client.query(
+        'UPDATE games SET current_round = $1 WHERE id = $2', [nextRound, gameId]
+      );
+
+      const phosRes   = await client.query("SELECT user_id FROM game_players WHERE game_id = $1 AND team = 'phos'",   [gameId]);
+      const skotiaRes = await client.query("SELECT user_id FROM game_players WHERE game_id = $1 AND team = 'skotia'", [gameId]);
+      const phosIds   = phosRes.rows.map((r) => String(r.user_id));
+      const skotiaIds = skotiaRes.rows.map((r) => String(r.user_id));
+
+      const newGroups = await _assignGroups(client, gameId, nextRound, phosIds, skotiaIds);
+
+      const newRoundRes = await client.query(
+        "INSERT INTO rounds (game_id, round_number, status) VALUES ($1, $2, 'active') RETURNING id",
+        [gameId, nextRound]
+      );
+      await client.query(
+        "INSERT INTO movements (round_id, movement_type, status) VALUES ($1, 'A', 'pending')",
+        [newRoundRes.rows[0].id]
+      );
+
+      const userRes = await client.query(
+        `SELECT u.id, u.username, gp.is_marked
+         FROM users u
+         JOIN game_players gp ON gp.user_id = u.id AND gp.game_id = $1`,
         [gameId]
       );
-      const pts = { phos: 0, skotia: 0 };
-      ptsRes.rows.forEach((r) => { pts[r.team] = r.points; });
-      const winner = pts.phos >= pts.skotia ? 'phos' : 'skotia';
+      const userMap = {};
+      userRes.rows.forEach((r) => { userMap[String(r.id)] = { username: r.username, isMarked: r.is_marked }; });
 
-      await client.query("UPDATE rounds SET status = 'completed' WHERE id = $1", [roundId]);
-      const gameOverData = await _endGame(client, gameId, winner, 'points');
+      const enrichedGroups = newGroups.map((g) => ({
+        ...g,
+        members: g.memberIds.map((id) => ({
+          id,
+          username: userMap[id]?.username ?? id,
+          isMarked: userMap[id]?.isMarked ?? false,
+        })),
+      }));
+
+      const teamPtsRes = await client.query(
+        'SELECT team, points FROM game_teams WHERE game_id = $1', [gameId]
+      );
+      const teamPoints = { phos: 0, skotia: 0 };
+      teamPtsRes.rows.forEach((r) => { teamPoints[r.team] = r.points; });
+
       await client.query('COMMIT');
+      // Init in-memory turn state for new groups (A is pending; startTurns called on activateA)
+      await _initTurnState(newGroups, gameId, lobbyId);
+
       return {
-        gameOver:     true,
-        winner,
-        condition:    'points',
-        summary:      _buildSummary(votingResult, roundNumber),
-        groupResults: votingResult.groupResults,
-        gameOverData,
-        lobbyId,
+        step:        'nextRound',
+        roundNumber: nextRound,
+        totalRounds,
+        newGroups:   enrichedGroups,
+        teamPoints,
+        lobbyId: String(lobbyId),
+        gameId:  String(gameId),
       };
     }
 
-    // More rounds — complete this round, start next
-    await client.query("UPDATE rounds SET status = 'completed' WHERE id = $1", [roundId]);
-    const nextRound = roundNumber + 1;
-    await client.query(
-      'UPDATE games SET current_round = $1 WHERE id = $2',
-      [nextRound, gameId]
+    await client.query('ROLLBACK');
+    throw new Error(
+      `advanceMovement: unexpected state — movA=${movA?.status ?? 'none'}, ` +
+      `movB=${movB?.status ?? 'none'}, movC=${movC?.status ?? 'none'}, roundStatus=${roundStatus}`
     );
-
-    // Rebuild groups for the new round
-    const phosRes = await client.query(
-      "SELECT user_id FROM game_players WHERE game_id = $1 AND team = 'phos'",
-      [gameId]
-    );
-    const skotiaRes = await client.query(
-      "SELECT user_id FROM game_players WHERE game_id = $1 AND team = 'skotia'",
-      [gameId]
-    );
-    const phosIds   = phosRes.rows.map((r) => String(r.user_id));
-    const skotiaIds = skotiaRes.rows.map((r) => String(r.user_id));
-
-    const newGroups = await _assignGroups(client, gameId, nextRound, phosIds, skotiaIds);
-
-    const newRoundRes = await client.query(
-      "INSERT INTO rounds (game_id, round_number, status) VALUES ($1, $2, 'active') RETURNING id",
-      [gameId, nextRound]
-    );
-    await client.query(
-      "INSERT INTO movements (round_id, movement_type, status, started_at) VALUES ($1, 'A', 'active', now())",
-      [newRoundRes.rows[0].id]
-    );
-
-    // Load usernames for group member info
-    const userRes = await client.query(
-      `SELECT u.id, u.username, gp.is_marked
-       FROM users u
-       JOIN game_players gp ON gp.user_id = u.id AND gp.game_id = $1`,
-      [gameId]
-    );
-    const userMap = {};
-    userRes.rows.forEach((r) => {
-      userMap[String(r.id)] = { username: r.username, isMarked: r.is_marked };
-    });
-
-    // Enrich newGroups with member details
-    const enrichedGroups = newGroups.map((g) => ({
-      ...g,
-      members: g.memberIds.map((id) => ({
-        id,
-        username: userMap[id]?.username ?? id,
-        isMarked: userMap[id]?.isMarked ?? false,
-      })),
-    }));
-
-    // Team points snapshot
-    const teamPtsRes = await client.query(
-      'SELECT team, points FROM game_teams WHERE game_id = $1',
-      [gameId]
-    );
-    const teamPoints = { phos: 0, skotia: 0 };
-    teamPtsRes.rows.forEach((r) => { teamPoints[r.team] = r.points; });
-
-    await client.query('COMMIT');
-
-    // Initialise turn state for new groups
-    await _initTurnState(newGroups, gameId);
-
-    return {
-      nextMovement: 'A',
-      roundNumber:  nextRound,
-      totalRounds,
-      summary:      _buildSummary(votingResult, roundNumber),
-      groupResults: votingResult.groupResults,
-      newGroups:    enrichedGroups,
-      teamPoints,
-      lobbyId,
-    };
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     throw err;
@@ -920,10 +1205,10 @@ async function _endGame(client, gameId, winner, condition) {
 function _buildSummary(votingResult, roundNumber) {
   return {
     roundNumber,
-    marksApplied:      votingResult.marksApplied,
-    unmarksApplied:    votingResult.unmarksApplied,
-    phosPointsEarned:  votingResult.phosPointsEarned,
-    skotiaPointsEarned: votingResult.skotiaPointsEarned,
+    marksApplied:   votingResult.marksApplied,
+    unmarksApplied: votingResult.unmarksApplied,
+    phosPoints:     votingResult.phosPointsEarned,
+    skotiaPoints:   votingResult.skotiaPointsEarned,
   };
 }
 
@@ -970,16 +1255,29 @@ async function getPlayerState(gameId, userId) {
     }));
   }
 
-  // Game/round/movement
+  // Game/round/movement — include 'summarizing' rounds so state is always available
   const gameRes = await pool.query(
     `SELECT g.current_round, g.total_rounds, m.movement_type AS movement
      FROM games g
-     LEFT JOIN rounds r    ON r.game_id = g.id AND r.status = 'active'
+     LEFT JOIN rounds r    ON r.game_id = g.id AND r.status IN ('active', 'summarizing')
      LEFT JOIN movements m ON m.round_id = r.id AND m.status = 'active'
      WHERE g.id = $1`,
     [gameId]
   );
   const game = gameRes.rows[0];
+
+  // Which movements are completed for the current round (used by RoundHub indicator)
+  let completedMovements = [];
+  if (game?.current_round) {
+    const completedMovsRes = await pool.query(
+      `SELECT m.movement_type
+       FROM movements m
+       JOIN rounds r ON r.id = m.round_id
+       WHERE r.game_id = $1 AND r.round_number = $2 AND m.status = 'completed'`,
+      [gameId, game.current_round]
+    );
+    completedMovements = completedMovsRes.rows.map((r) => r.movement_type);
+  }
 
   // Team points
   const ptsRes = await pool.query(
@@ -991,14 +1289,15 @@ async function getPlayerState(gameId, userId) {
 
   return {
     team,
-    isMarked:        is_marked,
-    groupId:         groupId ? String(groupId) : null,
+    isMarked:           is_marked,
+    groupId:            groupId ? String(groupId) : null,
     groupIndex,
     groupMembers,
     teamPoints,
-    currentRound:    game?.current_round ?? null,
-    totalRounds:     game?.total_rounds ?? null,
-    currentMovement: game?.movement ?? null,
+    currentRound:       game?.current_round ?? null,
+    totalRounds:        game?.total_rounds ?? null,
+    currentMovement:    game?.movement ?? null,
+    completedMovements,
   };
 }
 
@@ -1013,6 +1312,27 @@ function setGroupTurnState(groupId, state) {
   groupTurnState.set(String(groupId), state);
 }
 
+/**
+ * Returns a snapshot of Movement A turn state for all groups in a game.
+ * Used by the gm-state endpoint so the GM dashboard can seed its timer on load.
+ * Returns null if no groups are active for this game.
+ */
+function getMovementATurnInfo(gameId) {
+  for (const [, state] of groupTurnState.entries()) {
+    if (state && String(state.gameId) === String(gameId)) {
+      const isDeliberation = state.completedCount >= state.turnOrder.length;
+      return {
+        turnIndex:     state.currentIndex,
+        totalTurns:    state.turnOrder.length,
+        timeLimit:     30,
+        phase:         isDeliberation ? 'deliberation' : 'active',
+        slotStartedAt: state.turnStartedAt,
+      };
+    }
+  }
+  return null;
+}
+
 module.exports = {
   POINTS,
   createGame,
@@ -1023,9 +1343,21 @@ module.exports = {
   setGroupTurnState,
   clearTurnTimeout,
   scheduleTurnTimeout,
+  clearRevealTimeout,
+  scheduleRevealTimeout,
+  clearAllGroupTimersForGame,
   startTurns,
   scheduleBotSubmitIfNeeded,
   notifyGroupDeliberationReady,
   clearDeliberationTimer,
   getDeliberationEndsAt,
+  storeMovementBAssignment,
+  getMovementBAssignment,
+  clearMovementBTimer,
+  scheduleMovementBAutoAdvance,
+  clearVotingTimer,
+  getVotingEndsAt,
+  scheduleVotingTimer,
+  emitGmTurnUpdate: _emitGmTurnUpdate,
+  getMovementATurnInfo,
 };

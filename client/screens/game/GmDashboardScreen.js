@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,9 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
   const [broadcastText, setBroadcastText] = useState('');
   const [socketConnected, setSocketConnected] = useState(false);
   const [advancing, setAdvancing] = useState(false);
+  // Movement A turn timer: { turnIndex, totalTurns, timeLimit, phase, slotStartedAt } | null
+  const [movAPhase, setMovAPhase] = useState(null);
+  const [gmTimerLeft, setGmTimerLeft] = useState(0);
 
   const socketRef = useRef(null);
   const pollRef = useRef(null);
@@ -40,6 +43,9 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
       if (data.groups) setGroups(data.groups);
       if (data.gameState) setGameState(data.gameState);
       if (data.teamPoints) setTeamPoints(data.teamPoints);
+      // Seed the turn timer on load / re-poll (socket events update it in real-time)
+      if (data.movATurnInfo) setMovAPhase(data.movATurnInfo);
+      else if (data.gameState?.movement !== 'A') setMovAPhase(null);
     } catch (err) {
       console.warn('[GM] Poll error:', err.message);
     }
@@ -70,6 +76,26 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
         if (state.teamPoints) setTeamPoints(state.teamPoints);
       });
 
+      socket.on('movementATurnUpdate', (data) => {
+        setMovAPhase(data);
+      });
+
+      socket.on('movementStart', (data) => {
+        // Clear the turn timer when a new movement starts
+        if (data.movement !== 'A') setMovAPhase(null);
+        fetchState();
+      });
+
+      socket.on('movementComplete', () => {
+        // A movement auto-completed (deliberation/B timer/voting timer) — refresh state
+        setMovAPhase(null);
+        fetchState();
+      });
+
+      socket.on('roundSummary', () => {
+        fetchState();
+      });
+
       socket.on('gameOver', (result) => {
         if (onGameOver) onGameOver(result);
       });
@@ -93,6 +119,21 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
       }
     };
   }, [gameId, lobbyId, token]);
+
+  // Countdown tick — resets whenever movAPhase changes (new turn or deliberation)
+  useEffect(() => {
+    if (!movAPhase || movAPhase.phase !== 'active' || !movAPhase.slotStartedAt) {
+      setGmTimerLeft(0);
+      return;
+    }
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - movAPhase.slotStartedAt) / 1000);
+      setGmTimerLeft(Math.max(0, movAPhase.timeLimit - elapsed));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [movAPhase]);
 
   const handleAdvance = () => {
     if (!socketRef.current?.connected) {
@@ -166,6 +207,33 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
                   : '—'}
               </Text>
             </View>
+            {movAPhase && (
+              <>
+                <View style={styles.stateDivider} />
+                <View style={styles.stateRow}>
+                  <Text style={styles.stateLabel}>TURN</Text>
+                  <Text style={styles.stateValue}>
+                    {movAPhase.turnIndex + 1} / {movAPhase.totalTurns}
+                  </Text>
+                </View>
+                <View style={styles.stateDivider} />
+                <View style={styles.stateRow}>
+                  <Text style={styles.stateLabel}>SLOT TIMER</Text>
+                  {movAPhase.phase === 'deliberation' ? (
+                    <Text style={[styles.stateValue, { color: colors.accent.amber }]}>
+                      DELIBERATION
+                    </Text>
+                  ) : (
+                    <Text style={[
+                      styles.stateValue,
+                      { color: gmTimerLeft <= 10 ? colors.primary.neonRed : colors.text.primary },
+                    ]}>
+                      {gmTimerLeft}s
+                    </Text>
+                  )}
+                </View>
+              </>
+            )}
           </View>
 
           {/* Score */}
