@@ -354,6 +354,7 @@ const DELIBERATION_DURATION_MS = 120_000;
 // ---------------------------------------------------------------------------
 const _movementBAssignments = new Map(); // gameId → Map<userId, taskId>
 const _movementBTimers       = new Map(); // gameId → timeoutId
+const _movementBEndTimes     = new Map(); // gameId → endsAt (epoch ms)
 const MOVEMENT_B_DURATION_MS = 300_000;  // 5 minutes
 
 // ---------------------------------------------------------------------------
@@ -488,6 +489,12 @@ function clearMovementBTimer(gameId) {
   const tid = _movementBTimers.get(key);
   if (tid) { clearTimeout(tid); _movementBTimers.delete(key); }
   _movementBAssignments.delete(key);
+  _movementBEndTimes.delete(key);
+}
+
+/** Returns the epoch-ms timestamp at which Movement B ends, or null. */
+function getMovementBEndsAt(gameId) {
+  return _movementBEndTimes.get(String(gameId)) ?? null;
 }
 
 /**
@@ -497,9 +504,12 @@ function clearMovementBTimer(gameId) {
 function scheduleMovementBAutoAdvance(gameId) {
   const key = String(gameId);
   if (_movementBTimers.has(key)) return;
+  const endsAt = Date.now() + MOVEMENT_B_DURATION_MS;
+  _movementBEndTimes.set(key, endsAt);
   const tid = setTimeout(async () => {
     _movementBTimers.delete(key);
     _movementBAssignments.delete(key);
+    _movementBEndTimes.delete(key);
     try {
       const { getIO, emitAdvanceEvents } = require('../websocket/lobbySocket');
       const result = await advanceMovement(key);
@@ -1299,6 +1309,9 @@ async function getPlayerState(gameId, userId) {
   const teamPoints = { phos: 0, skotia: 0 };
   ptsRes.rows.forEach((r) => { teamPoints[r.team] = r.points; });
 
+  // Include Movement B end time if B is the active movement
+  const movementBEndsAt = game?.movement === 'B' ? getMovementBEndsAt(gameId) : null;
+
   return {
     team,
     isMarked:           is_marked,
@@ -1310,6 +1323,7 @@ async function getPlayerState(gameId, userId) {
     totalRounds:        game?.total_rounds ?? null,
     currentMovement:    game?.movement ?? null,
     completedMovements,
+    movementBEndsAt,
   };
 }
 
@@ -1366,6 +1380,7 @@ module.exports = {
   storeMovementBAssignment,
   getMovementBAssignment,
   clearMovementBTimer,
+  getMovementBEndsAt,
   scheduleMovementBAutoAdvance,
   clearVotingTimer,
   getVotingEndsAt,

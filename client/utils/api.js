@@ -112,6 +112,14 @@ export async function fetchPlayerGameState(token, gameId) {
   });
 }
 
+export async function submitMovementBTask(token, gameId, taskId) {
+  return request(`/api/games/${gameId}/movement-b/complete`, {
+    method: 'POST',
+    headers: { ...jsonHeaders, ...authHeader(token) },
+    body: JSON.stringify({ taskId }),
+  });
+}
+
 export async function submitSabotagefix(token, lobbyId) {
   return request(`/api/lobbies/${lobbyId}/sabotage/fix`, {
     method: 'POST',

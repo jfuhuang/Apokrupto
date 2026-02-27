@@ -80,11 +80,11 @@ export default function RoundHubScreen({
         if (onMarkStatusUpdate) onMarkStatusUpdate(marked);
       });
 
-      socket.on('movementStart', ({ movement, groupId, groupMembers, groupNumber: gn }) => {
+      socket.on('movementStart', ({ movement, groupId, groupMembers, groupNumber: gn, movementBEndsAt }) => {
         setActiveMovement(movement);
         setStatusMessage(`Movement ${movement} — ${MOVEMENT_LABELS[movement]} beginning...`);
         if (groupMembers) setLiveGroupMembers(groupMembers);
-        if (onMovementReady) onMovementReady(movement, groupId, groupMembers, gn ?? null);
+        if (onMovementReady) onMovementReady(movement, groupId, groupMembers, gn ?? null, { movementBEndsAt });
       });
 
       socket.on('movementComplete', ({ movement }) => {
@@ -144,7 +144,8 @@ export default function RoundHubScreen({
             state.currentMovement,
             state.groupId || null,
             state.groupMembers || null,
-            state.groupIndex ?? null
+            state.groupIndex ?? null,
+            { movementBEndsAt: state.movementBEndsAt }
           );
         }
       } catch (err) {

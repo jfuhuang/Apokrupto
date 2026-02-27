@@ -719,6 +719,14 @@
 
       socket.on('gameStateUpdate', (data) => applyState(data));
 
+      // Game just started — capture the gameId so advance/polling work
+      socket.on('gameStarted', (data) => {
+        if (data && data.gameId) {
+          gameId = String(data.gameId);
+          fetchState();
+        }
+      });
+
       // Refresh state on any movement event
       socket.on('movementStart', ({ movement, roundNumber, totalRounds }) => {
         const movLabel = { A: 'MOV A — DEDUCTION', B: 'MOV B — TASKS', C: 'MOV C — VOTING' };

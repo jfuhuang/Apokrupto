@@ -76,6 +76,9 @@ export default function App() {
   // Scores (team-level only)
   const [teamPoints, setTeamPoints] = useState({ phos: 0, skotia: 0 });
 
+  // Movement B timer
+  const [movementBEndsAt, setMovementBEndsAt] = useState(null);
+
   // Round summary & game over
   const [roundSummary, setRoundSummary] = useState(null);
   const [gameOverResult, setGameOverResult] = useState(null);
@@ -174,6 +177,10 @@ export default function App() {
           state.currentMovement === 'B' ? 'movementB' :
           state.currentMovement === 'C' ? 'movementC' :
           'roundHub';
+
+        if (state.currentMovement === 'B' && state.movementBEndsAt) {
+          setMovementBEndsAt(state.movementBEndsAt);
+        }
 
         if (currentScreen !== targetScreen) {
           console.log(`[GameSync] ${currentScreen} → ${targetScreen} (movement: ${state.currentMovement})`);
@@ -289,11 +296,15 @@ export default function App() {
   // ── Round / Movement flow ─────────────────────────────────────────────────
 
   // Called by RoundHubScreen when the server announces the next movement
-  const handleMovementReady = (movement, groupId, groupMembers, groupNumber) => {
+  const handleMovementReady = (movement, groupId, groupMembers, groupNumber, extra = {}) => {
     setCurrentMovement(movement);
     if (groupId) setCurrentGroupId(groupId);
     if (groupMembers) setCurrentGroupMembers(groupMembers);
     if (groupNumber != null) setCurrentGroupNumber(groupNumber);
+
+    if (movement === 'B' && extra.movementBEndsAt) {
+      setMovementBEndsAt(extra.movementBEndsAt);
+    }
 
     if (movement === 'A') setCurrentScreen('movementA');
     else if (movement === 'B') setCurrentScreen('movementB');
@@ -367,6 +378,7 @@ export default function App() {
     setCurrentGroupNumber(null);
     setCurrentGroupMembers([]);
     setTeamPoints({ phos: 0, skotia: 0 });
+    setMovementBEndsAt(null);
     setRoundSummary(null);
     setGameOverResult(null);
   };
@@ -522,6 +534,7 @@ export default function App() {
             lobbyId={currentLobbyId}
             currentTeam={currentTeam}
             roundNumber={currentRound}
+            movementBEndsAt={movementBEndsAt}
             onMovementComplete={() => setCurrentScreen('roundHub')}
           />
         );

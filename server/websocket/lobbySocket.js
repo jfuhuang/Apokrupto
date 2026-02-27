@@ -265,36 +265,27 @@ function setupLobbySocket(httpServer) {
           });
         }
 
-        // If Movement B is active, re-emit this player's task assignment on reconnect.
-        // If no assignment is in memory (e.g. server restarted), assign a fresh random task.
-        // GM users are spectators and never receive task assignments.
-        if (!GM_USERNAMES.has(socket.username)) {
-          try {
-            const mbRes = await pool.query(
-              `SELECT g.id FROM games g
-               JOIN rounds r ON r.game_id = g.id AND r.status = 'active'
-               JOIN movements m ON m.round_id = r.id AND m.status = 'active'
-                 AND m.movement_type = 'B'
-               WHERE g.lobby_id = $1 AND g.status = 'active'`,
-              [lobbyId]
-            );
-            if (mbRes.rows.length > 0) {
-              const mbGameId = String(mbRes.rows[0].id);
-              let taskId = gameService.getMovementBAssignment(mbGameId, socket.userId);
-              if (!taskId) {
-                // Assignment missing (server restarted or player connected after A→B) — assign fresh
-                const { TASKS } = require('../data/tasks');
-                const randomTask = TASKS[Math.floor(Math.random() * TASKS.length)];
-                taskId = randomTask.id;
-                gameService.storeMovementBAssignment(mbGameId, socket.userId, taskId);
-                console.log(`[MovementB] Assigned fresh task "${taskId}" to user ${socket.userId}`);
-              }
-              socket.emit('taskAssigned', { taskId });
-              console.log(`[MovementB] Re-emitted task "${taskId}" to reconnecting user ${socket.userId}`);
+        // If Movement B is active, send the timer end time so the client
+        // can display the countdown and let the player pick tasks.
+        try {
+          const mbRes = await pool.query(
+            `SELECT g.id FROM games g
+             JOIN rounds r ON r.game_id = g.id AND r.status = 'active'
+             JOIN movements m ON m.round_id = r.id AND m.status = 'active'
+               AND m.movement_type = 'B'
+             WHERE g.lobby_id = $1 AND g.status = 'active'`,
+            [lobbyId]
+          );
+          if (mbRes.rows.length > 0) {
+            const mbGameId = String(mbRes.rows[0].id);
+            const movementBEndsAt = gameService.getMovementBEndsAt(mbGameId);
+            if (movementBEndsAt) {
+              socket.emit('movementBInfo', { movementBEndsAt });
+              console.log(`[MovementB] Sent movementBEndsAt to reconnecting user ${socket.userId}`);
             }
-          } catch (err) {
-            console.error('[MovementB] reconnect task lookup error:', err.message);
           }
+        } catch (err) {
+          console.error('[MovementB] reconnect lookup error:', err.message);
         }
 
         const state = await getLobbyState(lobbyId);
@@ -608,17 +599,14 @@ function _emitAdvanceEvents(io, result) {
 
   // ── activateB: GM started Movement B + task assignments ───────────────────
   if (result.step === 'activateB') {
-    io.to(lobbyRoom).emit('movementStart', { movement: 'B', roundNumber: result.roundNumber });
-    const { TASKS } = require('../data/tasks');
-    for (const [, sock] of io.sockets.sockets) {
-      if (!sock.rooms.has(lobbyRoom)) continue;
-      if (GM_USERNAMES.has(sock.username)) continue; // GM is a spectator — no task
-      const randomTask = TASKS[Math.floor(Math.random() * TASKS.length)];
-      gameService.storeMovementBAssignment(result.gameId, sock.userId, randomTask.id);
-      sock.emit('taskAssigned', { taskId: randomTask.id });
-      console.log(`[MovementB] Assigned task "${randomTask.id}" to user ${sock.userId}`);
-    }
+    // Schedule timer first so getMovementBEndsAt is available for the emit
     gameService.scheduleMovementBAutoAdvance(result.gameId);
+    const movementBEndsAt = gameService.getMovementBEndsAt(result.gameId);
+    io.to(lobbyRoom).emit('movementStart', {
+      movement: 'B',
+      roundNumber: result.roundNumber,
+      movementBEndsAt,
+    });
     return;
   }
 

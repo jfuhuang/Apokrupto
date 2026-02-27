@@ -26,8 +26,10 @@ const {
   clearVotingTimer,
   emitGmTurnUpdate,
   getMovementATurnInfo,
+  getMovementBEndsAt,
 } = require('../services/gameService');
 const { getIO, emitAdvanceEvents } = require('../websocket/lobbySocket');
+const { getTask } = require('../data/tasks');
 
 // ---------------------------------------------------------------------------
 // POST /api/games
@@ -564,6 +566,78 @@ router.post('/:gameId/movement-c/vote', auth, async (req, res) => {
   } catch (err) {
     console.error('[POST movement-c/vote]', err.message);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/games/:gameId/movement-b/complete
+// Player completed a task during Movement B. Awards points to their team
+// and records the completion. Points are applied immediately to game_teams.
+// ---------------------------------------------------------------------------
+router.post('/:gameId/movement-b/complete', auth, async (req, res) => {
+  const { gameId } = req.params;
+  const userId     = req.user.sub;
+  const { taskId } = req.body;
+
+  if (!taskId) return res.status(400).json({ error: 'taskId is required' });
+
+  const taskDef = getTask(taskId);
+  if (!taskDef) return res.status(400).json({ error: 'Unknown task' });
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Verify Movement B is active for this game
+    const movRes = await client.query(
+      `SELECT m.id FROM movements m
+       JOIN rounds r ON r.id = m.round_id
+       WHERE r.game_id = $1 AND r.status = 'active'
+         AND m.movement_type = 'B' AND m.status = 'active'`,
+      [gameId]
+    );
+    if (movRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Movement B is not active' });
+    }
+
+    // 2. Get player's team
+    const playerRes = await client.query(
+      'SELECT team FROM game_players WHERE game_id = $1 AND user_id = $2',
+      [gameId, userId]
+    );
+    if (playerRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Player not in this game' });
+    }
+    const { team } = playerRes.rows[0];
+
+    // 3. Determine points (use alive points — no elimination in this game)
+    const pointsEarned = taskDef.points.alive;
+
+    // 4. Award to team
+    await client.query(
+      'UPDATE game_teams SET points = points + $1 WHERE game_id = $2 AND team = $3',
+      [pointsEarned, gameId, team]
+    );
+
+    // 5. Read updated team points
+    const tpRes = await client.query(
+      'SELECT team, points FROM game_teams WHERE game_id = $1',
+      [gameId]
+    );
+    const teamPoints = { phos: 0, skotia: 0 };
+    for (const r of tpRes.rows) teamPoints[r.team] = r.points;
+
+    await client.query('COMMIT');
+
+    res.json({ ok: true, pointsEarned, teamPoints, taskId });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[movement-b/complete] error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 });
 

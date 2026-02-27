@@ -1,12 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Apokrupto Admin</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     :root {
       --bg: #0d0f1a;
@@ -41,6 +48,7 @@
       border-bottom: 1px solid var(--blue);
       flex-shrink: 0;
     }
+
     .logo {
       font-size: 1.3rem;
       font-weight: bold;
@@ -48,7 +56,11 @@
       color: var(--blue);
       text-transform: uppercase;
     }
-    .logo span { color: var(--green); }
+
+    .logo span {
+      color: var(--green);
+    }
+
     #header-user {
       display: flex;
       align-items: center;
@@ -56,7 +68,11 @@
       font-size: 0.85rem;
       color: var(--muted);
     }
-    #header-user strong { color: var(--text); }
+
+    #header-user strong {
+      color: var(--text);
+    }
+
     button {
       cursor: pointer;
       font-family: var(--font);
@@ -69,17 +85,43 @@
       text-transform: uppercase;
       transition: border-color 0.15s, color 0.15s, background 0.15s;
     }
+
     button:hover:not(:disabled) {
       border-color: var(--blue);
       color: var(--blue);
     }
-    button:disabled { opacity: 0.35; cursor: not-allowed; }
-    button.primary { border-color: var(--blue); color: var(--blue); }
-    button.primary:hover:not(:disabled) { background: rgba(0,212,255,.08); }
-    button.danger { border-color: var(--red); color: var(--red); }
-    button.danger:hover:not(:disabled) { background: rgba(220,20,60,.08); }
-    button.success { border-color: var(--green); color: var(--green); }
-    button.success:hover:not(:disabled) { background: rgba(0,255,159,.08); }
+
+    button:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    button.primary {
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+
+    button.primary:hover:not(:disabled) {
+      background: rgba(0, 212, 255, .08);
+    }
+
+    button.danger {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    button.danger:hover:not(:disabled) {
+      background: rgba(220, 20, 60, .08);
+    }
+
+    button.success {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    button.success:hover:not(:disabled) {
+      background: rgba(0, 255, 159, .08);
+    }
 
     /* ── Main ── */
     main {
@@ -90,14 +132,22 @@
     }
 
     /* ── Screens ── */
-    .screen { display: none; flex: 1; flex-direction: column; }
-    .screen.active { display: flex; }
+    .screen {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+    }
+
+    .screen.active {
+      display: flex;
+    }
 
     /* ── Login Screen ── */
     #screen-login {
       align-items: center;
       justify-content: center;
     }
+
     .login-box {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -105,6 +155,7 @@
       width: 360px;
       max-width: 90vw;
     }
+
     .login-box h2 {
       font-size: 1rem;
       letter-spacing: 2px;
@@ -113,8 +164,21 @@
       margin-bottom: 28px;
       text-align: center;
     }
-    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
-    .field label { font-size: 0.75rem; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 18px;
+    }
+
+    .field label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
     .field input {
       background: var(--bg);
       border: 1px solid var(--border);
@@ -125,12 +189,30 @@
       outline: none;
       transition: border-color 0.15s;
     }
-    .field input:focus { border-color: var(--blue); }
-    #login-error { color: var(--red); font-size: 0.8rem; min-height: 1.2em; margin-bottom: 10px; }
-    #btn-login { width: 100%; padding: 10px; font-size: 0.9rem; }
+
+    .field input:focus {
+      border-color: var(--blue);
+    }
+
+    #login-error {
+      color: var(--red);
+      font-size: 0.8rem;
+      min-height: 1.2em;
+      margin-bottom: 10px;
+    }
+
+    #btn-login {
+      width: 100%;
+      padding: 10px;
+      font-size: 0.9rem;
+    }
 
     /* ── Lobby List Screen ── */
-    #screen-lobbies { padding: 24px; gap: 16px; }
+    #screen-lobbies {
+      padding: 24px;
+      gap: 16px;
+    }
+
     .toolbar {
       display: flex;
       align-items: center;
@@ -138,12 +220,34 @@
       flex-wrap: wrap;
       gap: 10px;
     }
-    .toolbar h2 { font-size: 0.9rem; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
-    .toolbar-right { display: flex; gap: 10px; align-items: center; }
-    .refresh-indicator { font-size: 0.75rem; color: var(--muted); }
 
-    table { width: 100%; border-collapse: collapse; }
-    thead tr { border-bottom: 1px solid var(--border); }
+    .toolbar h2 {
+      font-size: 0.9rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .toolbar-right {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .refresh-indicator {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead tr {
+      border-bottom: 1px solid var(--border);
+    }
+
     th {
       text-align: left;
       padding: 8px 12px;
@@ -153,13 +257,17 @@
       text-transform: uppercase;
       white-space: nowrap;
     }
+
     td {
       padding: 10px 12px;
       font-size: 0.85rem;
-      border-bottom: 1px solid rgba(37,42,69,.5);
+      border-bottom: 1px solid rgba(37, 42, 69, .5);
       vertical-align: middle;
     }
-    tbody tr:hover { background: rgba(255,255,255,.02); }
+
+    tbody tr:hover {
+      background: rgba(255, 255, 255, .02);
+    }
 
     .badge {
       display: inline-block;
@@ -169,22 +277,47 @@
       text-transform: uppercase;
       border-radius: 2px;
     }
-    .badge-waiting { background: rgba(0,212,255,.12); color: var(--blue); border: 1px solid rgba(0,212,255,.3); }
-    .badge-in_progress { background: rgba(0,255,159,.12); color: var(--green); border: 1px solid rgba(0,255,159,.3); }
-    .badge-completed { background: rgba(90,96,128,.15); color: var(--muted); border: 1px solid var(--border); }
 
-    .empty-row td { text-align: center; color: var(--muted); padding: 40px; font-size: 0.85rem; }
+    .badge-waiting {
+      background: rgba(0, 212, 255, .12);
+      color: var(--blue);
+      border: 1px solid rgba(0, 212, 255, .3);
+    }
+
+    .badge-in_progress {
+      background: rgba(0, 255, 159, .12);
+      color: var(--green);
+      border: 1px solid rgba(0, 255, 159, .3);
+    }
+
+    .badge-completed {
+      background: rgba(90, 96, 128, .15);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .empty-row td {
+      text-align: center;
+      color: var(--muted);
+      padding: 40px;
+      font-size: 0.85rem;
+    }
 
     /* ── Modal ── */
     .modal-overlay {
       display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,.75);
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .75);
       align-items: center;
       justify-content: center;
       z-index: 100;
     }
-    .modal-overlay.open { display: flex; }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
     .modal {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -192,9 +325,28 @@
       width: 340px;
       max-width: 90vw;
     }
-    .modal h3 { font-size: 0.9rem; letter-spacing: 2px; color: var(--blue); text-transform: uppercase; margin-bottom: 24px; }
-    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
-    #modal-error { color: var(--red); font-size: 0.8rem; min-height: 1.2em; margin-bottom: 4px; }
+
+    .modal h3 {
+      font-size: 0.9rem;
+      letter-spacing: 2px;
+      color: var(--blue);
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 24px;
+    }
+
+    #modal-error {
+      color: var(--red);
+      font-size: 0.8rem;
+      min-height: 1.2em;
+      margin-bottom: 4px;
+    }
 
     /* ── Lobby Detail Screen ── */
     #screen-detail {
@@ -202,6 +354,7 @@
       gap: 0;
       overflow: hidden;
     }
+
     .detail-header {
       display: flex;
       align-items: center;
@@ -211,17 +364,33 @@
       border-bottom: 1px solid var(--border);
       flex-wrap: wrap;
     }
-    .detail-header h2 { font-size: 1rem; letter-spacing: 1px; }
-    .detail-header .badge { font-size: 0.75rem; }
+
+    .detail-header h2 {
+      font-size: 1rem;
+      letter-spacing: 1px;
+    }
+
+    .detail-header .badge {
+      font-size: 0.75rem;
+    }
+
     .ws-dot {
-      width: 8px; height: 8px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       background: var(--muted);
       display: inline-block;
       flex-shrink: 0;
     }
-    .ws-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
-    .back-btn { margin-left: auto; }
+
+    .ws-dot.connected {
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+    }
+
+    .back-btn {
+      margin-left: auto;
+    }
 
     .detail-body {
       display: flex;
@@ -238,6 +407,7 @@
       min-width: 0;
       overflow: hidden;
     }
+
     .panel-title {
       padding: 10px 20px;
       font-size: 0.72rem;
@@ -247,11 +417,13 @@
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
+
     #player-list {
       flex: 1;
       overflow-y: auto;
       padding: 8px 0;
     }
+
     .player-row {
       display: flex;
       align-items: center;
@@ -259,20 +431,32 @@
       padding: 10px 20px;
       transition: background 0.1s;
     }
-    .player-row:hover { background: rgba(255,255,255,.025); }
+
+    .player-row:hover {
+      background: rgba(255, 255, 255, .025);
+    }
+
     .avatar {
-      width: 32px; height: 32px;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
       background: var(--surface2);
       border: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       font-size: 0.85rem;
       font-weight: bold;
       color: var(--blue);
       flex-shrink: 0;
       text-transform: uppercase;
     }
-    .player-info { flex: 1; min-width: 0; }
+
+    .player-info {
+      flex: 1;
+      min-width: 0;
+    }
+
     .player-name {
       font-size: 0.9rem;
       display: flex;
@@ -280,14 +464,24 @@
       gap: 6px;
       flex-wrap: wrap;
     }
-    .player-name .host-star { color: var(--yellow); font-size: 0.75rem; }
+
+    .player-name .host-star {
+      color: var(--yellow);
+      font-size: 0.75rem;
+    }
+
     .player-name .conn-dot {
-      width: 7px; height: 7px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: var(--muted);
       display: inline-block;
     }
-    .player-name .conn-dot.on { background: var(--green); }
+
+    .player-name .conn-dot.on {
+      background: var(--green);
+    }
+
     .player-meta {
       font-size: 0.72rem;
       color: var(--muted);
@@ -295,6 +489,7 @@
       gap: 8px;
       margin-top: 2px;
     }
+
     .role-badge {
       font-size: 0.65rem;
       padding: 1px 6px;
@@ -302,10 +497,28 @@
       text-transform: uppercase;
       letter-spacing: 1px;
     }
-    .role-skotia { background: rgba(220,20,60,.15); color: var(--red); border: 1px solid rgba(220,20,60,.3); }
-    .role-phos { background: rgba(0,212,255,.1); color: var(--blue); border: 1px solid rgba(0,212,255,.25); }
-    .player-actions { display: flex; gap: 6px; }
-    .kick-btn { padding: 3px 8px; font-size: 0.7rem; }
+
+    .role-skotia {
+      background: rgba(220, 20, 60, .15);
+      color: var(--red);
+      border: 1px solid rgba(220, 20, 60, .3);
+    }
+
+    .role-phos {
+      background: rgba(0, 212, 255, .1);
+      color: var(--blue);
+      border: 1px solid rgba(0, 212, 255, .25);
+    }
+
+    .player-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .kick-btn {
+      padding: 3px 8px;
+      font-size: 0.7rem;
+    }
 
     .panel-footer {
       padding: 12px 20px;
@@ -317,7 +530,10 @@
     }
 
     /* Leaderboard */
-    #leaderboard { padding: 8px 20px; }
+    #leaderboard {
+      padding: 8px 20px;
+    }
+
     .lb-title {
       font-size: 0.72rem;
       letter-spacing: 2px;
@@ -327,23 +543,37 @@
       border-bottom: 1px solid var(--border);
       margin-bottom: 4px;
     }
+
     .lb-row {
       display: flex;
       align-items: center;
       gap: 10px;
       padding: 6px 0;
       font-size: 0.85rem;
-      border-bottom: 1px solid rgba(37,42,69,.4);
+      border-bottom: 1px solid rgba(37, 42, 69, .4);
     }
-    .lb-rank { width: 20px; color: var(--muted); font-size: 0.75rem; }
-    .lb-name { flex: 1; }
-    .lb-pts { color: var(--green); font-size: 0.8rem; }
+
+    .lb-rank {
+      width: 20px;
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+
+    .lb-name {
+      flex: 1;
+    }
+
+    .lb-pts {
+      color: var(--green);
+      font-size: 0.8rem;
+    }
 
 
     /* ── Toast ── */
     #toast {
       position: fixed;
-      bottom: 24px; right: 24px;
+      bottom: 24px;
+      right: 24px;
       background: var(--surface2);
       border: 1px solid var(--border);
       padding: 10px 18px;
@@ -355,252 +585,278 @@
       z-index: 200;
       max-width: 320px;
     }
-    #toast.show { opacity: 1; }
-    #toast.error { border-color: var(--red); color: var(--red); }
-    #toast.success { border-color: var(--green); color: var(--green); }
+
+    #toast.show {
+      opacity: 1;
+    }
+
+    #toast.error {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    #toast.success {
+      border-color: var(--green);
+      color: var(--green);
+    }
 
     /* scrollbar */
-    ::-webkit-scrollbar { width: 5px; }
-    ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: var(--border); }
-    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+    ::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--muted);
+    }
   </style>
 </head>
+
 <body>
 
-<header>
-  <div class="logo">APOKRUPTO <span>ADMIN</span></div>
-  <div id="header-user" style="display:none">
-    <span>Logged in as <strong id="header-username"></strong></span>
-    <button id="btn-logout">Logout</button>
-  </div>
-</header>
-
-<main>
-
-  <!-- ── Screen: Login ── -->
-  <div id="screen-login" class="screen active">
-    <div class="login-box">
-      <h2>Admin Login</h2>
-      <div class="field">
-        <label>Username</label>
-        <input id="login-username" type="text" autocomplete="username" />
-      </div>
-      <div class="field">
-        <label>Password</label>
-        <input id="login-password" type="password" autocomplete="current-password" />
-      </div>
-      <div id="login-error"></div>
-      <button id="btn-login" class="primary">Sign In</button>
+  <header>
+    <div class="logo">APOKRUPTO <span>ADMIN</span></div>
+    <div id="header-user" style="display:none">
+      <span>Logged in as <strong id="header-username"></strong></span>
+      <button id="btn-logout">Logout</button>
     </div>
-  </div>
+  </header>
 
-  <!-- ── Screen: Lobby List ── -->
-  <div id="screen-lobbies" class="screen">
-    <div class="toolbar">
-      <h2>Lobbies</h2>
-      <div class="toolbar-right">
-        <span class="refresh-indicator" id="refresh-timer">Refreshing in 5s</span>
-        <button class="primary" id="btn-create">+ Create Lobby</button>
+  <main>
+
+    <!-- ── Screen: Login ── -->
+    <div id="screen-login" class="screen active">
+      <div class="login-box">
+        <h2>Admin Login</h2>
+        <div class="field">
+          <label>Username</label>
+          <input id="login-username" type="text" autocomplete="username" />
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input id="login-password" type="password" autocomplete="current-password" />
+        </div>
+        <div id="login-error"></div>
+        <button id="btn-login" class="primary">Sign In</button>
       </div>
     </div>
-    <div style="overflow-x:auto; flex:1;">
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Players</th>
-            <th>Host</th>
-            <th>Created</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="lobby-table-body">
-          <tr class="empty-row"><td colspan="6">Loading...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
 
-  <!-- ── Screen: Lobby Detail ── -->
-  <div id="screen-detail" class="screen">
-    <div class="detail-header">
-      <button class="back-btn" style="margin-left:0" id="btn-back">← Back</button>
-      <h2 id="detail-name">Lobby</h2>
-      <span id="detail-badge" class="badge"></span>
-      <span id="detail-players" style="font-size:.8rem;color:var(--muted)"></span>
-      <span class="ws-dot" id="ws-dot" title="Socket.IO connection"></span>
-      <span style="font-size:.72rem;color:var(--muted)" id="ws-label">Connecting...</span>
-    </div>
-
-    <div class="detail-body">
-      <!-- Left: Player list -->
-      <div class="panel-left">
-        <div class="panel-title">Players</div>
-        <div id="player-list"></div>
-        <div id="leaderboard" style="display:none"></div>
-        <div class="panel-footer">
-          <button class="primary" id="btn-add-dummy">+ Add Dummy</button>
-          <button class="success" id="btn-start-game" style="display:none">&#9654; Start Game</button>
-          <button class="danger" id="btn-force-end" style="display:none">&#9632; Force End</button>
-          <div id="game-over-banner" style="display:none;color:var(--yellow);font-size:.85rem;align-self:center"></div>
+    <!-- ── Screen: Lobby List ── -->
+    <div id="screen-lobbies" class="screen">
+      <div class="toolbar">
+        <h2>Lobbies</h2>
+        <div class="toolbar-right">
+          <span class="refresh-indicator" id="refresh-timer">Refreshing in 5s</span>
+          <button class="primary" id="btn-create">+ Create Lobby</button>
         </div>
       </div>
+      <div style="overflow-x:auto; flex:1;">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Players</th>
+              <th>Host</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="lobby-table-body">
+            <tr class="empty-row">
+              <td colspan="6">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
+    <!-- ── Screen: Lobby Detail ── -->
+    <div id="screen-detail" class="screen">
+      <div class="detail-header">
+        <button class="back-btn" style="margin-left:0" id="btn-back">← Back</button>
+        <h2 id="detail-name">Lobby</h2>
+        <span id="detail-badge" class="badge"></span>
+        <span id="detail-players" style="font-size:.8rem;color:var(--muted)"></span>
+        <span class="ws-dot" id="ws-dot" title="Socket.IO connection"></span>
+        <span style="font-size:.72rem;color:var(--muted)" id="ws-label">Connecting...</span>
+      </div>
+
+      <div class="detail-body">
+        <!-- Left: Player list -->
+        <div class="panel-left">
+          <div class="panel-title">Players</div>
+          <div id="player-list"></div>
+          <div id="leaderboard" style="display:none"></div>
+          <div class="panel-footer">
+            <button class="primary" id="btn-add-dummy">+ Add Dummy</button>
+            <button class="success" id="btn-start-game">&#9654; Start Game</button>
+            <button class="danger" id="btn-force-end">&#9632; Force End</button>
+            <div id="game-over-banner" style="display:none;color:var(--yellow);font-size:.85rem;align-self:center">
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ── Modal: Create Lobby ── -->
+  <div class="modal-overlay" id="modal-create">
+    <div class="modal">
+      <h3>Create Lobby</h3>
+      <div class="field">
+        <label>Lobby Name</label>
+        <input id="new-lobby-name" type="text" placeholder="e.g. Alpha Station" />
+      </div>
+      <div class="field">
+        <label>Max Players (5–80)</label>
+        <input id="new-lobby-max" type="number" min="5" max="80" value="20" />
+      </div>
+      <div id="modal-error"></div>
+      <div class="modal-actions">
+        <button id="btn-modal-cancel">Cancel</button>
+        <button class="primary" id="btn-modal-create">Create</button>
+      </div>
     </div>
   </div>
 
-</main>
+  <!-- ── Toast ── -->
+  <div id="toast"></div>
 
-<!-- ── Modal: Create Lobby ── -->
-<div class="modal-overlay" id="modal-create">
-  <div class="modal">
-    <h3>Create Lobby</h3>
-    <div class="field">
-      <label>Lobby Name</label>
-      <input id="new-lobby-name" type="text" placeholder="e.g. Alpha Station" />
-    </div>
-    <div class="field">
-      <label>Max Players (5–80)</label>
-      <input id="new-lobby-max" type="number" min="5" max="80" value="20" />
-    </div>
-    <div id="modal-error"></div>
-    <div class="modal-actions">
-      <button id="btn-modal-cancel">Cancel</button>
-      <button class="primary" id="btn-modal-create">Create</button>
-    </div>
-  </div>
-</div>
+  <script>
+    // ── State ──────────────────────────────────────────────────────────────────
+    const state = {
+      token: null,
+      username: null,
+      currentLobby: null, // { id, name, status, hostId, maxPlayers }
+      socket: null,
+      lobbyData: null,    // latest lobbyUpdate payload
+      refreshInterval: null,
+      refreshCountdown: 5,
+    };
 
-<!-- ── Toast ── -->
-<div id="toast"></div>
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    function apiBase() { return window.location.origin; }
 
-<script>
-  // ── State ──────────────────────────────────────────────────────────────────
-  const state = {
-    token: null,
-    username: null,
-    currentLobby: null, // { id, name, status, hostId, maxPlayers }
-    socket: null,
-    lobbyData: null,    // latest lobbyUpdate payload
-    refreshInterval: null,
-    refreshCountdown: 5,
-  };
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-  function apiBase() { return window.location.origin; }
-
-  async function apiFetch(path, options = {}) {
-    const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
-    if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
-    const res = await fetch(apiBase() + path, { ...options, headers });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    return data;
-  }
-
-  let toastTimer = null;
-  function showToast(msg, type = '') {
-    const el = document.getElementById('toast');
-    el.textContent = msg;
-    el.className = 'show' + (type ? ' ' + type : '');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.className = ''; }, 3500);
-  }
-
-  function formatDate(iso) {
-    const d = new Date(iso);
-    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-
-  // ── Screen switching ───────────────────────────────────────────────────────
-  function showScreen(id) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('screen-' + id).classList.add('active');
-  }
-
-  // ── Auth ───────────────────────────────────────────────────────────────────
-  function loadSession() {
-    try {
-      const tok = sessionStorage.getItem('apk_token');
-      const usr = sessionStorage.getItem('apk_username');
-      if (tok && usr) { state.token = tok; state.username = usr; return true; }
-    } catch (_) {}
-    return false;
-  }
-
-  function saveSession(token, username) {
-    state.token = token;
-    state.username = username;
-    sessionStorage.setItem('apk_token', token);
-    sessionStorage.setItem('apk_username', username);
-  }
-
-  function clearSession() {
-    state.token = null;
-    state.username = null;
-    sessionStorage.removeItem('apk_token');
-    sessionStorage.removeItem('apk_username');
-  }
-
-  function setHeaderUser(username) {
-    document.getElementById('header-user').style.display = username ? 'flex' : 'none';
-    document.getElementById('header-username').textContent = username || '';
-  }
-
-  // ── Login ──────────────────────────────────────────────────────────────────
-  document.getElementById('btn-login').addEventListener('click', async () => {
-    const username = document.getElementById('login-username').value.trim();
-    const password = document.getElementById('login-password').value;
-    const errEl = document.getElementById('login-error');
-    errEl.textContent = '';
-    if (!username || !password) { errEl.textContent = 'Enter username and password.'; return; }
-    try {
-      const data = await apiFetch('/api/users/login', {
-        method: 'POST',
-        body: JSON.stringify({ username, password }),
-      });
-      saveSession(data.token, data.user?.username || username);
-      setHeaderUser(state.username);
-      showScreen('lobbies');
-      startLobbyRefresh();
-    } catch (err) {
-      errEl.textContent = err.message;
+    async function apiFetch(path, options = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
+      const res = await fetch(apiBase() + path, { ...options, headers });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
     }
-  });
 
-  document.getElementById('login-password').addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('btn-login').click();
-  });
-
-  document.getElementById('btn-logout').addEventListener('click', () => {
-    disconnectSocket();
-    stopLobbyRefresh();
-    clearSession();
-    setHeaderUser(null);
-    showScreen('login');
-  });
-
-  // ── Lobby List ─────────────────────────────────────────────────────────────
-  async function fetchLobbies() {
-    try {
-      const data = await apiFetch('/api/lobbies?all=true');
-      renderLobbyTable(data.lobbies || []);
-    } catch (err) {
-      console.error('fetchLobbies error:', err);
+    let toastTimer = null;
+    function showToast(msg, type = '') {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'show' + (type ? ' ' + type : '');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { el.className = ''; }, 3500);
     }
-  }
 
-  function renderLobbyTable(lobbies) {
-    const tbody = document.getElementById('lobby-table-body');
-    if (lobbies.length === 0) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No active lobbies</td></tr>';
-      return;
+    function formatDate(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
-    tbody.innerHTML = lobbies.map(l => {
-      const status = l.status || 'waiting';
-      return `
+
+    // ── Screen switching ───────────────────────────────────────────────────────
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('screen-' + id).classList.add('active');
+    }
+
+    // ── Auth ───────────────────────────────────────────────────────────────────
+    function loadSession() {
+      try {
+        const tok = sessionStorage.getItem('apk_token');
+        const usr = sessionStorage.getItem('apk_username');
+        if (tok && usr) { state.token = tok; state.username = usr; return true; }
+      } catch (_) { }
+      return false;
+    }
+
+    function saveSession(token, username) {
+      state.token = token;
+      state.username = username;
+      sessionStorage.setItem('apk_token', token);
+      sessionStorage.setItem('apk_username', username);
+    }
+
+    function clearSession() {
+      state.token = null;
+      state.username = null;
+      sessionStorage.removeItem('apk_token');
+      sessionStorage.removeItem('apk_username');
+    }
+
+    function setHeaderUser(username) {
+      document.getElementById('header-user').style.display = username ? 'flex' : 'none';
+      document.getElementById('header-username').textContent = username || '';
+    }
+
+    // ── Login ──────────────────────────────────────────────────────────────────
+    document.getElementById('btn-login').addEventListener('click', async () => {
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value;
+      const errEl = document.getElementById('login-error');
+      errEl.textContent = '';
+      if (!username || !password) { errEl.textContent = 'Enter username and password.'; return; }
+      try {
+        const data = await apiFetch('/api/users/login', {
+          method: 'POST',
+          body: JSON.stringify({ username, password }),
+        });
+        saveSession(data.token, data.user?.username || username);
+        setHeaderUser(state.username);
+        showScreen('lobbies');
+        startLobbyRefresh();
+      } catch (err) {
+        errEl.textContent = err.message;
+      }
+    });
+
+    document.getElementById('login-password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('btn-login').click();
+    });
+
+    document.getElementById('btn-logout').addEventListener('click', () => {
+      disconnectSocket();
+      stopLobbyRefresh();
+      clearSession();
+      setHeaderUser(null);
+      showScreen('login');
+    });
+
+    // ── Lobby List ─────────────────────────────────────────────────────────────
+    async function fetchLobbies() {
+      try {
+        const data = await apiFetch('/api/lobbies?all=true');
+        renderLobbyTable(data.lobbies || []);
+      } catch (err) {
+        console.error('fetchLobbies error:', err);
+      }
+    }
+
+    function renderLobbyTable(lobbies) {
+      const tbody = document.getElementById('lobby-table-body');
+      if (lobbies.length === 0) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No active lobbies</td></tr>';
+        return;
+      }
+      tbody.innerHTML = lobbies.map(l => {
+        const status = l.status || 'waiting';
+        return `
       <tr>
         <td>${escHtml(l.name)}</td>
         <td><span class="badge badge-${status}">${status.replace('_', ' ')}</span></td>
@@ -610,212 +866,212 @@
         <td><button class="primary" onclick="openLobbyDetail(${l.id}, '${escAttr(l.name)}', '${status}', ${l.created_by}, ${l.max_players})">Manage</button></td>
       </tr>
     `}).join('');
-  }
-
-  function escHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-  function escAttr(s) { return String(s).replace(/'/g, "\\'"); }
-
-  let refreshTimer = null;
-  function startLobbyRefresh() {
-    fetchLobbies();
-    state.refreshCountdown = 5;
-    updateRefreshLabel();
-    if (refreshTimer) clearInterval(refreshTimer);
-    refreshTimer = setInterval(() => {
-      state.refreshCountdown--;
-      updateRefreshLabel();
-      if (state.refreshCountdown <= 0) {
-        fetchLobbies();
-        state.refreshCountdown = 5;
-      }
-    }, 1000);
-  }
-  function stopLobbyRefresh() {
-    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
-  }
-  function updateRefreshLabel() {
-    const el = document.getElementById('refresh-timer');
-    if (el) el.textContent = `Refreshing in ${state.refreshCountdown}s`;
-  }
-
-  // ── Create Lobby Modal ─────────────────────────────────────────────────────
-  document.getElementById('btn-create').addEventListener('click', () => {
-    document.getElementById('modal-error').textContent = '';
-    document.getElementById('new-lobby-name').value = '';
-    document.getElementById('new-lobby-max').value = '8';
-    document.getElementById('modal-create').classList.add('open');
-    document.getElementById('new-lobby-name').focus();
-  });
-  document.getElementById('btn-modal-cancel').addEventListener('click', () => {
-    document.getElementById('modal-create').classList.remove('open');
-  });
-  document.getElementById('modal-create').addEventListener('click', e => {
-    if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
-  });
-  document.getElementById('btn-modal-create').addEventListener('click', async () => {
-    const name = document.getElementById('new-lobby-name').value.trim();
-    const max_players = parseInt(document.getElementById('new-lobby-max').value, 10);
-    const errEl = document.getElementById('modal-error');
-    errEl.textContent = '';
-    if (!name) { errEl.textContent = 'Name is required.'; return; }
-    if (max_players < 5 || max_players > 80 || isNaN(max_players)) {
-      errEl.textContent = 'Max players must be 5–80.'; return;
     }
-    try {
-      await apiFetch('/api/lobbies', { method: 'POST', body: JSON.stringify({ name, max_players }) });
-      document.getElementById('modal-create').classList.remove('open');
+
+    function escHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function escAttr(s) { return String(s).replace(/'/g, "\\'"); }
+
+    let refreshTimer = null;
+    function startLobbyRefresh() {
       fetchLobbies();
-      showToast('Lobby created', 'success');
-    } catch (err) {
-      errEl.textContent = err.message;
+      state.refreshCountdown = 5;
+      updateRefreshLabel();
+      if (refreshTimer) clearInterval(refreshTimer);
+      refreshTimer = setInterval(() => {
+        state.refreshCountdown--;
+        updateRefreshLabel();
+        if (state.refreshCountdown <= 0) {
+          fetchLobbies();
+          state.refreshCountdown = 5;
+        }
+      }, 1000);
     }
-  });
+    function stopLobbyRefresh() {
+      if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+    }
+    function updateRefreshLabel() {
+      const el = document.getElementById('refresh-timer');
+      if (el) el.textContent = `Refreshing in ${state.refreshCountdown}s`;
+    }
 
-  // ── Lobby Detail ───────────────────────────────────────────────────────────
-  function openLobbyDetail(id, name, status, hostId, maxPlayers) {
-    stopLobbyRefresh();
-    state.currentLobby = { id, name, status, hostId, maxPlayers };
-    document.getElementById('detail-name').textContent = name;
-    updateDetailBadge(status);
-    document.getElementById('detail-players').textContent = '';
-    document.getElementById('player-list').innerHTML = '<div style="padding:20px;color:var(--muted);font-size:.85rem;">Connecting...</div>';
-    document.getElementById('leaderboard').style.display = 'none';
-    document.getElementById('game-over-banner').style.display = 'none';
-    document.getElementById('game-over-banner').textContent = '';
-
-    // Show/hide Start Game / Force End buttons
-    const startBtn = document.getElementById('btn-start-game');
-    const forceEndBtn = document.getElementById('btn-force-end');
-    const myId = getUserIdFromToken(state.token);
-    startBtn.style.display = (status === 'waiting' && String(hostId) === String(myId)) ? 'inline-block' : 'none';
-    forceEndBtn.style.display = (status === 'in_progress') ? 'inline-block' : 'none';
-
-    showScreen('detail');
-    connectSocket(id);
-  }
-
-  function updateDetailBadge(status) {
-    const el = document.getElementById('detail-badge');
-    el.textContent = status.replace('_', ' ');
-    el.className = 'badge badge-' + status;
-    state.currentLobby.status = status;
-  }
-
-  document.getElementById('btn-back').addEventListener('click', () => {
-    disconnectSocket();
-    showScreen('lobbies');
-    startLobbyRefresh();
-  });
-
-  // ── Socket.IO ──────────────────────────────────────────────────────────────
-  function connectSocket(lobbyId) {
-    disconnectSocket();
-    setWsDot(false);
-
-    const socket = io(window.location.origin, {
-      auth: { token: state.token },
-      transports: ['websocket', 'polling'],
+    // ── Create Lobby Modal ─────────────────────────────────────────────────────
+    document.getElementById('btn-create').addEventListener('click', () => {
+      document.getElementById('modal-error').textContent = '';
+      document.getElementById('new-lobby-name').value = '';
+      document.getElementById('new-lobby-max').value = '8';
+      document.getElementById('modal-create').classList.add('open');
+      document.getElementById('new-lobby-name').focus();
     });
-    state.socket = socket;
-
-    socket.on('connect', () => {
-      setWsDot(true);
-      socket.emit('joinRoom', { lobbyId }, (ack) => {
-        if (ack && ack.error) showToast('joinRoom error: ' + ack.error, 'error');
-      });
+    document.getElementById('btn-modal-cancel').addEventListener('click', () => {
+      document.getElementById('modal-create').classList.remove('open');
+    });
+    document.getElementById('modal-create').addEventListener('click', e => {
+      if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+    });
+    document.getElementById('btn-modal-create').addEventListener('click', async () => {
+      const name = document.getElementById('new-lobby-name').value.trim();
+      const max_players = parseInt(document.getElementById('new-lobby-max').value, 10);
+      const errEl = document.getElementById('modal-error');
+      errEl.textContent = '';
+      if (!name) { errEl.textContent = 'Name is required.'; return; }
+      if (max_players < 5 || max_players > 80 || isNaN(max_players)) {
+        errEl.textContent = 'Max players must be 5–80.'; return;
+      }
+      try {
+        await apiFetch('/api/lobbies', { method: 'POST', body: JSON.stringify({ name, max_players }) });
+        document.getElementById('modal-create').classList.remove('open');
+        fetchLobbies();
+        showToast('Lobby created', 'success');
+      } catch (err) {
+        errEl.textContent = err.message;
+      }
     });
 
-    socket.on('disconnect', () => setWsDot(false));
-    socket.on('connect_error', (err) => {
-      setWsDot(false);
-      showToast('Socket error: ' + err.message, 'error');
-    });
+    // ── Lobby Detail ───────────────────────────────────────────────────────────
+    function openLobbyDetail(id, name, status, hostId, maxPlayers) {
+      stopLobbyRefresh();
+      state.currentLobby = { id, name, status, hostId, maxPlayers };
+      document.getElementById('detail-name').textContent = name;
+      updateDetailBadge(status);
+      document.getElementById('detail-players').textContent = '';
+      document.getElementById('player-list').innerHTML = '<div style="padding:20px;color:var(--muted);font-size:.85rem;">Connecting...</div>';
+      document.getElementById('leaderboard').style.display = 'none';
+      document.getElementById('game-over-banner').style.display = 'none';
+      document.getElementById('game-over-banner').textContent = '';
 
-    socket.on('lobbyUpdate', (data) => {
-      state.lobbyData = data;
-      renderPlayers(data);
-      updateDetailBadge(data.status);
-      document.getElementById('detail-players').textContent =
-        `${data.players.length} / ${data.maxPlayers}`;
-
-      // Show Start Game / Force End buttons based on status
+      // Show/hide Start Game / Force End buttons
+      const startBtn = document.getElementById('btn-start-game');
+      const forceEndBtn = document.getElementById('btn-force-end');
       const myId = getUserIdFromToken(state.token);
-      document.getElementById('btn-start-game').style.display =
-        (data.status === 'waiting' && String(data.hostId) === String(myId)) ? 'inline-block' : 'none';
-      document.getElementById('btn-force-end').style.display =
-        (data.status === 'in_progress') ? 'inline-block' : 'none';
+      startBtn.style.display = (status === 'waiting') ? 'inline-block' : 'none';
+      forceEndBtn.style.display = (status === 'in_progress') ? 'inline-block' : 'none';
 
-    });
+      showScreen('detail');
+      connectSocket(id);
+    }
 
-    socket.on('gameStarted', (data) => {
-      showToast('Game started!', 'success');
-      state.lobbyData = data;
-      updateDetailBadge('in_progress');
-      renderPlayers(data);
-      document.getElementById('btn-start-game').style.display = 'none';
-      document.getElementById('leaderboard').style.display = 'block';
-      renderLeaderboard(data.players);
-    });
+    function updateDetailBadge(status) {
+      const el = document.getElementById('detail-badge');
+      el.textContent = status.replace('_', ' ');
+      el.className = 'badge badge-' + status;
+      state.currentLobby.status = status;
+    }
 
-    socket.on('pointsUpdate', (payload) => {
-      if (!payload.leaderboard) return;
-      renderLeaderboard(payload.leaderboard.map(p => ({
-        id: p.user_id, username: p.username, points: p.points
-      })));
-    });
-
-    socket.on('gameOver', (data) => {
-      const banner = document.getElementById('game-over-banner');
-      banner.style.display = 'block';
-      banner.textContent = `Game Over — Winner: ${data.winner} (${data.reason || ''})`;
-      updateDetailBadge('completed');
-    });
-
-    socket.on('lobbyClosed', () => {
-      showToast('Lobby was closed', 'error');
+    document.getElementById('btn-back').addEventListener('click', () => {
       disconnectSocket();
       showScreen('lobbies');
       startLobbyRefresh();
     });
-  }
 
-  function disconnectSocket() {
-    if (state.socket) {
-      state.socket.disconnect();
-      state.socket = null;
+    // ── Socket.IO ──────────────────────────────────────────────────────────────
+    function connectSocket(lobbyId) {
+      disconnectSocket();
+      setWsDot(false);
+
+      const socket = io(window.location.origin, {
+        auth: { token: state.token },
+        transports: ['websocket', 'polling'],
+      });
+      state.socket = socket;
+
+      socket.on('connect', () => {
+        setWsDot(true);
+        socket.emit('joinRoom', { lobbyId }, (ack) => {
+          if (ack && ack.error) showToast('joinRoom error: ' + ack.error, 'error');
+        });
+      });
+
+      socket.on('disconnect', () => setWsDot(false));
+      socket.on('connect_error', (err) => {
+        setWsDot(false);
+        showToast('Socket error: ' + err.message, 'error');
+      });
+
+      socket.on('lobbyUpdate', (data) => {
+        state.lobbyData = data;
+        renderPlayers(data);
+        updateDetailBadge(data.status);
+        document.getElementById('detail-players').textContent =
+          `${data.players.length} / ${data.maxPlayers}`;
+
+        // Show Start Game / Force End buttons based on status
+        const myId = getUserIdFromToken(state.token);
+        document.getElementById('btn-start-game').style.display =
+          (data.status === 'waiting' && String(data.hostId) === String(myId)) ? 'inline-block' : 'none';
+        document.getElementById('btn-force-end').style.display =
+          (data.status === 'in_progress') ? 'inline-block' : 'none';
+
+      });
+
+      socket.on('gameStarted', (data) => {
+        showToast('Game started!', 'success');
+        state.lobbyData = data;
+        updateDetailBadge('in_progress');
+        renderPlayers(data);
+        document.getElementById('btn-start-game').style.display = 'none';
+        document.getElementById('leaderboard').style.display = 'block';
+        renderLeaderboard(data.players);
+      });
+
+      socket.on('pointsUpdate', (payload) => {
+        if (!payload.leaderboard) return;
+        renderLeaderboard(payload.leaderboard.map(p => ({
+          id: p.user_id, username: p.username, points: p.points
+        })));
+      });
+
+      socket.on('gameOver', (data) => {
+        const banner = document.getElementById('game-over-banner');
+        banner.style.display = 'block';
+        banner.textContent = `Game Over — Winner: ${data.winner} (${data.reason || ''})`;
+        updateDetailBadge('completed');
+      });
+
+      socket.on('lobbyClosed', () => {
+        showToast('Lobby was closed', 'error');
+        disconnectSocket();
+        showScreen('lobbies');
+        startLobbyRefresh();
+      });
     }
-    setWsDot(false);
-  }
 
-  function setWsDot(connected) {
-    const dot = document.getElementById('ws-dot');
-    const label = document.getElementById('ws-label');
-    dot.className = 'ws-dot' + (connected ? ' connected' : '');
-    label.textContent = connected ? 'Live' : 'Disconnected';
-  }
-
-  // ── Player list rendering ──────────────────────────────────────────────────
-  function renderPlayers(data) {
-    const container = document.getElementById('player-list');
-    const myId = getUserIdFromToken(state.token);
-
-    if (!data || !data.players || data.players.length === 0) {
-      container.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:.85rem;">No players</div>';
-      return;
+    function disconnectSocket() {
+      if (state.socket) {
+        state.socket.disconnect();
+        state.socket = null;
+      }
+      setWsDot(false);
     }
 
-    container.innerHTML = data.players.map(p => {
-      const initials = p.username.charAt(0).toUpperCase();
-      const isHost = String(p.id) === String(data.hostId);
-      const roleHtml = p.role
-        ? `<span class="role-badge role-${p.role}">${p.role}</span>`
-        : '';
-      const pointsHtml = (p.points !== undefined && p.points !== null)
-        ? `<span style="color:var(--green)">${p.points}pts</span>` : '';
+    function setWsDot(connected) {
+      const dot = document.getElementById('ws-dot');
+      const label = document.getElementById('ws-label');
+      dot.className = 'ws-dot' + (connected ? ' connected' : '');
+      label.textContent = connected ? 'Live' : 'Disconnected';
+    }
 
-      return `
+    // ── Player list rendering ──────────────────────────────────────────────────
+    function renderPlayers(data) {
+      const container = document.getElementById('player-list');
+      const myId = getUserIdFromToken(state.token);
+
+      if (!data || !data.players || data.players.length === 0) {
+        container.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:.85rem;">No players</div>';
+        return;
+      }
+
+      container.innerHTML = data.players.map(p => {
+        const initials = p.username.charAt(0).toUpperCase();
+        const isHost = String(p.id) === String(data.hostId);
+        const roleHtml = p.role
+          ? `<span class="role-badge role-${p.role}">${p.role}</span>`
+          : '';
+        const pointsHtml = (p.points !== undefined && p.points !== null)
+          ? `<span style="color:var(--green)">${p.points}pts</span>` : '';
+
+        return `
         <div class="player-row">
           <div class="avatar">${initials}</div>
           <div class="player-info">
@@ -832,86 +1088,87 @@
           </div>
         </div>
       `;
-    }).join('');
-  }
+      }).join('');
+    }
 
-  function renderLeaderboard(players) {
-    const el = document.getElementById('leaderboard');
-    const sorted = [...players].sort((a, b) => (b.points || 0) - (a.points || 0));
-    el.innerHTML = '<div class="lb-title">Leaderboard</div>' +
-      sorted.map((p, i) => `
+    function renderLeaderboard(players) {
+      const el = document.getElementById('leaderboard');
+      const sorted = [...players].sort((a, b) => (b.points || 0) - (a.points || 0));
+      el.innerHTML = '<div class="lb-title">Leaderboard</div>' +
+        sorted.map((p, i) => `
         <div class="lb-row">
           <span class="lb-rank">#${i + 1}</span>
           <span class="lb-name">${escHtml(p.username)}</span>
           <span class="lb-pts">${p.points || 0} pts</span>
         </div>
       `).join('');
-  }
+    }
 
-  // ── Actions ────────────────────────────────────────────────────────────────
-  async function kickPlayer(userId) {
-    if (!state.currentLobby) return;
-    try {
-      const result = await apiFetch(`/api/lobbies/${state.currentLobby.id}/kick/${userId}`, { method: 'POST' });
-      if (result.lobbyClosed) {
-        showToast('Last player removed — lobby closed', 'success');
-        disconnectSocket();
-        showScreen('lobbies');
-        startLobbyRefresh();
-      } else {
-        showToast('Player removed', 'success');
+    // ── Actions ────────────────────────────────────────────────────────────────
+    async function kickPlayer(userId) {
+      if (!state.currentLobby) return;
+      try {
+        const result = await apiFetch(`/api/lobbies/${state.currentLobby.id}/kick/${userId}`, { method: 'POST' });
+        if (result.lobbyClosed) {
+          showToast('Last player removed — lobby closed', 'success');
+          disconnectSocket();
+          showScreen('lobbies');
+          startLobbyRefresh();
+        } else {
+          showToast('Player removed', 'success');
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
       }
-    } catch (err) {
-      showToast(err.message, 'error');
     }
-  }
 
-  document.getElementById('btn-add-dummy').addEventListener('click', async () => {
-    if (!state.currentLobby) return;
-    try {
-      await apiFetch(`/api/lobbies/${state.currentLobby.id}/add-dummy`, { method: 'POST' });
-      showToast('Dummy added', 'success');
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  });
-
-  document.getElementById('btn-force-end').addEventListener('click', async () => {
-    if (!state.currentLobby) return;
-    if (!confirm('Force-end this game? This cannot be undone.')) return;
-    try {
-      await apiFetch(`/api/lobbies/${state.currentLobby.id}/force-end`, { method: 'POST' });
-      showToast('Game ended', 'success');
-      document.getElementById('btn-force-end').style.display = 'none';
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  });
-
-  document.getElementById('btn-start-game').addEventListener('click', () => {
-    if (!state.socket || !state.currentLobby) return;
-    state.socket.emit('startGame', { lobbyId: state.currentLobby.id }, (ack) => {
-      if (ack && ack.error) showToast(ack.error, 'error');
-      else showToast('Game started!', 'success');
+    document.getElementById('btn-add-dummy').addEventListener('click', async () => {
+      if (!state.currentLobby) return;
+      try {
+        await apiFetch(`/api/lobbies/${state.currentLobby.id}/add-dummy`, { method: 'POST' });
+        showToast('Dummy added', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
     });
-  });
 
-  // ── JWT decode (payload only, no verify) ───────────────────────────────────
-  function getUserIdFromToken(token) {
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.sub;
-    } catch (_) { return null; }
-  }
+    document.getElementById('btn-force-end').addEventListener('click', async () => {
+      if (!state.currentLobby) return;
+      if (!confirm('Force-end this game? This cannot be undone.')) return;
+      try {
+        await apiFetch(`/api/lobbies/${state.currentLobby.id}/force-end`, { method: 'POST' });
+        showToast('Game ended', 'success');
+        document.getElementById('btn-force-end').style.display = 'none';
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
 
-  // ── Init ───────────────────────────────────────────────────────────────────
-  if (loadSession()) {
-    setHeaderUser(state.username);
-    showScreen('lobbies');
-    startLobbyRefresh();
-  } else {
-    showScreen('login');
-  }
-</script>
+    document.getElementById('btn-start-game').addEventListener('click', () => {
+      if (!state.socket || !state.currentLobby) return;
+      state.socket.emit('startGame', { lobbyId: state.currentLobby.id }, (ack) => {
+        if (ack && ack.error) showToast(ack.error, 'error');
+        else showToast('Game started!', 'success');
+      });
+    });
+
+    // ── JWT decode (payload only, no verify) ───────────────────────────────────
+    function getUserIdFromToken(token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.sub;
+      } catch (_) { return null; }
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    if (loadSession()) {
+      setHeaderUser(state.username);
+      showScreen('lobbies');
+      startLobbyRefresh();
+    } else {
+      showScreen('login');
+    }
+  </script>
 </body>
+
 </html>
