@@ -1,218 +1,98 @@
-# AI Agent Handoff - Lobby System
+# AI Agent Handoff
 
-## What Was Done
+> For the canonical AI agent reference, see `CLAUDE.md`. This document provides a condensed handoff summary.
 
-This implementation added a complete lobby management system to Apokrupto, allowing users to create, browse, and join game lobbies.
+## Project Summary
 
-## Key Files and Their Purpose
+Apokrupto is a social-deduction party game for Campus Ministry events (up to 80 players). Two teams — **Phos** (light, majority 4:1) and **Skotia** (darkness, minority) — compete over 3–4 rounds. Each round has three movements: social deduction (A), tasks (B), and voting (C).
 
-### Backend
-- `server/middleware/auth.js` - JWT authentication middleware (required for all lobby routes)
-- `server/routes/lobbyRoutes.js` - All lobby API endpoints (create, list, join, leave)
-- `server/dbInit.js` - Database schema including lobbies and lobby_players tables
-- `server/app.js` - Registers lobby routes at `/api/lobbies`
+## Current State (February 2026)
 
-### Frontend
-- `client/screens/LobbyListScreen.js` - Main lobby browsing screen with search, create, join
-- `client/screens/LobbyScreen.js` - Individual lobby view when user joins
-- `client/components/LobbyCard.js` - Reusable lobby card component
-- `client/App.js` - Navigation logic updated for lobby flow
+**Core game is fully playable.** Auth, lobbies, Socket.IO real-time, the complete game state machine, all three movements, GM dashboard, and round/game-over flow are implemented and wired end-to-end.
 
-### Documentation
-- `server/README.md` - Server setup, API docs, database schema
-- `client/README.md` - Client features and backend integration
-- `LOBBY_IMPLEMENTATION.md` - Detailed implementation summary
-- `SECURITY_SUMMARY.md` - Security measures and limitations
-- `TESTING_GUIDE.md` - How to test the implementation
-- `README.md` - Updated with features and API endpoints
+## Key Files
 
-## How It Works
+### Server
+| File | Purpose |
+|------|---------|
+| `server/app.js` | Express + HTTP + Socket.IO bootstrapping |
+| `server/dbInit.js` | Auto-schema creation (all tables) + biblical prompt seeding |
+| `server/services/gameService.js` | Core game state machine (~1400 lines): team assignment, group shuffling, turn management, scoring, mark resolution, win conditions |
+| `server/routes/gameRoutes.js` | Game REST endpoints: create, start, advance, state, prompts, submissions, votes, broadcast |
+| `server/routes/lobbyRoutes.js` | Lobby CRUD, kick, add-dummy, force-end |
+| `server/websocket/lobbySocket.js` | Socket.IO handlers: joinRoom, startGame, gmAdvance, lobby state broadcasting |
+| `server/middleware/auth.js` | JWT auth (REST) |
+| `server/middleware/socketAuth.js` | JWT auth (Socket.IO handshake) |
+| `server/data/tasks.js` | Task definitions for Movement B |
+| `server/public/gm.html` | Web-based GM dashboard |
 
-### User Flow
-1. User logs in → redirected to LobbyListScreen
-2. LobbyListScreen fetches lobbies every 10 seconds (auto-refresh)
-3. User can:
-   - Browse lobbies (with search)
-   - Create new lobby (modal dialog)
-   - Join by clicking card
-   - Join by ID (modal dialog)
-4. On join → navigate to LobbyScreen
-5. LobbyScreen shows lobby details
-6. User can leave → back to LobbyListScreen
+### Client
+| File | Purpose |
+|------|---------|
+| `client/App.js` | Root component — navigation state machine (666 lines), 10s sync polling, all screen routing |
+| `client/utils/api.js` | REST API client for all endpoints |
+| `client/utils/networkUtils.js` | Dynamic server IP detection |
+| `client/config.js` | API URL management |
+| `client/screens/game/MovementAScreen.js` | Social deduction: prompts, turn-based word submission, deliberation |
+| `client/screens/game/MovementBScreen.js` | Task selector + task runner with team point scoring |
+| `client/screens/game/VotingScreen.js` | Movement C voting UI |
+| `client/screens/game/RoundHubScreen.js` | Between-movement hub, socket event routing |
+| `client/screens/game/RoundSummaryScreen.js` | End-of-round scoring display |
+| `client/screens/game/GmDashboardScreen.js` | In-app GM dashboard |
+| `client/screens/game/GameOverScreen.js` | Final results, Skotia reveal |
+| `client/screens/lobby/LobbyScreen.js` | Lobby waiting room with player list |
+| `client/screens/lobby/LobbyListScreen.js` | Browse/search/create/join lobbies |
+| `client/theme/colors.js` | Color palette |
+| `client/theme/typography.js` | Font styles |
 
-### Authentication
-- All lobby endpoints require JWT token in Authorization header
-- Format: `Authorization: Bearer <token>`
-- Token stored securely on client using expo-secure-store
-- Automatic logout if token invalid/expired
+## Architecture Essentials
 
-### Auto-Refresh
-- Lobbies refresh every 10 seconds in background
-- Pauses when app goes to background (saves battery)
-- Resumes when app returns to foreground
-- Manual refresh via pull-to-refresh gesture
+- **No React Navigation** — `App.js` uses `currentScreen` state with a switch block
+- **Socket rooms** — `lobby:{lobbyId}` for lobby-wide; `lobby:{groupId}` for group-specific (Movement A)
+- **Turn state is in-memory** — `groupTurnState` Map in `gameService.js`. Lost on server restart.
+- **10s sync polling** — `App.js` polls `/api/lobbies/current` and `/api/games/:id/state` as safety net
+- **JWT decoded client-side** — `token.split('.')[1]` → base64 → `payload.sub`
+- **DB auto-init** — All tables created on startup. 10 biblical prompts seeded if empty.
 
-## API Endpoints
+## What Still Needs Work
 
-All require `Authorization: Bearer <token>` header:
+| Feature | Where | Notes |
+|---------|-------|-------|
+| `gameStateUpdate` socket emission | Server | Emit `{ teamPoints, currentRound, totalRounds }` after each state change so clients update live |
+| `taskAssigned` socket event | Server | Emit per-socket when Movement B starts with assigned tasks |
+| Supermajority win condition | Server | Code exists but needs end-to-end verification |
+| Mark badge visibility | Client | Marks should be visible across all screens (currently only in group context) |
+| Live mark status push | Server | Players don't learn they were marked until next round |
+| Rate limiting | Server | Add `express-rate-limit` for production |
 
-- `GET /api/lobbies` - List all active lobbies
-- `GET /api/lobbies/:id` - Get lobby details
-- `POST /api/lobbies` - Create lobby (body: name, max_players)
-- `POST /api/lobbies/:id/join` - Join lobby
-- `POST /api/lobbies/:id/leave` - Leave lobby
+## Quick Start
 
-## Database Schema
+```bash
+# Server
+cd server && npm install && cp .env.example .env && npm run dev
 
-### lobbies
-- id, name, max_players (4-15), created_by, status, created_at
-
-### lobby_players
-- id, lobby_id, user_id, joined_at
-- Unique constraint on (lobby_id, user_id)
-
-## Important Notes for Next Developer
-
-### Security
-- JWT_SECRET **must** be set in .env (server won't start without it)
-- No rate limiting implemented (should be added for production)
-- All queries use parameterized statements (SQL injection safe)
-- Database transactions prevent race conditions on leave
-
-### Performance
-- Auto-refresh pauses in background (AppState listener)
-- FlatList used for efficient rendering
-- Background refreshes don't block UI
-
-### State Management
-- Navigation via component state (not React Navigation)
-- Token stored in App.js and passed as prop
-- Current lobby ID tracked in App.js state
-
-### Known Limitations
-1. No real-time updates (uses polling, not WebSocket)
-2. No lobby chat
-3. No host controls (kick, change settings)
-4. No private lobbies
-5. No player roster view in lobby
-6. No rate limiting
-
-## How to Continue Development
-
-### Add Real-Time Updates (Socket.IO)
-1. Install socket.io in server, socket.io-client in client
-2. Emit events on lobby changes (player join/leave, lobby create/delete)
-3. Listen to events in LobbyListScreen and LobbyScreen
-4. Remove auto-refresh polling
-
-### Add Lobby Chat
-1. Create messages table (lobby_id, user_id, message, timestamp)
-2. Add POST /api/lobbies/:id/messages endpoint
-3. Add GET /api/lobbies/:id/messages endpoint
-4. Create ChatComponent in LobbyScreen
-5. Use Socket.IO for real-time message delivery
-
-### Add Host Controls
-1. Add host_controls field to lobbies table
-2. Add endpoint to kick player: POST /api/lobbies/:id/kick
-3. Add endpoint to update settings: PATCH /api/lobbies/:id
-4. Add UI in LobbyScreen for host actions
-5. Check if current user is host before showing controls
-
-### Add Rate Limiting
-1. Install express-rate-limit: `npm install express-rate-limit`
-2. Create middleware in server/middleware/rateLimiter.js
-3. Apply to all routes in app.js
-4. Adjust limits per endpoint (stricter for login/register)
-
-### Add Game Start Flow
-1. Add game_state to lobbies table
-2. Add start_game endpoint (host only)
-3. Assign roles (crewmate/impostor) randomly
-4. Transition to GameScreen
-5. Create GameScreen component
+# Client
+cd client && npm install && npm start
+```
 
 ## Testing
 
-See `TESTING_GUIDE.md` for comprehensive testing instructions.
-
-Quick smoke test:
+No automated test framework. Testing is manual:
 1. Start server with PostgreSQL
-2. Register/login on client
-3. Create lobby
-4. Join lobby
-5. Leave lobby
-6. Verify auto-refresh works
+2. Register 5+ accounts (or use admin add-dummy)
+3. Create lobby, all join
+4. Host starts game
+5. Play through Movement A → B → C → Round Summary
+6. GM advances via dashboard (`/gm.html`) or in-app
 
-## Environment Setup
+## Documentation Map
 
-### Server
-```bash
-cd server
-cp .env.example .env
-# Edit .env with your settings
-npm install
-npm start
-```
-
-### Client
-```bash
-cd client
-npm install
-# Edit config.js with correct API_URL
-npx expo start
-```
-
-## Code Style
-
-- Dark theme (#1a1a1a background, #00aaff primary, #ff0000 danger)
-- Consistent spacing (16px, 20px, 30px)
-- Modal dialogs for simple forms
-- Loading states for async operations
-- Pull-to-refresh for lists
-- SafeAreaView for all screens
-
-## Dependencies
-
-No new dependencies required beyond what's already in package.json.
-
-Optional enhancements would need:
-- express-rate-limit (rate limiting)
-- socket.io (real-time updates)
-- react-navigation (better routing)
-
-## Common Issues
-
-1. **"JWT_SECRET not set"** - Create .env file with JWT_SECRET
-2. **Can't connect to DB** - Check PostgreSQL running and .env settings
-3. **Auto-refresh not working** - Check API_URL in client/config.js
-4. **Empty lobby list** - Create some lobbies first
-5. **Token expired** - Re-login (tokens last 7 days)
-
-## Next Steps Recommendations
-
-Priority order:
-1. Add rate limiting (security)
-2. Implement Socket.IO (UX improvement)
-3. Add lobby chat (engagement)
-4. Add game start flow (core feature)
-5. Add host controls (UX improvement)
-6. Add player roster (information)
-7. Add React Navigation (code quality)
-
-## Resources
-
-- Express docs: https://expressjs.com/
-- React Native docs: https://reactnative.dev/
-- Expo docs: https://docs.expo.dev/
-- PostgreSQL docs: https://www.postgresql.org/docs/
-- JWT docs: https://jwt.io/
-
-## Questions?
-
-Check these files:
-- Implementation details → LOBBY_IMPLEMENTATION.md
-- Security info → SECURITY_SUMMARY.md
-- Testing → TESTING_GUIDE.md
-- Server setup → server/README.md
-- Client setup → client/README.md
+| File | Content |
+|------|---------|
+| `CLAUDE.md` | Comprehensive AI agent context (architecture, DB schema, API, sockets, game flow) |
+| `GAME_DESIGN.md` | Full game design document |
+| `IMPLEMENTATION_PLAN.md` | Build phases with completion status |
+| `SECURITY_SUMMARY.md` | Security measures and limitations |
+| `LOBBY_IMPLEMENTATION.md` | Historical: original lobby system implementation details |
+| `server/README.md` | Server setup, full API docs, schema reference |
+| `client/README.md` | Client setup, screen inventory, theme guide |

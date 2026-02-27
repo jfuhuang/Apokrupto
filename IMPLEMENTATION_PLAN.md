@@ -1,106 +1,91 @@
 # Implementation Plan
 
 > See `GAME_DESIGN.md` for full game design. This document tracks what needs to be built.
+> 
+> **Last updated:** February 2026. Phases 0–7 are complete. Phase 8 (polish) is partially done.
 
 ---
 
-## Phase 0 — Codebase Restructure (Before any new features)
+## Phase 0 — Codebase Restructure ✅
 
-- [ ] Fork current repo as `Apokrupto-AmongUsIRL` to preserve the GPS/elimination version
-- [ ] Strip GPS/location logic, impostor kill mechanics, sabotage overlay
-- [ ] Remove/archive: `SabotageOverlay.js`, location-based game mechanics
-- [ ] Keep: auth, lobby system, task components, WebSocket infrastructure, biblical task data
-- [ ] Update `CLAUDE.md`, `README.md` to reflect new game identity
-- [ ] Rename or repurpose existing DB schema for new game model
-
----
-
-## Phase 1 — Core Infrastructure
-
-### 1.1 Database Schema (new/updated tables)
-```sql
-games              (id, lobby_id, status, current_round, total_rounds, created_at)
-game_teams         (id, game_id, team_name, points)
-game_players       (id, game_id, user_id, team [phos|skotia], is_marked)
-game_groups        (id, game_id, round_number, group_index)
-game_group_members (id, group_id, game_player_id)
-rounds             (id, game_id, round_number, current_movement [A|B|C], status)
-movements          (id, round_id, movement_type, started_at, ended_at)
-mark_events        (id, game_player_id, round_number, action [mark|unmark], was_correct)
--- mark_events enables: scoring, supermajority check, and post-game accuracy stats
-```
-
-### 1.2 Game State Machine (server-side)
-- States: `lobby → role_reveal → round_A → round_B → round_C → transition → (repeat) → game_over`
-- GM controls all state transitions
-- WebSocket broadcasts state changes to all players
-- Players can only act during their movement's window
-
-### 1.3 Game Master Dashboard
-- Separate GM screen (flagged by user role or lobby creator)
-- View: all players, their teams (visible to GM only), current marks
-- Controls: advance movement, pause, force-end round, broadcast message
-- Stats: live point totals per team
+- [X] Fork current repo as `Apokrupto-AmongUsIRL` to preserve the GPS/elimination version
+- [X] Strip GPS/location logic, impostor kill mechanics, sabotage overlay
+- [X] Remove/archive: `SabotageOverlay.js`, location-based game mechanics
+- [X] Keep: auth, lobby system, task components, WebSocket infrastructure, biblical task data
+- [X] Update `CLAUDE.md`, `README.md` to reflect new game identity
+- [X] Rename or repurpose existing DB schema for new game model
 
 ---
 
-## Phase 2 — Role Assignment & Grouping Engine
+## Phase 1 — Core Infrastructure ✅
 
-### 2.1 Role Assignment
-- On game start: assign Skotia to exactly 1 in every 5 players (or closest ratio)
-- Skotia players receive list of all other Skotia on role reveal screen
-- Phos players see only their own role
-- Store assignments in `game_players`
+### 1.1 Database Schema ✅
+All tables implemented in `server/dbInit.js` with auto-creation on startup:
+- `games`, `game_teams`, `game_players`, `game_groups`, `game_group_members`
+- `rounds`, `movements`, `prompts`, `movement_a_submissions`, `movement_c_votes`, `mark_events`
+- Prompt table seeded with 10 biblical theme pairs on first startup
 
-### 2.2 Group Assignment
-- Initial grouping: randomized groups of 5, guaranteed 1 Skotia per group
-- Round transition: reshuffle groups — same guarantee
-- Constraint: avoid repeating the exact same group composition across rounds (best-effort)
-- Store in `game_groups` + `game_group_members`
+### 1.2 Game State Machine ✅
+- Full state machine in `server/services/gameService.js` (~1400 lines)
+- GM-controlled transitions via `gmAdvance` socket event or `POST /api/games/:id/advance`
+- Movement A → B → C → next round (or game over)
+- In-memory turn state for Movement A with auto-advance timers
 
----
-
-## Phase 3 — Movement A: Social Deduction
-
-### 3.1 Prompt System
-- Prompt pairs: `{ phos_prompt, skotia_prompt, theme_label }`
-- Biblical theme pairing examples:
-  - Phos: "Fruits of the Spirit" / Skotia: "Things that feel good in the moment"
-  - Phos: "Names for Jesus" / Skotia: "Things people worship instead of God"
-  - Phos: "Ways to serve others" / Skotia: "Ways to put yourself first"
-- Server sends the correct prompt per player's team
-- Players enter 1 word within a timer (60–90 seconds)
-
-### 3.2 Word Display
-- All responses shown to the group simultaneously when timer ends (or all submit)
-- Displayed as a word list — no attribution shown
-- Discussion phase (no app interaction) for 2–3 minutes
-- No points awarded here
-
-### 3.3 Data Storage
-- Store each submission: `(round_id, group_id, player_id, submitted_word, prompt_received)`
+### 1.3 Game Master Dashboard ✅
+- Web-based GM dashboard at `server/public/gm.html`
+- In-app `GmDashboardScreen.js` (full dashboard) and `GmWaitingScreen.js` (URL redirect)
+- View all players, teams, marks, groups; advance movements; broadcast announcements
+- Live turn-slot countdown display during Movement A
 
 ---
 
-## Phase 4 — Movement B: Task Phase
+## Phase 2 — Role Assignment & Grouping Engine ✅
 
-### 4.1 Reuse Existing Tasks
-- Scripture Memory, Quiz, Match-Pair, etc. — largely already built
-- Review and update task themes to be movement-B appropriate
-- Add timer: task phase ends when GM advances or time limit expires
+### 2.1 Role Assignment ✅
+- [X] Assign Skotia to exactly 1 in every 5 players on game start
+- [X] Skotia players receive list of all other Skotia via `roleAssigned` socket event
+- [X] Phos players see only their own role
+- [X] Stored in `game_players` table
 
-### 4.2 Point Awarding
-- Points go to `game_teams` (team-level), not individual
-- Skotia passive bonus: +N points per minute in task phase (tunable constant)
-- Cooperative task failure (if Skotia deliberately underperforms): reduces Phos points earned
+### 2.2 Group Assignment ✅
+- [X] Randomized groups of 5, guaranteed 1 Skotia per group
+- [X] Groups reshuffled each round with same guarantee
+- [X] Stored in `game_groups` + `game_group_members`
 
-### 4.3 New Task Types Needed
-- **Bible Trivia** — multiple choice, server-side question pool
-- **Cooperative: Caesar Shift** — Operator screen (encoded text + input field) + Manual-holder screen (shift value + alphabet table); pair assigned server-side within the group
-- *[Additional KTANE-style cooperative tasks — design TBD]*
+---
 
-### 4.4 Task Category Taxonomy
-Existing tasks need to be tagged into categories: `trivia | scripture_memory | skill | cooperative`. Category determines point weight and how tasks are selected during a round.
+## Phase 3 — Movement A: Social Deduction ✅
+
+### 3.1 Prompt System ✅
+- [X] 10 biblical prompt pairs seeded on startup (`prompts` table)
+- [X] Server sends team-specific prompt via `GET /api/games/:id/movement-a/prompt`
+- [X] 30s per turn with auto-advance timer
+
+### 3.2 Word Display ✅
+- [X] Turn-based submission — each player submits one word on their turn
+- [X] `wordSubmitted` event reveals each word in real-time to the group
+- [X] `deliberationStart` event when all players have submitted
+- [X] Client shows full word list with attribution during deliberation
+
+### 3.3 Data Storage ✅
+- [X] Stored in `movement_a_submissions` (movement_id, group_id, user_id, word)
+
+---
+
+## Phase 4 — Movement B: Task Phase ✅ (partially)
+
+### 4.1 Task Mechanics ✅
+- [X] 10 task types implemented: CipherTask, CollectTask, DragPlaceTask, GuardTask, HoldTask, MatchPairTask, QuizTask, RapidTapTask, ScriptureMemoryTask, SlingTask
+- [X] `MovementBScreen.js` — task selector with difficulty indicators + task runner
+- [X] Timer: phase ends when GM advances or optional time limit expires
+
+### 4.2 Point Awarding ✅
+- [X] Points go to `game_teams` via `POST /api/games/:id/movement-b/complete`
+- [X] Skotia passive bonus: +50 points per Movement B (`POINTS.SKOTIA_PASSIVE`)
+
+### 4.3 Remaining Work
+- [ ] **Server-side task assignment** — Server should emit `taskAssigned` per socket when B starts (currently players self-select from available tasks)
+- [ ] **Cooperative tasks** — Caesar Shift Operator/Manual-holder pairing needs server-side pair assignment within groups
 
 ---
 
@@ -139,42 +124,40 @@ Existing tasks need to be tagged into categories: `trivia | scripture_memory | s
 
 ---
 
-## Phase 6 — Round Transition & UI
+## Phase 6 — Round Transition & UI ✅
 
-- GM triggers transition
-- Show round summary (total points per team, aggregate marks)
-- Optional: GM broadcast message / biblical reflection text
-- App reshuffles groups and loads next round
-
----
-
-## Phase 7 — Win Condition & Game Over
-
-### 7.1 Point Check (end of final round)
-- Compare `game_teams` totals
-- Highest total wins
-
-### 7.2 Supermajority Deduction Check (Phos only)
-- Count: total Skotia players vs. Marked Skotia players
-- If ≥80% correctly marked → Phos wins regardless of points
-- Check after each round's voting phase (could trigger early game end)
-
-### 7.3 Game Over Screen
-- Reveal all Skotia players
-- Show final point totals
-- Announce winner
-- Optional: show "MVP" stats (most tasks completed, best deduction accuracy)
+- [X] GM triggers transition via `gmAdvance`
+- [X] `RoundSummaryScreen.js` shows aggregate scoring, mark/unmark counts
+- [X] GM can broadcast announcements via `POST /api/games/:id/broadcast`
+- [X] Server reshuffles groups on new round, emits `movementStart` per socket with new group info
 
 ---
 
-## Phase 8 — Polish & Accessibility
+## Phase 7 — Win Condition & Game Over ✅
+
+### 7.1 Point Check ✅
+- [X] After final round, compares `game_teams` totals → highest wins
+
+### 7.2 Supermajority Deduction Check ✅
+- [X] Check exists in `advanceMovement`: (marked Skotia / total Skotia) ≥ 0.80 → Phos wins
+- [ ] End-to-end verification needed
+
+### 7.3 Game Over Screen ✅
+- [X] `GameOverScreen.js` — reveals all Skotia players, final point totals, winner announcement
+- [X] `gameOver` socket event with `{ winner, condition, phosPoints, skotiaPoints, skotiaPlayers }`
+
+---
+
+## Phase 8 — Polish & Accessibility (in progress)
 
 - [ ] Mark badge design (visible on all screens for marked players)
-- [ ] Timer countdown component (shared across movements)
-- [ ] GM announcement push (broadcast text displayed on all devices)
+- [X] Timer countdown component (used in Movement A turns, Movement B, countdown screen)
+- [X] GM announcement push (`announcement` socket event displayed on devices)
 - [ ] Color-blind mode / accessible team colors (don't rely on color alone)
-- [ ] Lobby capacity raised to 80 (currently likely capped lower)
+- [X] Lobby capacity raised to 5–100 (was 4–15)
 - [ ] Stress test WebSocket with 80 simultaneous clients
+- [ ] `gameStateUpdate` socket emission (live score/mark push — currently only updates on `movementStart`)
+- [ ] `taskAssigned` socket event for server-side Movement B task assignment
 
 ---
 

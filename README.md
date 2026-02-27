@@ -1,178 +1,199 @@
 # Apokrupto
 
-A full-stack, JavaScript-based mobile application that brings the popular game "Among Us" into the real world using GPS technology.
+A social-deduction party game for Campus Ministry events, supporting up to 80 players. Two teams — **Phos** (φῶς, light, majority ~4:1) and **Skotia** (σκοτία, darkness, minority) — compete across 3–4 rounds of social deduction, tasks, and voting.
 
-## Project Overview
+> The game name *Apokrupto* (ἀποκρύπτω) means "to hide/conceal." The original GPS-based "Among Us IRL" version is archived at `github.com/jfuhuang/among-us-irl`.
 
-Apokrupto is a location-based mobile game where players' physical movements dictate their in-game actions. Similar to Geoguessr IRL, this game leverages GPS to create an immersive real-world gaming experience inspired by the popular Among Us game.
+## Gameplay Overview
 
-## Gameplay Mechanics
+Players are split into two teams: a majority **Phos** (light) team and a hidden minority **Skotia** (darkness) team at a 4:1 ratio. Each round has three movements:
 
-### Roles
+1. **Movement A — Social Deduction:** Players receive team-specific prompts and submit one word each. Phos and Skotia get related but different prompts. Groups discuss to identify Skotia members.
+2. **Movement B — Tasks:** All players complete phone-based tasks (Bible trivia, scripture memory, skill games, cooperative cipher decoding) to earn team points. Skotia earns a passive bonus.
+3. **Movement C — Voting:** Group members vote on each other as Phos or Skotia. Majority votes mark or unmark players. Correct marks earn Phos points; false marks earn Skotia points.
 
-Players are assigned one of two roles at the start of each game:
+**Win conditions:** Most points after all rounds, or Phos correctly marks ≥80% of Skotia (supermajority).
 
-#### Crewmate
-- **Objective:** Complete all tasks before being eliminated by Impostors
-- **Tasks:** Physical activities requiring movement to specific real-world locations (buildings, landmarks)
-- **Task Activation:** Tasks become available when within GPS-defined range of a location
-- **Task Types:** Classic Among Us-style challenges adapted for real-world play:
-  - Running a certain distance
-  - Moving between two points within a time limit
-  - Location-based mini-games
+Groups of 5 are reshuffled each round (always 1 Skotia per group). Marks persist across rounds. No player elimination — everyone plays the full game.
 
-#### Impostor
-- **Objective:** Eliminate all Crewmates before they complete their tasks
-- **Kill Mechanic:** Can "kill" Crewmates when in close physical proximity
-- **Sabotage:** Can trigger sabotages that force all Crewmates to race to a specific location to prevent a game-ending crisis
-- **Deception:** Must blend in with Crewmates and avoid detection
-
-### Real-Time Features
-
-The game provides real-time updates for all players, including:
-- Player locations (with appropriate visibility rules)
-- Task progress
-- Kill notifications
-- Sabotage events
-- Emergency meetings
+See [GAME_DESIGN.md](./GAME_DESIGN.md) for the full game design document.
 
 ## Technology Stack
 
-### Client (Mobile Application)
-- **Framework:** React Native with Expo
-- **Key Dependencies:**
-  - `react` & `react-native` - Core mobile framework
-  - `expo` - Development and deployment platform
-  - `expo-location` - GPS location tracking
-  - `@rnmapbox/maps` - Interactive map display
-  - `socket.io-client` - Real-time communication with robust reconnection support
-
-### Server (Backend)
-- **Runtime:** Node.js
-- **Key Dependencies:**
-  - `express` - REST API framework
-  - `socket.io` - Real-time bidirectional communication
-  - `ioredis` - Redis client for state management
-  - `pg` - PostgreSQL database client
-  - `@turf/turf` - Geospatial calculations and analysis
-
-### Communication Architecture
-
-The application uses **Socket.IO** with **Redis** for real-time communication to address:
-- Network instability on mobile devices (Wi-Fi to cellular transitions)
-- Automatic reconnection handling with session resume
-- Fallback mechanisms for degraded connections
-- Low-latency updates for game state synchronization
-- Horizontal scaling via Redis Pub/Sub
-
-**See [REALTIME_LOBBY_DESIGN.md](./REALTIME_LOBBY_DESIGN.md) for detailed documentation on the lobby and reconnection system.**
+| Layer | Technology |
+|-------|-----------|
+| **Client** | React Native 0.81.5 + Expo 54 (iOS, Android, Web) |
+| **Server** | Node.js + Express 4, port 3000 |
+| **Database** | PostgreSQL (pg driver), schema auto-created on startup |
+| **Auth** | JWT (7-day expiry), stored via `expo-secure-store` |
+| **Real-time** | Socket.IO (lobby + game state sync, 10s REST polling fallback) |
+| **Fonts** | Orbitron (headings), Exo 2 (body), Rajdhani (accents) |
+| **Theme** | Dark cyberpunk — Phos: electric blue (#00D4FF), Skotia: neon red (#FF3366) |
 
 ## Project Structure
 
 ```
 apokrupto/
-├── client/                    # React Native mobile application
-│   └── package.json
-├── server/                    # Node.js backend
-│   ├── middleware/           # Express & Socket.IO middleware
-│   ├── routes/               # REST API routes
-│   ├── services/             # Business logic services
-│   ├── store/                # Redis data access layer
-│   ├── websocket/            # WebSocket server
-│   ├── __tests__/            # Test files
-│   ├── app.js               # Application entry point
-│   └── package.json
-├── REALTIME_LOBBY_DESIGN.md  # Lobby system documentation
-└── README.md
+├── client/                          # React Native (Expo) mobile app
+│   ├── App.js                       # Root component, navigation state machine
+│   ├── config.js                    # Dynamic API URL detection
+│   ├── components/                  # Reusable UI (AnimatedBackground, LobbyCard)
+│   ├── data/                        # Client-side task definitions
+│   ├── screens/
+│   │   ├── auth/                    # Login, Registration
+│   │   ├── dev/                     # DevMenuScreen (debug only)
+│   │   ├── game/                    # Countdown, RoleReveal, RoundHub, MovementA/B,
+│   │   │                            #   Voting, RoundSummary, GmDashboard, GameOver
+│   │   ├── lobby/                   # LobbyList, LobbyScreen
+│   │   ├── tasks/                   # TaskScreen + 10 task mechanics
+│   │   └── welcome/                 # WelcomeScreen
+│   ├── theme/                       # Colors, typography, font setup
+│   └── utils/                       # API client, network utils, scripture utils
+├── server/
+│   ├── app.js                       # Express + Socket.IO entry point
+│   ├── db.js                        # PostgreSQL connection pool
+│   ├── dbInit.js                    # Auto-schema creation + prompt seeding
+│   ├── data/                        # Task and sabotage definitions
+│   ├── middleware/                   # JWT auth, socket auth
+│   ├── routes/                      # REST: userRoutes, lobbyRoutes, gameRoutes
+│   ├── services/gameService.js      # Core game state machine + scoring
+│   ├── websocket/lobbySocket.js     # Socket.IO event handlers
+│   └── public/                      # GM dashboard (gm.html)
+├── GAME_DESIGN.md                   # Full game design document
+├── IMPLEMENTATION_PLAN.md           # Build phases and progress
+└── CLAUDE.md                        # AI agent context
 ```
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
-- Expo CLI (for mobile client)
-- PostgreSQL
-- Redis
+- Node.js v20+ (recommended)
+- PostgreSQL 12+
+- Expo Go app on mobile device (or emulator)
 
-### Installation
-
-#### Server Setup
+### Server Setup
 ```bash
 cd server
 npm install
+cp .env.example .env    # Edit with DB credentials and JWT_SECRET
+npm run dev             # Development with nodemon
 
-# Copy environment template and configure
-cp .env.example .env
-# Edit .env with your database credentials
-
-# Start with Docker (includes PostgreSQL and Redis)
-npm run docker:start
-
-# OR start manually (requires PostgreSQL and Redis running)
-npm start
+# Or use Docker for PostgreSQL:
+npm run docker:dev
 ```
 
-#### Client Setup
+### Client Setup
 ```bash
 cd client
 npm install
-npm start
+npm start               # Metro bundler (Expo)
 ```
 
-#### Running Tests
-```bash
-cd server
-npm test
+The client auto-detects the server IP via `client/utils/networkUtils.js` — no hardcoded addresses needed. For production, use `npm run start:prod` (or `android:prod`, `ios:prod`, `web:prod`) to point at the deployed server.
+
+### Environment Variables (`server/.env`)
+```env
+POSTGRES_USER=apokrupto
+POSTGRES_PASSWORD=your_password
+POSTGRES_DB=apokrupto
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+JWT_SECRET=your_secret_here
+GM_USERNAMES=admin_user        # Comma-separated usernames with GM/admin privileges
+ADMIN_USERNAMES=admin_user     # Comma-separated usernames with admin privileges
 ```
 
-## Development Roadmap
+## Screen Flow
 
-- [x] Initial project scaffolding
-- [x] User authentication (registration and login)
-- [x] JWT token management
-- [x] Game lobby system (create, join, list lobbies)
-- [x] Lobby list UI with search and auto-refresh
-- [x] Core server architecture with Socket.IO
-- [x] Redis-backed lobby system
-- [x] Mobile reconnection handling
-- [x] Real-time game state synchronization
-- [ ] GPS location tracking implementation
-- [ ] Map integration with Mapbox
-- [ ] Task system implementation
-- [ ] Kill and sabotage mechanics
-- [ ] UI/UX polish and animations
+```
+welcome → login / register → lobbyList → lobby
+  → countdown → roleReveal → roundHub
+    → movementA (Social Deduction)
+    → movementB (Tasks)
+    → movementC (Voting)
+  → roundSummary → (repeat for next round)
+  → gameOver
 
-## Features Implemented
-
-### Authentication
-- User registration with validation
-- Secure login with JWT tokens
-- Token persistence using secure storage
-- Password hashing with bcrypt
-
-### Lobby System
-- Create lobbies with custom names and player limits (4-15 players)
-- Browse all active lobbies
-- Search lobbies by name, host, or ID
-- Join lobbies directly from the list
-- Join lobbies by entering a specific ID
-- Auto-refresh lobby list every 10 seconds
-- Real-time player count tracking
-- Leave lobby functionality
+GM flow: lobby → gmDashboard (web-based GM controls)
+```
 
 ## API Endpoints
 
-### User Endpoints
-- `POST /api/users/register` - Create a new user account
-- `POST /api/users/login` - Authenticate and receive JWT token
+All endpoints require `Authorization: Bearer <token>` unless noted.
 
-### Lobby Endpoints (require JWT authentication)
-- `GET /api/lobbies` - List all active lobbies
-- `GET /api/lobbies/:id` - Get details of a specific lobby
-- `POST /api/lobbies` - Create a new lobby
-- `POST /api/lobbies/:id/join` - Join a lobby
-- `POST /api/lobbies/:id/leave` - Leave a lobby
+### Auth (no auth required)
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/users/register` | Register (`{ username, password }` → `{ username, token }`) |
+| POST | `/api/users/login` | Login (`{ username, password }` → `{ username, token }`) |
+
+### Lobbies
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/lobbies` | List all active lobbies |
+| GET | `/api/lobbies/current` | Get current user's active lobby |
+| GET | `/api/lobbies/:id` | Get lobby details |
+| GET | `/api/lobbies/:id/players` | Get lobby player list |
+| POST | `/api/lobbies` | Create lobby (5–100 players, multiple of 5) |
+| POST | `/api/lobbies/:id/join` | Join a lobby |
+| POST | `/api/lobbies/:id/leave` | Leave a lobby |
+| POST | `/api/lobbies/:id/kick/:userId` | Kick player (host/admin) |
+| POST | `/api/lobbies/:id/add-dummy` | Add bot player (admin) |
+| POST | `/api/lobbies/:id/force-end` | Force-end lobby (admin) |
+
+### Game
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/games` | Create game record (host only) |
+| POST | `/api/games/:id/start` | Start game via REST (host only) |
+| POST | `/api/games/:id/advance` | Advance movement/round (GM only) |
+| GET | `/api/games/:id/state` | Per-player game state snapshot |
+| GET | `/api/games/:id/gm-state` | GM dashboard state |
+| GET | `/api/games/:id/movement-a/prompt` | Get team-specific prompt |
+| POST | `/api/games/:id/movement-a/submit` | Submit Movement A word |
+| POST | `/api/games/:id/movement-c/vote` | Submit Movement C votes |
+| POST | `/api/games/:id/broadcast` | GM broadcast announcement |
+
+### Socket.IO Events
+| Direction | Event | Description |
+|-----------|-------|-------------|
+| Client → Server | `joinRoom` | Join lobby/group socket room |
+| Client → Server | `startGame` | Host starts game |
+| Client → Server | `gmAdvance` | GM advances movement/round |
+| Server → Client | `lobbyUpdate` | Lobby state change |
+| Server → Client | `roleAssigned` | Team + group assignment (per socket) |
+| Server → Client | `gameStarted` | Game created, triggers countdown |
+| Server → Client | `movementStart` | Movement transition |
+| Server → Client | `turnStart` | Movement A turn advance |
+| Server → Client | `deliberationStart` | All Movement A words submitted |
+| Server → Client | `votingComplete` | Movement C results |
+| Server → Client | `roundSummary` | End-of-round scoring |
+| Server → Client | `gameOver` | Final results |
+| Server → Client | `announcement` | GM broadcast |
+
+## Development Status
+
+### Implemented
+- [x] User authentication (JWT, bcrypt)
+- [x] Lobby system (create, join, leave, kick, real-time updates via Socket.IO)
+- [x] Complete game state machine (server-side)
+- [x] Team assignment (4:1 Phos:Skotia ratio, 1 Skotia per group of 5)
+- [x] Group shuffling each round
+- [x] Movement A: Social deduction (prompts, turn-based word submission, deliberation)
+- [x] Movement B: Task phase (10 task mechanics, team point scoring)
+- [x] Movement C: Voting (mark/unmark, scoring, supermajority check)
+- [x] GM Dashboard (web-based, advance movements, broadcast, view state)
+- [x] Round summary + game over screens
+- [x] Dark cyberpunk UI with custom fonts
+- [x] 10s REST polling fallback + Socket.IO real-time sync
+- [x] Admin features (add bots, kick, force-end)
+
+### Remaining
+- [ ] `gameStateUpdate` socket emission (live score/mark-status push)
+- [ ] `taskAssigned` socket event (server-side task assignment for Movement B)
+- [ ] Supermajority win condition end-to-end verification
+- [ ] Mark badge visibility across all screens
+- [ ] Stress test with 80 simultaneous clients
 
 ## License
 

@@ -1,18 +1,23 @@
-# Security Summary - Lobby List Implementation
+# Security Summary
+
+> Covers the full Apokrupto application (auth, lobby, game engine, Socket.IO).
 
 ## Security Measures Implemented
 
 ### ✅ Authentication & Authorization
-- JWT tokens required for all lobby endpoints
-- Token validation on every request
+- JWT tokens required for all REST and Socket.IO endpoints
+- Token validation on every request (REST middleware + socket handshake)
 - Automatic logout on token expiry
 - Secure token storage using expo-secure-store
+- GM/Admin actions gated by `GM_USERNAMES` / `ADMIN_USERNAMES` env vars
 - No hardcoded JWT secrets (server fails if not set)
 
 ### ✅ Input Validation
 - All user inputs are validated before database operations
 - Lobby names limited to 100 characters
-- Player counts restricted to 4-15 range
+- Player counts restricted to 5–100 range (must be multiple of 5)
+- Movement A word submissions validated (non-empty, turn order enforced)
+- Movement C votes validated (targets must be in same group, valid values only)
 - Numeric IDs validated before queries
 - Form validation on frontend before API calls
 
@@ -29,10 +34,11 @@
 - Strong password requirements enforced
 
 ### ✅ Data Integrity
-- Database transactions prevent race conditions
+- Database transactions for all state mutations (lobby join/leave, game state changes, scoring)
 - Foreign key constraints maintain referential integrity
-- Unique constraints prevent duplicate entries
+- Unique constraints prevent duplicate entries (lobby membership, game players, votes, submissions)
 - CASCADE deletes clean up related data
+- Game state machine prevents out-of-order actions (can't vote during Movement A, etc.)
 
 ### ✅ Error Handling
 - Sensitive information not leaked in error messages
@@ -123,10 +129,11 @@ Before deploying to production, implement:
 ## Conclusion
 
 The current implementation provides **good security for MVP/development** with:
-- Strong authentication
-- Proper authorization
+- Strong authentication (JWT for REST and Socket.IO)
+- Role-based authorization (player, host, GM, admin)
 - Secure data storage
 - SQL injection protection
 - Password hashing
+- Game state machine enforcing valid action ordering
 
 The main limitation is **lack of rate limiting**, which should be addressed before public deployment. All other security fundamentals are in place.

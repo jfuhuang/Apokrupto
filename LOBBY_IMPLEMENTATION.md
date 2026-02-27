@@ -1,5 +1,7 @@
 # Lobby List Front End - Implementation Summary
 
+> **Note:** This document was written when the lobby system was first built. Many limitations listed here have since been resolved. See `CLAUDE.md` for the current comprehensive reference.
+
 ## Overview
 This implementation adds a complete lobby management system to the Apokrupto mobile application, allowing users to create, browse, search, and join game lobbies with real-time updates.
 
@@ -13,7 +15,7 @@ Added two new tables to support lobby functionality:
 **lobbies table:**
 - `id` - Primary key
 - `name` - Lobby name (max 100 characters)
-- `max_players` - Player limit (4-15)
+- `max_players` - Player limit (5–100, must be multiple of 5)
 - `created_by` - Reference to user who created it
 - `status` - Lobby state (waiting, in_progress, completed)
 - `created_at` - Timestamp
@@ -301,30 +303,35 @@ docs/
 **Documentation:** ~500 lines  
 **Total:** ~1,500 lines added
 
-## Known Limitations
+## Known Limitations (historical — most are now resolved)
 
-1. **No Real-Time Updates**: Lobbies refresh on timer, not via WebSocket. Future enhancement: Socket.IO integration.
+1. **~~No Real-Time Updates~~**: ✅ **Resolved.** Socket.IO integrated for lobby and game state. 10s REST polling kept as fallback.
 
-2. **No Lobby Ownership Controls**: Host can't kick players or change settings. Future enhancement: Host management features.
+2. **~~No Lobby Ownership Controls~~**: ✅ **Resolved.** Host can kick players. Admin can force-end lobbies.
 
 3. **No Lobby Privacy**: All lobbies are public. Future enhancement: Private lobbies with passwords.
 
 4. **Basic Error Messages**: Some errors could be more descriptive. Future enhancement: Better error categorization.
 
-5. **No Player List in Lobby**: Can see count but not individual players. Future enhancement: Player roster view.
+5. **~~No Player List in Lobby~~**: ✅ **Resolved.** `LobbyScreen.js` shows full player roster with host indicator and connection status.
 
-## Future Enhancements
+## Future Enhancements (remaining)
 
-- [ ] Real-time lobby updates via Socket.IO
-- [ ] Lobby chat functionality  
-- [ ] Host controls (kick, start game, change settings)
+- [ ] Lobby chat functionality
 - [ ] Private lobbies with password protection
 - [ ] Lobby search filters (by player count, status)
 - [ ] Pagination for large lobby lists
-- [ ] Player list with avatar/status in lobby screen
-- [ ] Game start flow from lobby
-- [ ] Spectator mode
 - [ ] Lobby templates/presets
+
+## Enhancements Completed Since Original Implementation
+
+- [x] Real-time lobby updates via Socket.IO
+- [x] Host controls (kick players)
+- [x] Admin controls (add bots, force-end)
+- [x] Player list with connection status in lobby screen
+- [x] Game start flow from lobby
+- [x] Full game lifecycle (Movements A, B, C, round transitions, game over)
+- [x] Lobby capacity expanded to 5–100 players
 
 ## Conclusion
 

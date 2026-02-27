@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Apokrupto is a social-deduction party game for Campus Ministry events, supporting up to 80 players. It is **not** a GPS/location-based game. Two teams — **Phos** (φῶς, light, majority ~4:1) and **Skotia** (σκοτία, darkness, minority) — compete over 3–4 rounds. Full game design is in `GAME_DESIGN.md`. The implementation roadmap is in `IMPLEMENTATION_PLAN.md`.
+Apokrupto is a social-deduction party game for Campus Ministry events, supporting up to 80 players.Two teams — **Phos** (φῶς, light, majority ~4:1) and **Skotia** (σκοτία, darkness, minority) — compete over 3–4 rounds. Full game design is in `GAME_DESIGN.md`. The implementation roadmap is in `IMPLEMENTATION_PLAN.md`.
 
 > The original "Among Us IRL" GPS-based version is archived at `github.com/jfuhuang/among-us-irl`.
 

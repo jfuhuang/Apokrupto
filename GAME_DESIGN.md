@@ -1,6 +1,6 @@
 # Apokrupto — Game Design Document
 
-> **Status:** Pre-MVP planning. The existing "Among Us IRL" codebase will be restructured into this game. The original codebase will be forked and preserved separately at a future date.
+> **Status:** Core gameplay implemented. Movements A, B, and C are functional. See `IMPLEMENTATION_PLAN.md` for detailed build status.
 > **Audience:** Campus Ministry event, up to 80 players, location-independent.
 
 ---

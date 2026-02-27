@@ -1,301 +1,148 @@
 # Apokrupto - Client
 
-React Native mobile client for Apokrupto game.
+React Native (Expo 54) mobile client for the Apokrupto social-deduction party game. Supports iOS, Android, and Web.
 
 ## Features
 
-- **Welcome Screen** with animated background featuring floating dots
-  - Red "impostor" dots that can "kill" connected green dots
-  - Dots regenerate after being killed
-  - Beautiful particle connection effect
-  
-- **User Registration**
-  - Form validation (username, email, password)
-  - Error handling and user feedback
-  - API integration with backend
-  
-- **Login**
-  - Username or email login
-  - Secure JWT token storage
-  - Form validation and error handling
+- **Dark cyberpunk UI** with custom fonts (Orbitron, Exo 2, Rajdhani) and animated particle backgrounds
+- **Authentication** — Login, registration, JWT stored via `expo-secure-store`
+- **Lobby System** — Browse, search, create, join lobbies with real-time Socket.IO updates + 10s REST polling
+- **Full Game Flow** — Countdown → Role Reveal → Round Hub → Movement A/B/C → Round Summary → Game Over
+- **Movement A** — Turn-based word submission with real-time turn indicators, word reveals, deliberation phase
+- **Movement B** — 10 task mechanics (trivia, scripture memory, cipher, skill games) with team point scoring
+- **Movement C** — Vote on group members as Phos/Skotia, see mark results
+- **GM Dashboard** — Web-based GM controls (redirects to server `/gm.html`)
+- **Dev Menu** — Debug tool for navigating to any screen with mock data (DEV builds only)
+- **Auto-reconnect** — 10s sync polling recovers state if socket disconnects mid-game
 
-- **Lobby List**
-  - Browse all active lobbies
-  - Search lobbies by name, host, or ID
-  - Auto-refresh every 10 seconds
-  - Pull-to-refresh for manual updates
-  - Create new lobbies with custom settings
-  - Join lobbies by clicking or entering ID
-  - Real-time player count display
-  - Visual indicators for full lobbies
-  
-- **Lobby Details**
-  - View lobby information
-  - See current player count
-  - Leave lobby functionality
-  - Ready for game features integration
+## Screens
+
+| Screen | File | Description |
+|--------|------|-------------|
+| Welcome | `screens/welcome/WelcomeScreen.js` | Landing with login/register buttons |
+| Login | `screens/auth/LoginScreen.js` | Username + password login |
+| Register | `screens/auth/RegistrationScreen.js` | New account registration |
+| Lobby List | `screens/lobby/LobbyListScreen.js` | Browse/search/create/join lobbies |
+| Lobby | `screens/lobby/LobbyScreen.js` | Lobby waiting room with player list |
+| Countdown | `screens/game/CountdownScreen.js` | 5s countdown before role reveal |
+| Role Reveal | `screens/game/RoleRevealScreen.js` | Phos/Skotia assignment reveal |
+| Round Hub | `screens/game/RoundHubScreen.js` | Between-movement hub, movement navigation |
+| Movement A | `screens/game/MovementAScreen.js` | Social deduction: prompts + word submission |
+| Movement B | `screens/game/MovementBScreen.js` | Task selector + task execution |
+| Voting (C) | `screens/game/VotingScreen.js` | Vote on group members |
+| Round Summary | `screens/game/RoundSummaryScreen.js` | End-of-round scoring summary |
+| GM Dashboard | `screens/game/GmDashboardScreen.js` | Full GM dashboard (in-app) |
+| GM Waiting | `screens/game/GmWaitingScreen.js` | Shows URL for web-based GM dashboard |
+| Game Over | `screens/game/GameOverScreen.js` | Final results + Skotia reveal |
+| Task | `screens/tasks/TaskScreen.js` | Task runner wrapper |
+| Dev Menu | `screens/dev/DevMenuScreen.js` | Debug navigation to any screen |
+
+### Task Mechanics (10 types)
+`screens/tasks/mechanics/`: CipherTask, CollectTask, DragPlaceTask, GuardTask, HoldTask, MatchPairTask, QuizTask, RapidTapTask, ScriptureMemoryTask, SlingTask
 
 ## Prerequisites
 
-- **Node.js v20 or higher** (recommended: v20 LTS)
-- npm or yarn
-- Expo Go app on your mobile device, or:
-  - iOS Simulator (macOS only)
-  - Android Emulator (requires Android Studio)
+- **Node.js v20+** (recommended)
+- npm
+- Expo Go app on mobile device, or emulator (Android Studio / Xcode)
 
 ## Installation
 
-### 1. Install Node.js (if needed)
-
-**Using nvm (recommended):**
-
 ```bash
-# Install nvm
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-
-# Reload shell or source nvm
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-
-# Install and use Node 20
-nvm install 20
-nvm use 20
-nvm alias default 20
-
-# Verify
-node -v  # should show v20.x.x
-```
-
-**Alternative:** Download from [nodejs.org](https://nodejs.org)
-
-### 2. Install dependencies
-
-```bash
+cd client
 npm install
 ```
 
-**Note:** If you encounter peer dependency conflicts, try:
-```bash
-npm install --legacy-peer-deps
-```
-
-### 3. Configure the API URL
-
-Edit `config.js` to set your backend server URL:
-- Default is `http://localhost:3000`
-- For physical devices, use your computer's IP address (e.g., `http://192.168.1.100:3000`)
-
-## Running the App
-
-### Start the development server
+## Running
 
 ```bash
-npx expo start
+npm start               # Metro bundler (Expo) — scan QR with Expo Go
+npm run android         # Build and run on Android emulator
+npm run ios             # Build and run on iOS simulator (macOS only)
+npm run web             # Web version
+npm run tunnel          # Expo with tunnel (for remote devices)
 ```
 
-This will start Metro bundler and show a QR code in your terminal.
-
-### Run on your device or emulator
-
-**Option 1: Physical device (easiest)**
-1. Install the **Expo Go** app from the App Store (iOS) or Google Play (Android)
-2. Ensure your device is on the same Wi-Fi network as your development machine
-3. Scan the QR code with:
-   - iOS: Camera app
-   - Android: Expo Go app
-
-**Option 2: Emulator/Simulator**
+**Production builds** (point at deployed server):
 ```bash
-# Android (requires Android Studio & emulator running)
-npx expo run:android
-
-# iOS (macOS only, requires Xcode)
-npx expo run:ios
+npm run start:prod      # Metro with production API URL
+npm run android:prod    # Android with production API URL
+npm run ios:prod        # iOS with production API URL
 ```
-
-**Keyboard shortcuts in terminal:**
-- Press `a` to open Android emulator
-- Press `i` to open iOS simulator (macOS only)
-- Press `r` to reload app
-- Press `m` to toggle menu
-- Press `c` to clear cache and restart
 
 ## Project Structure
 
 ```
 client/
-├── App.js                      # Main app component with navigation
-├── app.json                    # Expo configuration
-├── config.js                   # API configuration
+├── App.js                        # Root component — navigation state machine
+├── config.js                     # Dynamic API URL detection
+├── app.json                      # Expo configuration
 ├── components/
-│   ├── AnimatedBackground.js   # Animated dots background
-│   └── LobbyCard.js            # Lobby card component for list
-└── screens/
-    ├── WelcomeScreen.js        # Initial screen with login/register buttons
-    ├── RegistrationScreen.js   # User registration form
-    ├── LoginScreen.js          # Login form
-    ├── LobbyListScreen.js      # Browse and manage lobbies
-    └── LobbyScreen.js          # Individual lobby view
+│   ├── AnimatedBackground.js     # Reusable particle animation
+│   └── LobbyCard.js             # Lobby list item card
+├── data/
+│   ├── tasks.js                  # Task definitions
+│   └── sabotages.js              # Legacy sabotage data
+├── screens/
+│   ├── auth/                     # LoginScreen, RegistrationScreen
+│   ├── dev/                      # DevMenuScreen
+│   ├── game/                     # All game screens (Countdown through GameOver)
+│   ├── lobby/                    # LobbyListScreen, LobbyScreen
+│   ├── tasks/
+│   │   ├── TaskScreen.js         # Task runner
+│   │   └── mechanics/            # 10 task type implementations
+│   └── welcome/                  # WelcomeScreen
+├── theme/
+│   ├── colors.js                 # Color palette (cyberpunk dark theme)
+│   ├── typography.js             # Font styles and text presets
+│   ├── fontSetup.js              # Font loading utilities
+│   ├── COLOR_GUIDE.md            # Color usage guide
+│   └── FONT_GUIDE.md            # Typography guide
+└── utils/
+    ├── api.js                    # REST API client (all endpoints)
+    ├── networkUtils.js           # Dynamic server IP detection
+    └── scriptureUtils.js         # Scripture verse utilities
+```
+
+## Navigation
+
+There is **no React Navigation library**. `App.js` manages a `currentScreen` string state and renders the matching screen component via a `switch` block. To add a screen, add a case in `renderScreen()` in `App.js`.
+
+**Screen flow:**
+```
+welcome → login / register → lobbyList → lobby
+  → countdown → roleReveal → roundHub
+    → movementA → movementB → movementC
+  → roundSummary → (next round) → gameOver
+
+GM: lobby → gmDashboard / gmWaiting
 ```
 
 ## Configuration
 
 ### API URL
+The client auto-detects the server IP at runtime via `utils/networkUtils.js`. No hardcoded addresses needed. For production, set `EXPO_PUBLIC_API_URL` environment variable (the `:prod` npm scripts do this automatically).
 
-Edit `config.js` to change the backend server URL:
+### Theme
+- **Phos color:** `colors.primary.electricBlue` (#00D4FF)
+- **Skotia color:** `colors.primary.neonRed` (#FF3366)
+- **Background:** `colors.background.space` (dark)
+- Role reveal uses `colors.accent.ultraviolet` for both teams (prevents onlookers from reading roles)
+- See [theme/COLOR_GUIDE.md](theme/COLOR_GUIDE.md) and [theme/FONT_GUIDE.md](theme/FONT_GUIDE.md)
 
-```javascript
-export const API_URL = 'http://your-server-url:3000';
-```
+## Key Implementation Notes
 
-### Expo Configuration
-
-Edit `app.json` to customize:
-- App name and slug
-- Icon and splash screen
-- Platform-specific settings
-
-## Backend Integration
-
-The app expects the following API endpoints on the backend:
-
-### User Endpoints
-
-- `POST /api/users/register` - Create new user account
-  - Body: `{ username, email, password }`
-  - Returns: `{ username, token }` on success, `{ error }` on failure
-
-- `POST /api/users/login` - Login user
-  - Body: `{ usernameOrEmail, password }`
-  - Returns: `{ username, token }` (JWT) on success, `{ error }` on failure
-
-### Lobby Endpoints (require JWT authentication via Bearer token)
-
-- `GET /api/lobbies` - Get all active lobbies
-  - Headers: `Authorization: Bearer <token>`
-  - Returns: `{ lobbies: [...] }` array of lobby objects
-
-- `GET /api/lobbies/:id` - Get specific lobby details
-  - Headers: `Authorization: Bearer <token>`
-  - Returns: `{ lobby: {...} }` lobby object
-
-- `POST /api/lobbies` - Create a new lobby
-  - Headers: `Authorization: Bearer <token>`
-  - Body: `{ name, max_players }`
-  - Returns: `{ lobby: {...} }` created lobby object
-
-- `POST /api/lobbies/:id/join` - Join a lobby
-  - Headers: `Authorization: Bearer <token>`
-  - Returns: `{ message, lobbyId }` on success
-
-- `POST /api/lobbies/:id/leave` - Leave a lobby
-  - Headers: `Authorization: Bearer <token>`
-  - Returns: `{ message }` on success
-
-## Development Notes
-
-- The app uses `expo-secure-store` to securely store JWT tokens
-- Form validation is performed client-side before API calls
-- The animated background runs at 30 FPS for smooth performance
-- Navigation is currently implemented using component state (can be upgraded to React Navigation)
-- Password requirements: minimum 8 characters with uppercase, lowercase, and number
-- Lobby list auto-refreshes every 10 seconds to show latest data
-- JWT tokens are sent via Authorization header with Bearer scheme
-- Session expiration is handled gracefully with automatic logout
+- **JWT decoded client-side** — `token.split('.')[1]` → base64 decode → `payload.sub` for user ID
+- **Socket.IO** — Client connects to server Socket.IO for real-time updates. Lobby screens use socket + 10s REST polling fallback. Game screens are socket-driven.
+- **State sync** — A 10s polling loop in `App.js` fetches `/api/lobbies/current` and `/api/games/:id/state` to recover from disconnects and keep the client on the correct screen.
+- **Socket rooms** — `lobby:{lobbyId}` for lobby-wide events; `lobby:{groupId}` for group-specific events. `MovementAScreen` joins both rooms.
 
 ## Troubleshooting
 
-### Node.js Version Issues
-
-**Error: `Unexpected token '?'` or `toReversed is not a function`**
-
-You're using an outdated Node.js version. Expo SDK 50+ requires Node 18+, and Metro bundler requires Node 20+ for full compatibility.
-
-**Solution:**
-```bash
-# Using nvm
-nvm install 20
-nvm use 20
-nvm alias default 20
-
-# Verify
-node -v  # should show v20.x.x
-
-# Clean reinstall
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### Expo Go SDK Version Mismatch
-
-**Error: `Project is incompatible with this version of Expo Go`**
-
-Your project's Expo SDK version doesn't match the Expo Go app on your device.
-
-**Solutions:**
-1. **Upgrade project (recommended):**
-   ```bash
-   npx expo upgrade
-   npm install
-   ```
-
-2. **Install matching Expo Go:** Download the SDK-specific version from [expo.dev/go](https://expo.dev/go)
-
-3. **Use development build (advanced):**
-   ```bash
-   npx expo run:android  # or run:ios
-   ```
-
-### Dependency Issues
-
-If you encounter peer dependency conflicts:
-```bash
-npm install --legacy-peer-deps
-```
-
-### Network/Connection Errors
-
-**Cannot connect to backend API:**
-
-- Ensure the backend server is running
-- Check that `API_URL` in `config.js` is correct:
-  - **iOS Simulator:** Use `http://localhost:3000`
-  - **Android Emulator:** Use `http://10.0.2.2:3000` (Android's special alias for host)
-  - **Physical device:** Use your computer's local IP (e.g., `http://192.168.1.100:3000`)
-
-**Find your local IP:**
-```bash
-# Linux/macOS
-ip addr show | grep "inet " | grep -v 127.0.0.1
-
-# or
-ifconfig | grep "inet " | grep -v 127.0.0.1
-```
-
-### Metro Bundler Issues
-
-**Error: Metro bundler won't start or shows cache errors**
-
-Clear the cache and restart:
-```bash
-npx expo start -c
-```
-
-### Missing Assets
-
-**Error: `Unable to resolve asset "./assets/icon.png"`**
-
-The app references assets in `app.json` that may not exist:
-1. Create an `assets/` folder if it doesn't exist
-2. Add placeholder images, or
-3. Remove/update asset references in `app.json`
-
-## Next Steps
-
-- [ ] Implement proper navigation with React Navigation
-- [ ] Add loading state when app starts (check for stored JWT)
-- [ ] Implement lobby functionality
-- [ ] Add game screens
-- [ ] Add real-time Socket.IO integration
-- [ ] Implement GPS location tracking
-- [ ] Add map integration
+| Problem | Solution |
+|---------|----------|
+| Node.js version errors | Use Node 20+ (`nvm install 20 && nvm use 20`) |
+| Expo Go SDK mismatch | Run `npx expo upgrade` or install matching Expo Go |
+| Peer dependency conflicts | `npm install --legacy-peer-deps` |
+| Can't connect to backend | Check server is running; API URL auto-detected. For Android emulator use `http://10.0.2.2:3000` |
+| Metro cache errors | `npx expo start -c` (clears cache) |
