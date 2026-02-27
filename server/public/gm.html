@@ -95,19 +95,18 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       flex-shrink: 0;
-      min-height: 200px;
+      min-height: 180px;
     }
     .team-card {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 40px 24px;
-      gap: 12px;
+      padding: 32px 24px;
+      gap: 10px;
       border-bottom: 1px solid var(--border);
     }
     .team-card.phos  { border-right: 1px solid var(--border); }
-    .team-card.skotia {}
 
     .team-name {
       font-size: 1rem;
@@ -126,7 +125,7 @@
     }
 
     .team-points {
-      font-size: clamp(72px, 12vw, 140px);
+      font-size: clamp(60px, 10vw, 120px);
       font-weight: bold;
       line-height: 1;
       letter-spacing: 2px;
@@ -135,11 +134,45 @@
     .phos  .team-points { color: var(--blue); text-shadow: 0 0 40px rgba(0,212,255,0.4); }
     .skotia .team-points { color: var(--red);  text-shadow: 0 0 40px rgba(220,20,60,0.4); }
 
-    .team-count {
-      font-size: 0.8rem;
-      letter-spacing: 2px;
-      color: var(--muted);
+    /* ── Score ratio bar ── */
+    #score-bar-wrap {
+      padding: 14px 20px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
     }
+    #score-bar {
+      height: 28px;
+      display: flex;
+      border-radius: 3px;
+      overflow: hidden;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+    }
+    #score-bar-phos {
+      background: var(--blue);
+      box-shadow: 6px 0 24px rgba(0, 212, 255, 0.5);
+      transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      width: 50%;
+    }
+    #score-bar-skotia {
+      background: var(--red);
+      box-shadow: -6px 0 24px rgba(220, 20, 60, 0.5);
+      transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      width: 50%;
+    }
+    .score-bar-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    #score-bar-phos-pct { color: var(--blue); }
+    #score-bar-skotia-pct { color: var(--red); }
 
     /* ── Game-over overlay ── */
     #game-over-overlay {
@@ -219,10 +252,8 @@
     /* Controls (shown after token is set) */
     #controls {
       display: none;
-      flex-direction: column;
-      gap: 14px;
     }
-    #controls.visible { display: flex; }
+    #controls.visible { display: flex; flex-direction: column; gap: 14px; }
 
     .ctrl-row {
       display: flex;
@@ -247,74 +278,14 @@
     button:disabled { opacity: 0.3; cursor: not-allowed; }
     button.primary { border-color: var(--amber); color: var(--amber); }
     button.primary:hover:not(:disabled) { background: rgba(255,215,0,0.08); }
-    button.danger { border-color: var(--red); color: var(--red); }
-    button.danger:hover:not(:disabled) { background: rgba(220,20,60,0.08); }
-
-    #broadcast-input {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: var(--font);
-      font-size: 0.8rem;
-      padding: 8px 12px;
-      flex: 1;
-      min-width: 200px;
-      outline: none;
-    }
-    #broadcast-input:focus { border-color: var(--blue); }
-
-    /* ── Player roster ── */
-    #roster {
-      display: none;
-      flex-direction: column;
-      gap: 10px;
-    }
-    #roster.visible { display: flex; }
-
-    .roster-section { display: flex; flex-direction: column; gap: 6px; }
-    .roster-title {
-      font-size: 0.65rem;
-      letter-spacing: 3px;
-      color: var(--muted);
-      text-transform: uppercase;
-      padding-bottom: 2px;
-      border-bottom: 1px solid var(--border);
-    }
-    .player-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      padding: 7px 12px;
-      font-size: 0.8rem;
-    }
-    .player-row.phos-row  { border-left: 2px solid var(--blue); }
-    .player-row.skotia-row { border-left: 2px solid var(--red); }
-    .mark-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--red);
-    }
-
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-    }
-    .section-header .toggle-label {
-      font-size: 0.65rem;
-      letter-spacing: 2px;
-      color: var(--muted);
-      text-transform: uppercase;
-    }
-    .section-header .caret { color: var(--muted); font-size: 0.8rem; }
 
     /* ── Groups grid ── */
     #groups-section {
       padding: 16px 20px;
       border-top: 1px solid var(--border);
       display: none;
+      flex: 1;
+      overflow-y: auto;
     }
     #groups-section.visible { display: block; }
 
@@ -365,24 +336,19 @@
     .group-member {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 7px;
       font-size: 0.8rem;
       line-height: 1.3;
     }
-    .group-member-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .group-member-dot.phos   { background: var(--blue); }
-    .group-member-dot.skotia { background: var(--red);  }
     .group-member-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .group-member-name.skotia { color: var(--red); }
+    .group-member-name.marked { color: var(--red); }
     .group-member-mark {
-      font-size: 0.6rem;
+      font-size: 0.55rem;
       color: var(--red);
       letter-spacing: 1px;
+      border: 1px solid rgba(220,20,60,0.4);
+      padding: 1px 4px;
       flex-shrink: 0;
     }
 
@@ -549,23 +515,33 @@
     </div>
   </header>
 
-  <!-- Scoreboard (always visible) -->
+  <!-- Scoreboard -->
   <div id="scoreboard">
     <div class="team-card phos">
       <span class="team-label">Team</span>
       <span class="team-name">ΦΩΣ</span>
       <span class="team-points" id="phos-pts">0</span>
-      <span class="team-count" id="phos-count">— players</span>
     </div>
     <div class="team-card skotia">
       <span class="team-label">Team</span>
       <span class="team-name">ΣΚΟΤΊΑ</span>
       <span class="team-points" id="skotia-pts">0</span>
-      <span class="team-count" id="skotia-count">— players</span>
     </div>
   </div>
 
-  <!-- Groups section (shown when game has groups) -->
+  <!-- Score ratio bar -->
+  <div id="score-bar-wrap">
+    <div id="score-bar">
+      <div id="score-bar-phos"></div>
+      <div id="score-bar-skotia"></div>
+    </div>
+    <div class="score-bar-labels">
+      <span id="score-bar-phos-pct">ΦΩΣ 50%</span>
+      <span id="score-bar-skotia-pct">ΣΚΟΤΊΑ 50%</span>
+    </div>
+  </div>
+
+  <!-- Groups section -->
   <div id="groups-section">
     <div class="groups-header">
       <span class="groups-header-label">Groups</span>
@@ -576,7 +552,7 @@
     </div>
   </div>
 
-  <!-- Control panel (mode=control only) -->
+  <!-- Control panel (control mode only) -->
   <div id="control-panel">
 
     <!-- Token gate -->
@@ -594,26 +570,6 @@
         <button class="primary" id="advance-btn" onclick="advanceMovement()" disabled>
           ADVANCE MOVEMENT
         </button>
-      </div>
-      <div class="ctrl-row">
-        <input type="text" id="broadcast-input" placeholder="Broadcast message to all players..." maxlength="200" />
-        <button onclick="sendBroadcast()">SEND</button>
-      </div>
-
-      <!-- Player roster (collapsible) -->
-      <div class="section-header" onclick="toggleRoster()">
-        <span class="toggle-label">Player Roster</span>
-        <span class="caret" id="roster-caret">▼</span>
-      </div>
-      <div id="roster">
-        <div class="roster-section">
-          <div class="roster-title">ΣΚΟΤΊΑ — Darkness</div>
-          <div id="skotia-list"><span style="color:var(--muted);font-size:0.75rem;">No data yet</span></div>
-        </div>
-        <div class="roster-section">
-          <div class="roster-title">ΦΩΣ — Light</div>
-          <div id="phos-list"><span style="color:var(--muted);font-size:0.75rem;">No data yet</span></div>
-        </div>
       </div>
     </div>
   </div>
@@ -636,12 +592,10 @@
     // ── State ───────────────────────────────────────────────────────────────
     let socket = null;
     let pollInterval = null;
-    let rosterOpen = false;
-    let setupSelectedLobby = null; // { id, gameId }
+    let setupSelectedLobby = null;
 
     // ── Init ────────────────────────────────────────────────────────────────
     if (lobbyId) {
-      // Params provided — skip lobby selector and connect directly
       document.getElementById('setup-screen').classList.add('hidden');
       if (isControl) {
         document.getElementById('control-panel').classList.add('visible');
@@ -651,7 +605,6 @@
       fetchState();
       pollInterval = setInterval(fetchState, 10000);
     }
-    // else: setup-screen stays visible; user selects a lobby first
 
     // ── Setup functions ──────────────────────────────────────────────────────
     async function setupLogin() {
@@ -675,7 +628,6 @@
         return;
       }
 
-      // Login succeeded — hide login step, show lobby list
       document.getElementById('setup-login-step').style.display = 'none';
       const listEl = document.getElementById('setup-lobby-list');
       listEl.innerHTML = '<span style="color:var(--muted);font-size:0.8rem;">Loading...</span>';
@@ -739,7 +691,6 @@
 
       if (isControl) {
         document.getElementById('control-panel').classList.add('visible');
-        // Token already set; bypass the token-gate and unlock directly
         unlockControls();
       }
 
@@ -750,7 +701,6 @@
 
     // ── Socket ──────────────────────────────────────────────────────────────
     function connectSocket() {
-      // Unauthenticated connection for scoreboard; authenticated for control
       const opts = {
         transports: ['websocket', 'polling'],
         reconnection: true,
@@ -767,12 +717,30 @@
       socket.on('disconnect', () => setConnected(false));
       socket.on('connect_error', () => setConnected(false));
 
-      socket.on('gameStateUpdate', (data) => {
-        applyState(data);
+      socket.on('gameStateUpdate', (data) => applyState(data));
+
+      // Refresh state on any movement event
+      socket.on('movementStart', ({ movement, roundNumber, totalRounds }) => {
+        const movLabel = { A: 'MOV A — DEDUCTION', B: 'MOV B — TASKS', C: 'MOV C — VOTING' };
+        if (movement) setText('movement-badge', movLabel[movement] || '—');
+        if (roundNumber) setText('round-badge', `ROUND ${roundNumber} / ${totalRounds || '?'}`);
+        fetchState();
       });
 
-      socket.on('gameOver', ({ winner, reason } = {}) => {
-        showGameOver(winner, reason);
+      socket.on('movementComplete', ({ movement }) => {
+        setText('movement-badge', `${movement} COMPLETE`);
+        fetchState();
+      });
+
+      socket.on('roundSummary', () => fetchState());
+      socket.on('roundSetup', ({ roundNumber, totalRounds }) => {
+        if (roundNumber) setText('round-badge', `ROUND ${roundNumber} / ${totalRounds || '?'}`);
+        setText('movement-badge', '—');
+        fetchState();
+      });
+
+      socket.on('gameOver', ({ winner, condition } = {}) => {
+        showGameOver(winner, condition);
       });
 
       socket.on('lobbyClosed', () => {
@@ -796,35 +764,36 @@
 
     // ── Apply game state to DOM ─────────────────────────────────────────────
     function applyState({ players = [], groups = [], gameState = {}, teamPoints = {} } = {}) {
-      // Scores
-      setText('phos-pts',    teamPoints.phos   ?? 0);
-      setText('skotia-pts',  teamPoints.skotia ?? 0);
+      const phos   = teamPoints.phos   ?? 0;
+      const skotia = teamPoints.skotia ?? 0;
 
-      // Player counts
-      const phosPlayers   = players.filter(p => p.team === 'phos');
-      const skotiaPlayers = players.filter(p => p.team === 'skotia');
-      setText('phos-count',   phosPlayers.length   + ' player' + (phosPlayers.length   !== 1 ? 's' : ''));
-      setText('skotia-count', skotiaPlayers.length + ' player' + (skotiaPlayers.length !== 1 ? 's' : ''));
+      setText('phos-pts',   phos);
+      setText('skotia-pts', skotia);
 
-      // Round / movement
+      updateScoreBar(phos, skotia);
+
       const round = gameState.round;
       const total = gameState.totalRounds;
       setText('round-badge',    round ? `ROUND ${round} / ${total}` : '— / —');
       const movLabel = { A: 'MOV A — DEDUCTION', B: 'MOV B — TASKS', C: 'MOV C — VOTING' };
       setText('movement-badge', movLabel[gameState.movement] || '—');
 
-      // Groups (always shown when data exists)
       if (groups.length > 0) {
         setText('groups-round-badge', round ? `ROUND ${round}` : '—');
         document.getElementById('groups-section').classList.add('visible');
         renderGroups(groups);
       }
+    }
 
-      // Roster (control mode)
-      if (isControl) {
-        renderRoster('phos-list',   phosPlayers,   'phos-row');
-        renderRoster('skotia-list', skotiaPlayers, 'skotia-row');
-      }
+    function updateScoreBar(phos, skotia) {
+      const total    = (phos || 0) + (skotia || 0);
+      const phosPct  = total === 0 ? 50 : Math.round((phos   / total) * 100);
+      const skotiaPct = 100 - phosPct;
+
+      document.getElementById('score-bar-phos').style.width   = phosPct   + '%';
+      document.getElementById('score-bar-skotia').style.width = skotiaPct + '%';
+      setText('score-bar-phos-pct',   'ΦΩΣ '     + phosPct   + '%');
+      setText('score-bar-skotia-pct', 'ΣΚΟΤΊΑ ' + skotiaPct + '%');
     }
 
     function renderGroups(groups) {
@@ -838,46 +807,30 @@
           <div class="group-card-title">Group ${g.groupIndex}</div>
           ${g.members.map(m => `
             <div class="group-member">
-              <div class="group-member-dot ${m.team}"></div>
-              <span class="group-member-name${m.team === 'skotia' ? ' skotia' : ''}">${escHtml(m.username)}</span>
-              ${m.isMarked ? '<span class="group-member-mark" title="Marked">●</span>' : ''}
+              <span class="group-member-name${m.isMarked ? ' marked' : ''}">${escHtml(m.username)}</span>
+              ${m.isMarked ? '<span class="group-member-mark">MARKED</span>' : ''}
             </div>
           `).join('')}
         </div>
       `).join('');
     }
 
-    function renderRoster(containerId, players, rowClass) {
-      const el = document.getElementById(containerId);
-      if (players.length === 0) {
-        el.innerHTML = '<span style="color:var(--muted);font-size:0.75rem;">No players yet</span>';
-        return;
-      }
-      el.innerHTML = players.map(p => `
-        <div class="player-row ${rowClass}">
-          <span>${escHtml(p.username)}</span>
-          ${p.isMarked ? '<div class="mark-dot" title="Marked"></div>' : ''}
-        </div>`
-      ).join('');
-    }
-
     // ── Connection indicator ────────────────────────────────────────────────
     function setConnected(live) {
-      const dot   = document.getElementById('conn-dot');
-      const label = document.getElementById('conn-label');
+      const dot    = document.getElementById('conn-dot');
+      const label  = document.getElementById('conn-label');
       const banner = document.getElementById('offline-banner');
       dot.className = live ? 'live' : 'offline';
       label.textContent = live ? 'LIVE' : 'OFFLINE';
       if (live) banner.classList.remove('visible');
       else      banner.classList.add('visible');
 
-      // Advance button requires live socket
       const btn = document.getElementById('advance-btn');
       if (btn) btn.disabled = !live;
     }
 
     // ── Game over ───────────────────────────────────────────────────────────
-    function showGameOver(winner, reason) {
+    function showGameOver(winner, condition) {
       const titleEl = document.getElementById('game-over-title');
       const subEl   = document.getElementById('game-over-sub');
 
@@ -892,7 +845,7 @@
         titleEl.textContent = 'GAME OVER';
       }
 
-      subEl.textContent = reason ? reason.toUpperCase() : '';
+      subEl.textContent = condition ? condition.toUpperCase().replace('_', ' ') : '';
       document.getElementById('game-over-overlay').classList.add('visible');
     }
 
@@ -905,41 +858,18 @@
       document.getElementById('token-gate').style.display = 'none';
       document.getElementById('controls').classList.add('visible');
 
-      // Reconnect socket with auth token if already connected without it
       if (socket) { socket.disconnect(); connectSocket(); }
     }
 
     function advanceMovement() {
       if (!socket || !socket.connected) return;
+      const btn = document.getElementById('advance-btn');
+      btn.disabled = true;
       socket.emit('gmAdvance', { gameId }, (res) => {
+        btn.disabled = false;
         if (res && res.error) alert('Error: ' + res.error);
+        else fetchState();
       });
-    }
-
-    async function sendBroadcast() {
-      const input = document.getElementById('broadcast-input');
-      const message = input.value.trim();
-      if (!message || !gameId || !lobbyId || !gmToken) return;
-
-      try {
-        await fetch(`/api/games/${gameId}/broadcast`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${gmToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ message, lobbyId }),
-        });
-        input.value = '';
-      } catch (err) {
-        alert('Broadcast failed: ' + err.message);
-      }
-    }
-
-    function toggleRoster() {
-      rosterOpen = !rosterOpen;
-      document.getElementById('roster').classList.toggle('visible', rosterOpen);
-      document.getElementById('roster-caret').textContent = rosterOpen ? '▲' : '▼';
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
@@ -956,10 +886,7 @@
         .replace(/"/g, '&quot;');
     }
 
-    // Enter key on broadcast input
     document.addEventListener('DOMContentLoaded', () => {
-      const bi = document.getElementById('broadcast-input');
-      if (bi) bi.addEventListener('keydown', e => { if (e.key === 'Enter') sendBroadcast(); });
       const sp = document.getElementById('setup-password');
       if (sp) sp.addEventListener('keydown', e => { if (e.key === 'Enter') setupLogin(); });
     });

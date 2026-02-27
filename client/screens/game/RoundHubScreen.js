@@ -9,7 +9,6 @@ import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
-import { TASKS } from '../../data/tasks';
 
 const MOVEMENT_LABELS = { A: 'DEDUCTION', B: 'TASKS', C: 'VOTING' };
 const MOVEMENT_SEQUENCE = ['A', 'B', 'C'];
@@ -25,8 +24,6 @@ export default function RoundHubScreen({
   currentGroupMembers,
   groupNumber,
   teamPoints,
-  movementBMode,
-  onStartTask,
   onMovementReady,
   onGameStateUpdate,
   onRoundSummary,
@@ -102,14 +99,6 @@ export default function RoundHubScreen({
         setActiveMovement(null);
         setStatusMessage('Waiting for Game Master...');
         if (onRoundSetup) onRoundSetup({ roundNumber, groupId, groupNumber: gn, groupMembers, teamPoints: tp });
-      });
-
-      socket.on('taskAssigned', ({ taskId }) => {
-        if (movementBMode && onStartTask) {
-          const task = TASKS.find((t) => t.id === taskId);
-          if (task) onStartTask(task);
-          else console.warn('[RoundHub] Unknown taskId from server:', taskId);
-        }
       });
 
       socket.on('announcement', ({ message }) => {

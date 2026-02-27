@@ -55,6 +55,11 @@ async function init() {
     -- Expand max_players from 4–15 to 5–80
     ALTER TABLE lobbies DROP CONSTRAINT IF EXISTS lobbies_max_players_check;
     ALTER TABLE lobbies ADD CONSTRAINT lobbies_max_players_check CHECK (max_players >= 5 AND max_players <= 80);
+
+    -- Add 'summarizing' to rounds.status allowed values
+    ALTER TABLE rounds DROP CONSTRAINT IF EXISTS rounds_status_check;
+    ALTER TABLE rounds ADD CONSTRAINT rounds_status_check
+      CHECK (status IN ('pending', 'active', 'summarizing', 'completed'));
   `);
 
   await pool.query(`

@@ -28,12 +28,12 @@ import CountdownScreen from './screens/game/CountdownScreen';
 import RoleRevealScreen from './screens/game/RoleRevealScreen';
 import RoundHubScreen from './screens/game/RoundHubScreen';
 import MovementAScreen from './screens/game/MovementAScreen';
+import MovementBScreen from './screens/game/MovementBScreen';
 import VotingScreen from './screens/game/VotingScreen';
 import RoundSummaryScreen from './screens/game/RoundSummaryScreen';
-import GmDashboardScreen from './screens/game/GmDashboardScreen';
+import GmWaitingScreen from './screens/game/GmWaitingScreen';
 import GameOverScreen from './screens/game/GameOverScreen';
 import DevMenuScreen from './screens/dev/DevMenuScreen';
-import TaskScreen from './screens/tasks/TaskScreen';
 import { colors } from './theme/colors';
 import { fetchCurrentLobby, fetchPlayerGameState } from './utils/api';
 
@@ -76,9 +76,6 @@ export default function App() {
   // Scores (team-level only)
   const [teamPoints, setTeamPoints] = useState({ phos: 0, skotia: 0 });
 
-  // Task (Movement B)
-  const [currentTask, setCurrentTask] = useState(null);
-
   // Round summary & game over
   const [roundSummary, setRoundSummary] = useState(null);
   const [gameOverResult, setGameOverResult] = useState(null);
@@ -107,7 +104,6 @@ export default function App() {
   const SYNC_SKIP_SCREENS = [
     'loading', 'welcome', 'login', 'register', 'lobbyList',
     'countdown', 'roleReveal', 'roundSummary', 'gameOver', 'devMenu',
-    'task',
   ];
 
   // "Latest callback ref" pattern — updated on every render so the stable
@@ -306,14 +302,6 @@ export default function App() {
 
   const handleMovementAComplete = () => setCurrentScreen('roundHub');
 
-  // Movement B reuses TaskScreen; task is assigned server-side
-  const handleStartTask = (task) => {
-    setCurrentTask(task);
-    setCurrentScreen('task');
-  };
-
-  const handleTaskComplete = () => setCurrentScreen('roundHub');
-
   // Movement C voting timer (or GM force) ended — return to RoundHub for GM to resolve
   const handleMovementCComplete = () => {
     setCurrentScreen('roundHub');
@@ -376,7 +364,6 @@ export default function App() {
     setCurrentGroupNumber(null);
     setCurrentGroupMembers([]);
     setTeamPoints({ phos: 0, skotia: 0 });
-    setCurrentTask(null);
     setRoundSummary(null);
     setGameOverResult(null);
   };
@@ -399,7 +386,6 @@ export default function App() {
     if (params.groupNumber !== undefined) setCurrentGroupNumber(params.groupNumber);
     if (params.roundSummary !== undefined) setRoundSummary(params.roundSummary);
     if (params.gameOverResult !== undefined) setGameOverResult(params.gameOverResult);
-    if (params.currentTask !== undefined) setCurrentTask(params.currentTask);
     setCurrentScreen(screen);
   };
 
@@ -490,7 +476,6 @@ export default function App() {
       case 'roundHub':
         return (
           <RoundHubScreen
-            key="roundHub"
             token={token}
             gameId={gameId}
             lobbyId={currentLobbyId}
@@ -527,38 +512,13 @@ export default function App() {
 
       case 'movementB':
         return (
-          <RoundHubScreen
-            key="movementB"
+          <MovementBScreen
             token={token}
             gameId={gameId}
             lobbyId={currentLobbyId}
-            currentRound={currentRound}
-            totalRounds={totalRounds}
             currentTeam={currentTeam}
-            isMarked={isMarked}
-            currentGroupMembers={currentGroupMembers}
-            groupNumber={currentGroupNumber}
-            teamPoints={teamPoints}
-            movementBMode
-            onStartTask={handleStartTask}
-            onMovementReady={handleMovementReady}
-            onGameStateUpdate={handleGameStateUpdate}
-            onRoundSummary={handleRoundSummary}
-            onRoundSetup={handleRoundSetup}
-            onGameOver={handleGameOver}
-            onLobbyGone={handleLobbyGone}
-          />
-        );
-
-      case 'task':
-        return (
-          <TaskScreen
-            task={currentTask}
-            role={currentTeam}
-            token={token}
-            lobbyId={currentLobbyId}
-            onComplete={handleTaskComplete}
-            onCancel={() => setCurrentScreen('movementB')}
+            roundNumber={currentRound}
+            onMovementComplete={() => setCurrentScreen('roundHub')}
           />
         );
 
@@ -593,15 +553,7 @@ export default function App() {
         );
 
       case 'gmDashboard':
-        return (
-          <GmDashboardScreen
-            token={token}
-            gameId={gameId}
-            lobbyId={currentLobbyId}
-            onGameOver={handleGameOver}
-            onLobbyGone={handleLobbyGone}
-          />
-        );
+        return <GmWaitingScreen />;
 
       case 'gameOver':
         return (

@@ -815,7 +815,7 @@ async function advanceMovement(gameId) {
     if (!roundId) throw new Error('No active or summarizing round found for this game');
 
     const movementsRes = await client.query(
-      'SELECT id, movement_type, status FROM movements WHERE round_id = $1 ORDER BY created_at',
+      'SELECT id, movement_type, status FROM movements WHERE round_id = $1 ORDER BY id',
       [roundId]
     );
     const movByType = {};
