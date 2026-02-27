@@ -876,10 +876,6 @@ async function advanceMovement(gameId) {
         "INSERT INTO movements (round_id, movement_type, status, started_at) VALUES ($1, 'B', 'active', now())",
         [roundId]
       );
-      await client.query(
-        "UPDATE game_teams SET points = points + $1 WHERE game_id = $2 AND team = 'skotia'",
-        [POINTS.SKOTIA_PASSIVE, gameId]
-      );
       await client.query('COMMIT');
       return { step: 'activateB', roundNumber, lobbyId: String(lobbyId), gameId: String(gameId) };
     }
@@ -889,6 +885,11 @@ async function advanceMovement(gameId) {
       await client.query(
         "UPDATE movements SET status = 'completed', completed_at = now() WHERE id = $1",
         [movB.id]
+      );
+      // Award Skotia passive bonus at the end of Movement B
+      await client.query(
+        "UPDATE game_teams SET points = points + $1 WHERE game_id = $2 AND team = 'skotia'",
+        [POINTS.SKOTIA_PASSIVE, gameId]
       );
       await client.query('COMMIT');
       return { step: 'completeB', lobbyId: String(lobbyId), gameId: String(gameId) };

@@ -54,11 +54,15 @@ export default function GameOverScreen({ result, onReturn }) {
             {result?.skotiaPlayers?.length > 0 && (
               <View style={styles.revealBox}>
                 <Text style={styles.revealLabel}>THE SKOTIA WERE</Text>
-                {result.skotiaPlayers.map((name) => (
-                  <Text key={name} style={[styles.revealName, { color: colors.primary.neonRed }]}>
-                    {name}
-                  </Text>
-                ))}
+                {result.skotiaPlayers.map((player) => {
+                  const name = typeof player === 'string' ? player : player.username;
+                  const key = typeof player === 'string' ? player : player.id;
+                  return (
+                    <Text key={key} style={[styles.revealName, { color: colors.primary.neonRed }]}>
+                      {name}
+                    </Text>
+                  );
+                })}
               </View>
             )}
 

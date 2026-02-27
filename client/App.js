@@ -155,6 +155,23 @@ export default function App() {
           return;
         }
 
+        // If player is still on the lobby screen and game just started,
+        // route through countdown → roleReveal flow instead of jumping
+        // straight into the game. This prevents the sync loop from racing
+        // with the socket gameStarted event and skipping the countdown.
+        // Also fetch player state so team/group info is available for roleReveal.
+        if (currentScreen === 'lobby') {
+          const { ok: earlyOk, data: earlyState } = await fetchPlayerGameState(token, gId);
+          if (earlyOk && earlyState) {
+            if (earlyState.team)         setCurrentTeam(earlyState.team);
+            if (earlyState.groupId)      setCurrentGroupId(String(earlyState.groupId));
+            if (earlyState.groupMembers) setCurrentGroupMembers(earlyState.groupMembers);
+            if (earlyState.groupIndex != null) setCurrentGroupNumber(earlyState.groupIndex);
+          }
+          setCurrentScreen('countdown');
+          return;
+        }
+
         // Step 2 — per-player game state
         const { ok: stateOk, data: state } = await fetchPlayerGameState(token, gId);
         if (!stateOk) return;
