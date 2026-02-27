@@ -13,6 +13,10 @@ router.use(authenticateToken);
 const ADMIN_USERNAMES = new Set(
   (process.env.ADMIN_USERNAMES || '').split(',').map(s => s.trim()).filter(Boolean)
 );
+
+const GM_USERNAMES = new Set(
+  (process.env.GM_USERNAMES || '').split(',').map(s => s.trim()).filter(Boolean)
+);
 function requireAdmin(req, res, next) {
   if (!ADMIN_USERNAMES.has(req.user.username)) {
     return res.status(403).json({ error: 'Admin access required' });
@@ -71,6 +75,10 @@ router.get('/current', async (req, res) => {
 
     if (!result.rows[0]) return res.json({ lobby: null });
     const row = result.rows[0];
+    // When GM_USERNAMES is configured, only listed users are GM; otherwise fall back to host=GM
+    const isGm = GM_USERNAMES.size > 0
+      ? GM_USERNAMES.has(req.user.username)
+      : (row.is_gm === true || row.is_gm === 't');
     res.json({
       lobby: {
         id:     row.id,
@@ -78,7 +86,7 @@ router.get('/current', async (req, res) => {
         status: row.status,
         role:   row.role,
         team:   row.team || null,
-        isGm:   row.is_gm === true || row.is_gm === 't',
+        isGm,
         gameId: row.game_id ? String(row.game_id) : null,
       },
     });

@@ -11,6 +11,7 @@ export default function RoundSummaryScreen({
   totalRounds,
   summary,
   isLastRound,
+  isMarked,
   token,
   lobbyId,
   onContinue,
@@ -67,6 +68,16 @@ export default function RoundSummaryScreen({
           <Text style={styles.title}>ROUND COMPLETE</Text>
 
           <View style={styles.divider} />
+
+          {/* Personal mark status */}
+          {isMarked !== undefined && isMarked !== null && (
+            <View style={[styles.statusCard, isMarked && styles.statusCardMarked]}>
+              <Text style={styles.statusLabel}>YOUR STATUS</Text>
+              <Text style={[styles.statusValue, { color: isMarked ? colors.primary.neonRed : colors.accent.neonGreen }]}>
+                {isMarked ? 'MARKED ●' : 'CLEAR ●'}
+              </Text>
+            </View>
+          )}
 
           {/* Mark summary */}
           <View style={styles.card}>
@@ -214,6 +225,34 @@ const styles = StyleSheet.create({
   dividerV: {
     width: 1,
     backgroundColor: colors.border.subtle,
+  },
+  statusCard: {
+    width: '100%',
+    backgroundColor: colors.background.void,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderLeftWidth: 4,
+    borderColor: colors.border.default,
+    borderLeftColor: colors.accent.neonGreen,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statusCardMarked: {
+    borderLeftColor: colors.primary.neonRed,
+  },
+  statusLabel: {
+    fontFamily: fonts.display.bold,
+    fontSize: 10,
+    letterSpacing: 3,
+    color: colors.text.tertiary,
+  },
+  statusValue: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 18,
+    letterSpacing: 1,
   },
   finalRoundNotice: {
     width: '100%',

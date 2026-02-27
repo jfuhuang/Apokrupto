@@ -4,6 +4,10 @@ const pool = require('../db');
 const { getSabotage } = require('../data/sabotages');
 const gameService = require('../services/gameService');
 
+const GM_USERNAMES = new Set(
+  (process.env.GM_USERNAMES || '').split(',').map(s => s.trim()).filter(Boolean)
+);
+
 // In-memory map of lobbyId -> Set of connected userIds (as strings)
 const lobbyConnections = new Map();
 
@@ -63,12 +67,20 @@ async function getLobbyState(lobbyId) {
     .filter((p) => p.role === 'innocent')
     .reduce((sum, p) => sum + parseInt(p.points || 0), 0);
 
+  // If GM_USERNAMES is configured, surface the first GM user's id so the client
+  // can show the correct START button state and "You are the GM" label.
+  const gmPlayer = GM_USERNAMES.size > 0
+    ? playersResult.rows.find(p => GM_USERNAMES.has(p.username))
+    : null;
+  const gmUserId = gmPlayer ? gmPlayer.id : null;
+
   return {
     lobbyId: lobby.id,
     name: lobby.name,
     maxPlayers: lobby.max_players,
     status: lobby.status,
     hostId: lobby.created_by,
+    gmUserId,
     players,
     totalInnocentPoints,
   };
@@ -255,31 +267,34 @@ function setupLobbySocket(httpServer) {
 
         // If Movement B is active, re-emit this player's task assignment on reconnect.
         // If no assignment is in memory (e.g. server restarted), assign a fresh random task.
-        try {
-          const mbRes = await pool.query(
-            `SELECT g.id FROM games g
-             JOIN rounds r ON r.game_id = g.id AND r.status = 'active'
-             JOIN movements m ON m.round_id = r.id AND m.status = 'active'
-               AND m.movement_type = 'B'
-             WHERE g.lobby_id = $1 AND g.status = 'active'`,
-            [lobbyId]
-          );
-          if (mbRes.rows.length > 0) {
-            const mbGameId = String(mbRes.rows[0].id);
-            let taskId = gameService.getMovementBAssignment(mbGameId, socket.userId);
-            if (!taskId) {
-              // Assignment missing (server restarted or player connected after A→B) — assign fresh
-              const { TASKS } = require('../data/tasks');
-              const randomTask = TASKS[Math.floor(Math.random() * TASKS.length)];
-              taskId = randomTask.id;
-              gameService.storeMovementBAssignment(mbGameId, socket.userId, taskId);
-              console.log(`[MovementB] Assigned fresh task "${taskId}" to user ${socket.userId}`);
+        // GM users are spectators and never receive task assignments.
+        if (!GM_USERNAMES.has(socket.username)) {
+          try {
+            const mbRes = await pool.query(
+              `SELECT g.id FROM games g
+               JOIN rounds r ON r.game_id = g.id AND r.status = 'active'
+               JOIN movements m ON m.round_id = r.id AND m.status = 'active'
+                 AND m.movement_type = 'B'
+               WHERE g.lobby_id = $1 AND g.status = 'active'`,
+              [lobbyId]
+            );
+            if (mbRes.rows.length > 0) {
+              const mbGameId = String(mbRes.rows[0].id);
+              let taskId = gameService.getMovementBAssignment(mbGameId, socket.userId);
+              if (!taskId) {
+                // Assignment missing (server restarted or player connected after A→B) — assign fresh
+                const { TASKS } = require('../data/tasks');
+                const randomTask = TASKS[Math.floor(Math.random() * TASKS.length)];
+                taskId = randomTask.id;
+                gameService.storeMovementBAssignment(mbGameId, socket.userId, taskId);
+                console.log(`[MovementB] Assigned fresh task "${taskId}" to user ${socket.userId}`);
+              }
+              socket.emit('taskAssigned', { taskId });
+              console.log(`[MovementB] Re-emitted task "${taskId}" to reconnecting user ${socket.userId}`);
             }
-            socket.emit('taskAssigned', { taskId });
-            console.log(`[MovementB] Re-emitted task "${taskId}" to reconnecting user ${socket.userId}`);
+          } catch (err) {
+            console.error('[MovementB] reconnect task lookup error:', err.message);
           }
-        } catch (err) {
-          console.error('[MovementB] reconnect task lookup error:', err.message);
         }
 
         const state = await getLobbyState(lobbyId);
@@ -312,35 +327,63 @@ function setupLobbySocket(httpServer) {
         if (lobbyRes.rows.length === 0) throw new Error('Lobby not found');
 
         const lobby = lobbyRes.rows[0];
-        if (String(lobby.created_by) !== socket.userId) {
-          throw new Error('Only the host can start the game');
-        }
         if (lobby.status !== 'waiting') throw new Error('Game already started');
 
+        // Determine which connected sockets belong to GM_USERNAMES users
+        const roomKey = `lobby:${String(lobbyId)}`;
+        const gmUserIds = new Set();
+        for (const [, sock] of io.sockets.sockets) {
+          if (sock.rooms.has(roomKey) && GM_USERNAMES.has(sock.username)) {
+            gmUserIds.add(sock.userId);
+          }
+        }
+        const gmInRoom    = gmUserIds.size > 0;
+        const callerIsGm  = GM_USERNAMES.has(socket.username);
+        const callerIsHost = String(lobby.created_by) === socket.userId;
+        if (gmInRoom ? !callerIsGm : !callerIsHost) {
+          throw new Error(gmInRoom ? 'Only the GM can start the game' : 'Only the host can start the game');
+        }
+
         // Create game record + start it (assigns teams, groups, round 1 Movement A)
+        // GM users are excluded from team/group assignment — they are pure spectators.
         const gameId = await gameService.createGame(lobbyId, 4);
         const { playerTeams, playerGroups, skotiaPlayers, groups } =
-          await gameService.startGame(gameId);
+          await gameService.startGame(gameId, { excludeUserIds: [...gmUserIds] });
 
         console.log(
           `[WS] startGame lobby ${lobbyId}: gameId=${gameId}, ` +
-          `${skotiaPlayers.length} skotia / ${playerTeams.size - skotiaPlayers.length} phos`
+          `${skotiaPlayers.length} skotia / ${playerTeams.size - skotiaPlayers.length} phos` +
+          (gmInRoom ? ` (GM excluded: ${[...gmUserIds].join(',')})` : '')
         );
 
         // Emit per-player roleAssigned
-        const roomKey = `lobby:${String(lobbyId)}`;
         const skotiaUsernames = skotiaPlayers.map((p) => p.username);
 
         for (const [, sock] of io.sockets.sockets) {
           if (!sock.rooms.has(roomKey)) continue;
-          const uid  = sock.userId;
+          const uid = sock.userId;
+
+          // GM sockets get a special spectator payload
+          if (gmUserIds.has(uid)) {
+            sock.emit('roleAssigned', {
+              team: null,
+              isGm: true,
+              skotiaTeammates: [],
+              groupId: null,
+              groupNumber: null,
+              groupMembers: [],
+            });
+            console.log(`[WS] roleAssigned GM (spectator) → user ${uid}`);
+            continue;
+          }
+
           const team = playerTeams.get(uid);
           if (!team) continue;
 
           const groupInfo = playerGroups.get(uid);
           const rolePayload = {
             team,
-            isGm: uid === String(lobby.created_by),
+            isGm: gmInRoom ? false : uid === String(lobby.created_by),
             skotiaTeammates: team === 'skotia'
               ? skotiaUsernames.filter((name) => name !== sock.username)
               : [],
@@ -460,7 +503,9 @@ function setupLobbySocket(httpServer) {
           [gameId]
         );
         if (gameRes.rows.length === 0) throw new Error('Game not found');
-        if (String(gameRes.rows[0].created_by) !== socket.userId) {
+        const callerIsGmUser = GM_USERNAMES.has(socket.username);
+        const callerIsHost   = String(gameRes.rows[0].created_by) === socket.userId;
+        if (!callerIsGmUser && !callerIsHost) {
           throw new Error('Only the GM can advance the game');
         }
 
@@ -567,6 +612,7 @@ function _emitAdvanceEvents(io, result) {
     const { TASKS } = require('../data/tasks');
     for (const [, sock] of io.sockets.sockets) {
       if (!sock.rooms.has(lobbyRoom)) continue;
+      if (GM_USERNAMES.has(sock.username)) continue; // GM is a spectator — no task
       const randomTask = TASKS[Math.floor(Math.random() * TASKS.length)];
       gameService.storeMovementBAssignment(result.gameId, sock.userId, randomTask.id);
       sock.emit('taskAssigned', { taskId: randomTask.id });
@@ -603,6 +649,14 @@ function _emitAdvanceEvents(io, result) {
         io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
       }
     }
+    // Emit personal mark status to each connected lobby member before roundSummary
+    if (result.isMarkedMap) {
+      for (const [, sock] of io.sockets.sockets) {
+        if (!sock.rooms.has(lobbyRoom)) continue;
+        const marked = result.isMarkedMap.get(sock.userId);
+        if (marked !== undefined) sock.emit('markStatusUpdate', { isMarked: marked });
+      }
+    }
     io.to(lobbyRoom).emit('roundSummary', result.summary);
     return;
   }
@@ -637,6 +691,14 @@ function _emitAdvanceEvents(io, result) {
     if (result.groupResults) {
       for (const [gId, actions] of result.groupResults) {
         io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
+      }
+    }
+    // Emit personal mark status to each connected lobby member before roundSummary/gameOver
+    if (result.isMarkedMap) {
+      for (const [, sock] of io.sockets.sockets) {
+        if (!sock.rooms.has(lobbyRoom)) continue;
+        const marked = result.isMarkedMap.get(sock.userId);
+        if (marked !== undefined) sock.emit('markStatusUpdate', { isMarked: marked });
       }
     }
     if (result.summary) {

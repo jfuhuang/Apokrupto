@@ -664,7 +664,7 @@ async function createGame(lobbyId, totalRounds = 4) {
 // ---------------------------------------------------------------------------
 // startGame — assigns teams, groups, creates round 1 + Movement A
 // ---------------------------------------------------------------------------
-async function startGame(gameId) {
+async function startGame(gameId, options = {}) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -686,7 +686,10 @@ async function startGame(gameId) {
        ORDER BY lp.joined_at ASC`,
       [lobbyId]
     );
-    const players = playersRes.rows;
+
+    // Exclude GM users — they are spectators and must not be assigned a team/group
+    const excludeSet = new Set((options.excludeUserIds || []).map(String));
+    const players = playersRes.rows.filter(p => !excludeSet.has(String(p.user_id)));
 
     if (players.length < 5) {
       throw new Error('Need at least 5 players to start');
@@ -913,6 +916,13 @@ async function advanceMovement(gameId) {
       const votingResult = await _resolveVoting(client, gameId, roundNumber);
       const supermajority = await _checkSupermajority(client, gameId);
 
+      // Build per-player mark status map after voting resolves
+      const marksRes = await client.query(
+        'SELECT user_id::text, is_marked FROM game_players WHERE game_id = $1',
+        [gameId]
+      );
+      const isMarkedMap = new Map(marksRes.rows.map((r) => [r.user_id, r.is_marked]));
+
       if (supermajority) {
         await client.query("UPDATE rounds SET status = 'completed' WHERE id = $1", [roundId]);
         const gameOverData = await _endGame(client, gameId, 'phos', 'supermajority');
@@ -922,6 +932,7 @@ async function advanceMovement(gameId) {
           summary:      _buildSummary(votingResult, roundNumber),
           groupResults: votingResult.groupResults,
           gameOverData,
+          isMarkedMap,
           lobbyId: String(lobbyId),
           gameId:  String(gameId),
         };
@@ -936,6 +947,7 @@ async function advanceMovement(gameId) {
         gameId:  String(gameId),
         summary:      _buildSummary(votingResult, roundNumber),
         groupResults: votingResult.groupResults,
+        isMarkedMap,
       };
     }
 

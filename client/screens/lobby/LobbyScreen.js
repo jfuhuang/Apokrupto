@@ -156,6 +156,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
           maxPlayers: state.maxPlayers,
           status: state.status,
           hostId: state.hostId,
+          gmUserId: state.gmUserId ?? null,
         });
         setIsLoading(false);
       });
@@ -286,7 +287,11 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
   };
 
   const isHost = lobbyInfo ? String(lobbyInfo.hostId ?? lobbyInfo.created_by) === myUserId.current : false;
-  const canStart = isHost && players.length >= 5;
+  const isGmUser = lobbyInfo?.gmUserId
+    ? String(lobbyInfo.gmUserId) === myUserId.current
+    : false;
+  // If a GM is in the lobby only they can start; otherwise host can start
+  const canStart = (lobbyInfo?.gmUserId ? isGmUser : isHost) && players.length >= 5;
 
   if (isLoading) {
     return (
@@ -314,7 +319,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
               {players.length}/{lobbyInfo?.maxPlayers ?? '?'} players
             </Text>
             <Text style={styles.playerCountHeader}>
-              {isHost ? 'You are the host' : 'Waiting for host to start the game'}
+              {isGmUser ? 'You are the GM' : isHost ? 'You are the host' : lobbyInfo?.gmUserId ? 'Waiting for GM to start...' : 'Waiting for host to start the game'}
             </Text>
           </View>
 

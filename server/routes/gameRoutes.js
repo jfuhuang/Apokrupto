@@ -1,6 +1,10 @@
 const express = require('express');
 const router  = express.Router();
 const auth    = require('../middleware/auth');
+
+const GM_USERNAMES = new Set(
+  (process.env.GM_USERNAMES || '').split(',').map(s => s.trim()).filter(Boolean)
+);
 const db      = require('../db');
 const {
   createGame,
@@ -132,7 +136,9 @@ router.post('/:gameId/advance', auth, async (req, res) => {
       [gameId]
     );
     if (gameRes.rows.length === 0) return res.status(404).json({ error: 'Game not found' });
-    if (String(gameRes.rows[0].created_by) !== String(req.user.sub)) {
+    const callerIsGmUser = GM_USERNAMES.has(req.user.username);
+    const callerIsHost   = String(gameRes.rows[0].created_by) === String(req.user.sub);
+    if (!callerIsGmUser && !callerIsHost) {
       return res.status(403).json({ error: 'Only the GM can advance the game' });
     }
 

@@ -307,6 +307,9 @@ export default function App() {
     setCurrentScreen('roundHub');
   };
 
+  // RoundHubScreen received markStatusUpdate event — update personal mark status
+  const handleMarkStatusUpdate = (marked) => setIsMarked(marked);
+
   // RoundHubScreen received roundSummary event — navigate to summary screen
   const handleRoundSummary = (summary) => {
     setRoundSummary(summary || null);
@@ -488,6 +491,7 @@ export default function App() {
             teamPoints={teamPoints}
             onMovementReady={handleMovementReady}
             onGameStateUpdate={handleGameStateUpdate}
+            onMarkStatusUpdate={handleMarkStatusUpdate}
             onRoundSummary={handleRoundSummary}
             onRoundSetup={handleRoundSetup}
             onGameOver={handleGameOver}
@@ -544,6 +548,7 @@ export default function App() {
             totalRounds={totalRounds}
             summary={roundSummary}
             isLastRound={currentRound >= totalRounds}
+            isMarked={isMarked}
             token={token}
             lobbyId={currentLobbyId}
             onContinue={handleRoundSummaryContinue}

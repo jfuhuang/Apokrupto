@@ -26,6 +26,7 @@ export default function RoundHubScreen({
   teamPoints,
   onMovementReady,
   onGameStateUpdate,
+  onMarkStatusUpdate,
   onRoundSummary,
   onRoundSetup,
   onGameOver,
@@ -73,6 +74,10 @@ export default function RoundHubScreen({
         if (state.teamPoints) setLiveTeamPoints(state.teamPoints);
         if (state.groupMembers) setLiveGroupMembers(state.groupMembers);
         if (onGameStateUpdate) onGameStateUpdate(state);
+      });
+
+      socket.on('markStatusUpdate', ({ isMarked: marked }) => {
+        if (onMarkStatusUpdate) onMarkStatusUpdate(marked);
       });
 
       socket.on('movementStart', ({ movement, groupId, groupMembers, groupNumber: gn }) => {
