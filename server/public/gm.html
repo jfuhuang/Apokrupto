@@ -86,12 +86,20 @@
     .header-right {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 12px;
       font-size: 0.7rem;
       letter-spacing: 2px;
       color: var(--muted);
       text-transform: uppercase;
     }
+    #change-lobby-btn {
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      padding: 4px 10px;
+      border-color: var(--muted);
+      color: var(--muted);
+    }
+    #change-lobby-btn:hover { border-color: var(--blue); color: var(--blue); }
     #conn-dot {
       width: 8px;
       height: 8px;
@@ -556,6 +564,7 @@
       <span id="timer-badge">--:--</span>
     </div>
     <div class="header-right">
+      <button id="change-lobby-btn" onclick="changeSession()" style="display:none;">CHANGE LOBBY</button>
       <div id="conn-dot" class="offline"></div>
       <span id="conn-label">OFFLINE</span>
     </div>
@@ -646,6 +655,49 @@
     let pollInterval = null;
     let setupSelectedLobby = null;
 
+    // ── Session persistence ─────────────────────────────────────────────────
+    const SESSION_KEY = 'apk_gm_session';
+
+    function saveSession() {
+      try {
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+          token: gmToken, lobbyId, gameId, isControl,
+        }));
+      } catch (_) {}
+    }
+
+    function loadSession() {
+      try {
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        if (!raw) return false;
+        const s = JSON.parse(raw);
+        if (!s.token || !s.lobbyId) return false;
+        gmToken   = s.token;
+        lobbyId   = s.lobbyId;
+        gameId    = s.gameId   || gameId;
+        isControl = s.isControl ?? isControl;
+        return true;
+      } catch (_) { return false; }
+    }
+
+    function clearSession() {
+      try { sessionStorage.removeItem(SESSION_KEY); } catch (_) {}
+    }
+
+    function changeSession() {
+      clearSession();
+      if (socket) { socket.disconnect(); socket = null; }
+      if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+      stopTimer();
+      gmToken = ''; lobbyId = ''; gameId = ''; isControl = false;
+      document.getElementById('change-lobby-btn').style.display = 'none';
+      document.getElementById('setup-screen').classList.remove('hidden');
+      document.getElementById('control-panel').classList.remove('visible');
+      document.getElementById('setup-login-step').style.display = 'flex';
+      document.getElementById('setup-lobby-step').classList.remove('visible');
+      document.getElementById('setup-error').textContent = '';
+    }
+
     // ── Movement timer ──────────────────────────────────────────────────────
     let _timerEndsAt = null;
     let _timerInterval = null;
@@ -686,8 +738,9 @@
     }
 
     // ── Init ────────────────────────────────────────────────────────────────
-    if (lobbyId) {
+    function launchDashboard() {
       document.getElementById('setup-screen').classList.add('hidden');
+      document.getElementById('change-lobby-btn').style.display = 'inline';
       if (isControl) {
         document.getElementById('control-panel').classList.add('visible');
         if (gmToken) unlockControls();
@@ -695,6 +748,12 @@
       connectSocket();
       fetchState();
       pollInterval = setInterval(fetchState, 10000);
+    }
+
+    if (lobbyId) {
+      launchDashboard();
+    } else if (!lobbyId && loadSession()) {
+      launchDashboard();
     }
 
     // ── Setup functions ──────────────────────────────────────────────────────
@@ -769,6 +828,7 @@
       document.getElementById('setup-error').textContent = '';
       setupSelectedLobby = null;
       gmToken = '';
+      clearSession();
       document.getElementById('setup-connect-btn').disabled = true;
     }
 
@@ -777,17 +837,8 @@
       lobbyId   = String(setupSelectedLobby.id);
       gameId    = setupSelectedLobby.gameId || '';
       isControl = document.getElementById('setup-control-mode').checked;
-
-      document.getElementById('setup-screen').classList.add('hidden');
-
-      if (isControl) {
-        document.getElementById('control-panel').classList.add('visible');
-        unlockControls();
-      }
-
-      connectSocket();
-      fetchState();
-      pollInterval = setInterval(fetchState, 10000);
+      saveSession();
+      launchDashboard();
     }
 
     // ── Socket ──────────────────────────────────────────────────────────────
@@ -814,6 +865,7 @@
       socket.on('gameStarted', (data) => {
         if (data && data.gameId) {
           gameId = String(data.gameId);
+          saveSession();
           fetchState();
         }
       });
