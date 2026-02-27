@@ -291,6 +291,7 @@ router.get('/:id/players', async (req, res) => {
         name: lobby.name,
         maxPlayers: lobby.max_players,
         status: lobby.status,
+        hostId: lobby.created_by,
       },
     });
   } catch (err) {
