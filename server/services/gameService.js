@@ -159,6 +159,7 @@ async function _autoAdvanceTurn(groupId, expectedIndex) {
         turnIndex:       newIndex,
         completedCount:  newCompleted,
         timeLimit:       30,
+        turnOrder:       state.turnOrder.map(String),
       });
     }
     _emitGmTurnUpdate(state.gameId, state.lobbyId, newIndex, state.turnOrder.length, 'active', now, io);
@@ -282,6 +283,7 @@ async function _doBotSubmit(groupId, expectedIndex) {
           completedCount:  newCompleted,
           timeLimit:       30,
           lastWord,
+          turnOrder:       state.turnOrder.map(String),
         });
       }
       _emitGmTurnUpdate(capturedGameId, freshState.lobbyId, newIndex, state.turnOrder.length, 'active', now, io2);
@@ -362,7 +364,7 @@ const MOVEMENT_B_DURATION_MS = 300_000;  // 5 minutes
 // ---------------------------------------------------------------------------
 const _votingTimers   = new Map(); // gameId → timeoutId
 const _votingEndTimes = new Map(); // gameId → votingEndsAt (epoch ms)
-const VOTING_DURATION_MS = 3 * 60 * 1000; // 3 minutes
+const VOTING_DURATION_MS = 60 * 1000; // 60 seconds
 
 function clearVotingTimer(gameId) {
   const key = String(gameId);
@@ -837,6 +839,9 @@ async function advanceMovement(gameId) {
     const movB = movByType['B'];
     const movC = movByType['C'];
 
+    const movSummary = Object.entries(movByType).map(([t, m]) => `${t}:${m.status}`).join(' ');
+    console.log(`[Game] advanceMovement game=${gameId} round=${roundNumber}/${totalRounds} roundStatus=${roundStatus} movements=[${movSummary}]`);
+
     // ── Phase 2: execute the applicable step in a transaction ─────────────
     await client.query('BEGIN');
 
@@ -891,6 +896,7 @@ async function advanceMovement(gameId) {
         "UPDATE game_teams SET points = points + $1 WHERE game_id = $2 AND team = 'skotia'",
         [POINTS.SKOTIA_PASSIVE, gameId]
       );
+      console.log(`[Game] completeB game=${gameId}: Skotia passive bonus +${POINTS.SKOTIA_PASSIVE}`);
       await client.query('COMMIT');
       return { step: 'completeB', lobbyId: String(lobbyId), gameId: String(gameId) };
     }
@@ -925,7 +931,9 @@ async function advanceMovement(gameId) {
     // ── summarizeRound: all 3 done, round still 'active' → GM resolves ───
     if (movC && movC.status === 'completed' && roundStatus === 'active') {
       const votingResult = await _resolveVoting(client, gameId, roundNumber);
+      console.log(`[Game] Voting resolved game=${gameId} round=${roundNumber}: marks=${votingResult.marksApplied} unmarks=${votingResult.unmarksApplied} phos=+${votingResult.phosPointsEarned} skotia=+${votingResult.skotiaPointsEarned}`);
       const supermajority = await _checkSupermajority(client, gameId);
+      if (supermajority) console.log(`[Game] SUPERMAJORITY detected game=${gameId} — Phos wins!`);
 
       // Build per-player mark status map after voting resolves
       const marksRes = await client.query(
@@ -972,6 +980,7 @@ async function advanceMovement(gameId) {
         const pts = { phos: 0, skotia: 0 };
         ptsRes.rows.forEach((r) => { pts[r.team] = r.points; });
         const winner = pts.phos >= pts.skotia ? 'phos' : 'skotia';
+        console.log(`[Game] GAME OVER game=${gameId} winner=${winner} by=points phos=${pts.phos} skotia=${pts.skotia}`);
 
         await client.query("UPDATE rounds SET status = 'completed' WHERE id = $1", [roundId]);
         const gameOverData = await _endGame(client, gameId, winner, 'points');

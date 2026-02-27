@@ -10,6 +10,19 @@ const { setupLobbySocket } = require('./websocket/lobbySocket');
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ── Request logger for API routes ──────────────────────────────────────────
+app.use('/api', (req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    const userId = req.user?.sub || '-';
+    const tag = res.statusCode >= 400 ? '!' : '→';
+    console.log(`[API] ${tag} ${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms user:${userId}`);
+  });
+  next();
+});
+
 app.use('/api/users', userRoutes);
 app.use('/api/lobbies', lobbyRoutes);
 app.use('/api/games', gameRoutes);

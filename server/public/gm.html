@@ -71,6 +71,18 @@
       letter-spacing: 2px;
       font-size: 0.7rem;
     }
+    #timer-badge {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 3px 10px;
+      letter-spacing: 2px;
+      font-size: 0.7rem;
+      font-weight: bold;
+      color: var(--text);
+      display: none;
+    }
+    #timer-badge.visible { display: inline; }
+    #timer-badge.urgent { color: var(--red); border-color: var(--red); }
     .header-right {
       display: flex;
       align-items: center;
@@ -173,6 +185,39 @@
     }
     #score-bar-phos-pct { color: var(--blue); }
     #score-bar-skotia-pct { color: var(--red); }
+
+    /* ── Large Timer ── */
+    #timer-section {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      height: 20vh;
+      min-height: 100px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      gap: 6px;
+    }
+    #timer-section.visible { display: flex; }
+    #timer-section-label {
+      font-size: 0.65rem;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    #timer-section-value {
+      font-size: clamp(48px, 12vw, 120px);
+      font-weight: bold;
+      line-height: 1;
+      letter-spacing: 4px;
+      color: var(--text);
+      transition: color 0.3s;
+    }
+    #timer-section.urgent #timer-section-value {
+      color: var(--red);
+      text-shadow: 0 0 30px rgba(220,20,60,0.5);
+    }
 
     /* ── Game-over overlay ── */
     #game-over-overlay {
@@ -508,6 +553,7 @@
     <div class="header-center">
       <span id="round-badge">— / —</span>
       <span id="movement-badge">—</span>
+      <span id="timer-badge">--:--</span>
     </div>
     <div class="header-right">
       <div id="conn-dot" class="offline"></div>
@@ -539,6 +585,12 @@
       <span id="score-bar-phos-pct">ΦΩΣ 50%</span>
       <span id="score-bar-skotia-pct">ΣΚΟΤΊΑ 50%</span>
     </div>
+  </div>
+
+  <!-- Large Timer -->
+  <div id="timer-section">
+    <span id="timer-section-label">Time Remaining</span>
+    <span id="timer-section-value">--:--</span>
   </div>
 
   <!-- Groups section -->
@@ -593,6 +645,45 @@
     let socket = null;
     let pollInterval = null;
     let setupSelectedLobby = null;
+
+    // ── Movement timer ──────────────────────────────────────────────────────
+    let _timerEndsAt = null;
+    let _timerInterval = null;
+
+    function startTimer(endsAt) {
+      stopTimer();
+      if (!endsAt) return;
+      _timerEndsAt = endsAt;
+      const badge = document.getElementById('timer-badge');
+      const section = document.getElementById('timer-section');
+      badge.classList.add('visible');
+      section.classList.add('visible');
+      const tick = () => {
+        const secs = Math.max(0, Math.round((_timerEndsAt - Date.now()) / 1000));
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        const display = m + ':' + String(s).padStart(2, '0');
+        badge.textContent = display;
+        document.getElementById('timer-section-value').textContent = display;
+        const isUrgent = secs <= 15;
+        badge.classList.toggle('urgent', isUrgent);
+        section.classList.toggle('urgent', isUrgent);
+        if (secs <= 0) stopTimer();
+      };
+      tick();
+      _timerInterval = setInterval(tick, 1000);
+    }
+
+    function stopTimer() {
+      if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
+      _timerEndsAt = null;
+      const badge = document.getElementById('timer-badge');
+      const section = document.getElementById('timer-section');
+      badge.classList.remove('visible', 'urgent');
+      badge.textContent = '--:--';
+      section.classList.remove('visible', 'urgent');
+      document.getElementById('timer-section-value').textContent = '--:--';
+    }
 
     // ── Init ────────────────────────────────────────────────────────────────
     if (lobbyId) {
@@ -728,15 +819,30 @@
       });
 
       // Refresh state on any movement event
-      socket.on('movementStart', ({ movement, roundNumber, totalRounds }) => {
+      socket.on('movementStart', ({ movement, roundNumber, totalRounds, movementBEndsAt }) => {
         const movLabel = { A: 'MOV A — DEDUCTION', B: 'MOV B — TASKS', C: 'MOV C — VOTING' };
         if (movement) setText('movement-badge', movLabel[movement] || '—');
         if (roundNumber) setText('round-badge', `ROUND ${roundNumber} / ${totalRounds || '?'}`);
+        if (movement === 'B' && movementBEndsAt) startTimer(movementBEndsAt);
+        else if (movement === 'C' || movement === 'A') stopTimer(); // timer for A is driven by movementATurnUpdate
         fetchState();
+      });
+
+      socket.on('movementATurnUpdate', ({ phase, slotStartedAt, timeLimit }) => {
+        if (phase === 'active') {
+          startTimer((slotStartedAt || Date.now()) + (timeLimit || 30) * 1000);
+        } else {
+          stopTimer(); // deliberation phase — no countdown
+        }
+      });
+
+      socket.on('votingReady', ({ votingEndsAt }) => {
+        if (votingEndsAt) startTimer(votingEndsAt);
       });
 
       socket.on('movementComplete', ({ movement }) => {
         setText('movement-badge', `${movement} COMPLETE`);
+        stopTimer();
         fetchState();
       });
 
@@ -744,10 +850,12 @@
       socket.on('roundSetup', ({ roundNumber, totalRounds }) => {
         if (roundNumber) setText('round-badge', `ROUND ${roundNumber} / ${totalRounds || '?'}`);
         setText('movement-badge', '—');
+        stopTimer();
         fetchState();
       });
 
       socket.on('gameOver', ({ winner, condition } = {}) => {
+        stopTimer();
         showGameOver(winner, condition);
       });
 
@@ -771,7 +879,7 @@
     }
 
     // ── Apply game state to DOM ─────────────────────────────────────────────
-    function applyState({ players = [], groups = [], gameState = {}, teamPoints = {} } = {}) {
+    function applyState({ players = [], groups = [], gameState = {}, teamPoints = {}, movementBEndsAt, votingEndsAt } = {}) {
       const phos   = teamPoints.phos   ?? 0;
       const skotia = teamPoints.skotia ?? 0;
 
@@ -785,6 +893,15 @@
       setText('round-badge',    round ? `ROUND ${round} / ${total}` : '— / —');
       const movLabel = { A: 'MOV A — DEDUCTION', B: 'MOV B — TASKS', C: 'MOV C — VOTING' };
       setText('movement-badge', movLabel[gameState.movement] || '—');
+
+      // Start timer from REST data if not already running (reconnect / page refresh)
+      if (movementBEndsAt && movementBEndsAt > Date.now() && !_timerInterval) {
+        startTimer(movementBEndsAt);
+      } else if (votingEndsAt && votingEndsAt > Date.now() && !_timerInterval) {
+        startTimer(votingEndsAt);
+      } else if (!movementBEndsAt && !votingEndsAt && gameState.movement !== 'B' && gameState.movement !== 'C') {
+        stopTimer();
+      }
 
       if (groups.length > 0) {
         setText('groups-round-badge', round ? `ROUND ${round}` : '—');

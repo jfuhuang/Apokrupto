@@ -262,6 +262,7 @@ function setupLobbySocket(httpServer) {
             turnIndex:       turnState.currentIndex,
             completedCount:  turnState.completedCount,
             timeLimit:       remaining,
+            turnOrder:       turnState.turnOrder.map(String),
           });
         }
 
@@ -562,6 +563,63 @@ function getActiveSabotage(lobbyId) {
 function getIO() { return _io; }
 
 /**
+ * Emit a gameStateUpdate snapshot to the lobby room so all clients
+ * (RoundHubScreen, GmDashboardScreen, gm.html) can refresh live state.
+ * Fire-and-forget — errors are logged but never propagated.
+ */
+async function _emitGameStateUpdate(io, gameId, lobbyRoom) {
+  try {
+    const [gameRes, playersRes, ptsRes] = await Promise.all([
+      pool.query(
+        `SELECT g.current_round, g.total_rounds, g.status,
+                m.movement_type AS movement
+         FROM games g
+         LEFT JOIN rounds r    ON r.game_id = g.id AND r.status IN ('active', 'summarizing')
+         LEFT JOIN movements m ON m.round_id = r.id AND m.status = 'active'
+         WHERE g.id = $1`,
+        [gameId]
+      ),
+      pool.query(
+        `SELECT u.id, u.username, gp.team, gp.is_marked
+         FROM game_players gp
+         JOIN users u ON u.id = gp.user_id
+         WHERE gp.game_id = $1
+         ORDER BY gp.team, u.username`,
+        [gameId]
+      ),
+      pool.query(
+        'SELECT team, points FROM game_teams WHERE game_id = $1',
+        [gameId]
+      ),
+    ]);
+
+    const game = gameRes.rows[0];
+    if (!game) return;
+
+    const teamPoints = { phos: 0, skotia: 0 };
+    ptsRes.rows.forEach((r) => { teamPoints[r.team] = r.points; });
+
+    io.to(lobbyRoom).emit('gameStateUpdate', {
+      players: playersRes.rows.map((p) => ({
+        id:       String(p.id),
+        username: p.username,
+        team:     p.team,
+        isMarked: p.is_marked,
+      })),
+      gameState: {
+        round:       game.current_round,
+        totalRounds: game.total_rounds,
+        movement:    game.movement || null,
+        status:      game.status,
+      },
+      teamPoints,
+    });
+  } catch (err) {
+    console.error('[gameStateUpdate] emit error:', err.message);
+  }
+}
+
+/**
  * Emit the correct socket events after gameService.advanceMovement() resolves.
  * Shared between the WS gmAdvance handler and the REST POST /advance route.
  * Uses result.step (new 9-step state machine) to decide what to emit.
@@ -573,6 +631,7 @@ function _emitAdvanceEvents(io, result) {
   // ── activateA: GM started Movement A ──────────────────────────────────────
   if (result.step === 'activateA') {
     if (result.playerGroupMap && result.groups) {
+      let emitCount = 0;
       for (const [, sock] of io.sockets.sockets) {
         if (!sock.rooms.has(lobbyRoom)) continue;
         const group = result.playerGroupMap.get(sock.userId);
@@ -584,21 +643,24 @@ function _emitAdvanceEvents(io, result) {
           groupNumber:  group.groupIndex,
           groupMembers: group.members,
         });
+        emitCount++;
       }
+      console.log(`[Socket] activateA → movementStart per-socket to ${emitCount} players, ${result.groups.length} groups`);
+      // Also notify the lobby room (GM dashboard) that Movement A has started
+      io.to(lobbyRoom).emit('movementStart', { movement: 'A', roundNumber: result.roundNumber, totalRounds: result.totalRounds });
       // Start per-group turn timers; clients get initial turnStart via joinRoom
       gameService.startTurns(result.groups);
     }
-    return;
   }
 
   // ── completeA: deliberation timer (or GM force) finished A ────────────────
-  if (result.step === 'completeA') {
+  else if (result.step === 'completeA') {
     io.to(lobbyRoom).emit('movementComplete', { movement: 'A' });
-    return;
+    console.log(`[Socket] completeA → movementComplete {A} to ${lobbyRoom}`);
   }
 
   // ── activateB: GM started Movement B + task assignments ───────────────────
-  if (result.step === 'activateB') {
+  else if (result.step === 'activateB') {
     // Schedule timer first so getMovementBEndsAt is available for the emit
     gameService.scheduleMovementBAutoAdvance(result.gameId);
     const movementBEndsAt = gameService.getMovementBEndsAt(result.gameId);
@@ -607,56 +669,60 @@ function _emitAdvanceEvents(io, result) {
       roundNumber: result.roundNumber,
       movementBEndsAt,
     });
-    return;
+    console.log(`[Socket] activateB → movementStart {B} to ${lobbyRoom} (endsAt=${movementBEndsAt})`);
   }
 
   // ── completeB: B timer (or GM force) finished B ───────────────────────────
-  if (result.step === 'completeB') {
+  else if (result.step === 'completeB') {
     io.to(lobbyRoom).emit('movementComplete', { movement: 'B' });
-    return;
+    console.log(`[Socket] completeB → movementComplete {B} to ${lobbyRoom}`);
   }
 
   // ── activateC: GM started voting + voting timer ───────────────────────────
-  if (result.step === 'activateC') {
+  else if (result.step === 'activateC') {
     io.to(lobbyRoom).emit('movementStart', { movement: 'C', roundNumber: result.roundNumber });
     io.to(lobbyRoom).emit('votingReady', { votingEndsAt: result.votingEndsAt });
     gameService.scheduleVotingTimer(result.gameId, result.votingEndsAt);
-    return;
+    console.log(`[Socket] activateC → movementStart {C} + votingReady to ${lobbyRoom} (votingEndsAt=${result.votingEndsAt})`);
   }
 
   // ── completeC: voting timer (or GM force) finished C ─────────────────────
-  if (result.step === 'completeC') {
+  else if (result.step === 'completeC') {
     io.to(lobbyRoom).emit('movementComplete', { movement: 'C' });
-    return;
+    console.log(`[Socket] completeC → movementComplete {C} to ${lobbyRoom}`);
   }
 
   // ── summarizeRound: GM resolved votes → show round summary ───────────────
-  if (result.step === 'summarizeRound') {
+  else if (result.step === 'summarizeRound') {
     if (result.groupResults) {
       for (const [gId, actions] of result.groupResults) {
         io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
       }
+      console.log(`[Socket] summarizeRound → votingComplete to ${result.groupResults.size || 0} groups`);
     }
     // Emit personal mark status to each connected lobby member before roundSummary
     if (result.isMarkedMap) {
+      let markCount = 0;
       for (const [, sock] of io.sockets.sockets) {
         if (!sock.rooms.has(lobbyRoom)) continue;
         const marked = result.isMarkedMap.get(sock.userId);
-        if (marked !== undefined) sock.emit('markStatusUpdate', { isMarked: marked });
+        if (marked !== undefined) { sock.emit('markStatusUpdate', { isMarked: marked }); markCount++; }
       }
+      console.log(`[Socket] summarizeRound → markStatusUpdate per-socket to ${markCount} players`);
     }
     io.to(lobbyRoom).emit('roundSummary', result.summary);
-    return;
+    console.log(`[Socket] summarizeRound → roundSummary to ${lobbyRoom}`);
   }
 
   // ── nextRound: GM starts new round — per-player group assignments ─────────
-  if (result.step === 'nextRound') {
+  else if (result.step === 'nextRound') {
     const userGroupMap = new Map();
     for (const group of (result.newGroups || [])) {
       for (const memberId of group.memberIds) {
         userGroupMap.set(String(memberId), group);
       }
     }
+    let emitCount = 0;
     for (const [, sock] of io.sockets.sockets) {
       if (!sock.rooms.has(lobbyRoom)) continue;
       const group = userGroupMap.get(sock.userId);
@@ -669,34 +735,51 @@ function _emitAdvanceEvents(io, result) {
         groupMembers: group.members,
         teamPoints:   result.teamPoints,
       });
+      emitCount++;
     }
+    console.log(`[Socket] nextRound → roundSetup per-socket to ${emitCount} players (round ${result.roundNumber}/${result.totalRounds})`);
     // NOTE: startTurns is NOT called here — GM must activate A first
-    return;
   }
 
   // ── gameOver: supermajority hit during summarize, or final round ──────────
-  if (result.step === 'gameOver') {
+  else if (result.step === 'gameOver') {
     if (result.groupResults) {
       for (const [gId, actions] of result.groupResults) {
         io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
       }
+      console.log(`[Socket] gameOver → votingComplete to ${result.groupResults.size || 0} groups`);
     }
     // Emit personal mark status to each connected lobby member before roundSummary/gameOver
     if (result.isMarkedMap) {
+      let markCount = 0;
       for (const [, sock] of io.sockets.sockets) {
         if (!sock.rooms.has(lobbyRoom)) continue;
         const marked = result.isMarkedMap.get(sock.userId);
-        if (marked !== undefined) sock.emit('markStatusUpdate', { isMarked: marked });
+        if (marked !== undefined) { sock.emit('markStatusUpdate', { isMarked: marked }); markCount++; }
       }
+      console.log(`[Socket] gameOver → markStatusUpdate per-socket to ${markCount} players`);
     }
     if (result.summary) {
       io.to(lobbyRoom).emit('roundSummary', result.summary);
     }
     io.to(lobbyRoom).emit('gameOver', result.gameOverData);
+    console.log(`[Socket] gameOver → roundSummary + gameOver to ${lobbyRoom} (winner=${result.gameOverData?.winner})`);
+    // No gameStateUpdate needed — game is over
     return;
   }
 
-  console.warn('[emitAdvanceEvents] Unknown step:', result.step);
+  else {
+    console.warn('[emitAdvanceEvents] Unknown step:', result.step);
+    return;
+  }
+
+  // ── Broadcast gameStateUpdate after every step (except gameOver) ───────────
+  if (result.gameId) {
+    console.log(`[Socket] ${result.step} → gameStateUpdate to ${lobbyRoom}`);
+    _emitGameStateUpdate(io, result.gameId, lobbyRoom).catch((err) =>
+      console.error('[gameStateUpdate] error:', err.message)
+    );
+  }
 }
 
 module.exports = { setupLobbySocket, getIO, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage, broadcastPlayerKicked, emitAdvanceEvents: _emitAdvanceEvents };

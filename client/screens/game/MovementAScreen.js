@@ -43,6 +43,7 @@ export default function MovementAScreen({
   const [deliberationSecondsLeft, setDeliberationSecondsLeft] = useState(null); // null = waiting for server time
   const [submitting, setSubmitting] = useState(false);
   const [submittedIds, setSubmittedIds] = useState(new Set());
+  const [turnOrder, setTurnOrder] = useState(null); // [userId, ...] from server
 
   const socketRef = useRef(null);
   const turnTimerRef = useRef(null);
@@ -54,22 +55,38 @@ export default function MovementAScreen({
   // Keep ref in sync with state so the interval callback always has the latest value
   useEffect(() => { wordInputRef.current = wordInput; }, [wordInput]);
 
-  // Fetch prompt on mount (server returns team-specific prompt via JWT)
+  // Fetch prompt on mount (server returns team-specific prompt via JWT).
+  // Retries up to 3 times with a short delay — turn state may not be
+  // initialised yet if the client navigated before the server finished setup.
   useEffect(() => {
-    const fetchPrompt = async () => {
+    let cancelled = false;
+    const fetchPrompt = async (attempt = 1) => {
       try {
         const baseUrl = await getApiUrl();
         const res = await fetch(`${baseUrl}/api/games/${gameId}/movement-a/prompt`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (!res.ok) {
+          if (attempt < 3 && !cancelled) {
+            console.warn(`[MovementA] Prompt fetch attempt ${attempt} failed (${res.status}), retrying...`);
+            setTimeout(() => fetchPrompt(attempt + 1), 1500);
+            return;
+          }
+          console.warn(`[MovementA] Prompt fetch failed after ${attempt} attempts`);
+          return;
+        }
         const data = await res.json();
-        if (data.prompt) setPrompt(data.prompt);
+        if (!cancelled && data.prompt) setPrompt(data.prompt);
       } catch (err) {
+        if (attempt < 3 && !cancelled) {
+          setTimeout(() => fetchPrompt(attempt + 1), 1500);
+          return;
+        }
         console.warn('[MovementA] Could not fetch prompt:', err.message);
-        setPrompt('Think of a word that fits your theme.');
       }
     };
     if (gameId) fetchPrompt();
+    return () => { cancelled = true; };
   }, [gameId, token]);
 
   // Socket connection
@@ -93,7 +110,8 @@ export default function MovementAScreen({
       });
 
       // Server announces whose turn it is
-      socket.on('turnStart', ({ currentPlayerId, completedCount: cc, timeLimit, lastWord }) => {
+      socket.on('turnStart', ({ currentPlayerId, completedCount: cc, timeLimit, lastWord, turnOrder: order }) => {
+        if (order) setTurnOrder(order);
         clearInterval(turnTimerRef.current);
         submittedRef.current = false; // reset for this new turn
 

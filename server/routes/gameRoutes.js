@@ -27,6 +27,7 @@ const {
   emitGmTurnUpdate,
   getMovementATurnInfo,
   getMovementBEndsAt,
+  getVotingEndsAt,
 } = require('../services/gameService');
 const { getIO, emitAdvanceEvents } = require('../websocket/lobbySocket');
 const { getTask } = require('../data/tasks');
@@ -263,6 +264,8 @@ router.get('/:gameId/gm-state', auth, async (req, res) => {
       },
       teamPoints,
       movATurnInfo: game.movement === 'A' ? getMovementATurnInfo(gameId) : null,
+      movementBEndsAt: game.movement === 'B' ? getMovementBEndsAt(gameId) : null,
+      votingEndsAt: game.movement === 'C' ? getVotingEndsAt(gameId) : null,
     });
   } catch (err) {
     if (err.code === '42P01') return res.json(empty); // table not found
@@ -476,6 +479,7 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
             completedCount:  newCompleted,
             timeLimit:       30,
             lastWord,
+            turnOrder:       capturedTurnState.turnOrder.map(String),
           });
         }
         emitGmTurnUpdate(capturedGameId, capturedTurnState.lobbyId, newIndex, capturedTurnState.turnOrder.length, 'active', now, io2);
