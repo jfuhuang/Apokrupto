@@ -24,14 +24,17 @@ export default function SlingTask({ config, onSuccess, onFail }) {
   const [message, setMessage] = useState('');
   const [done, setDone] = useState(false);
 
+  // Refs so PanResponder callbacks (created once) always see the latest values
+  const attemptsLeftRef = useRef(attempts);
+  const doneRef = useRef(false);
+
   const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const lastPos = useRef({ x: STONE_START_X, y: STONE_START_Y });
   const prevPos = useRef({ x: STONE_START_X, y: STONE_START_Y });
-  const stone = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !done,
+      onStartShouldSetPanResponder: () => !doneRef.current,
       onPanResponderMove: (_, g) => {
         prevPos.current = { ...lastPos.current };
         lastPos.current = { x: STONE_START_X + g.dx, y: STONE_START_Y + g.dy };
@@ -61,11 +64,13 @@ export default function SlingTask({ config, onSuccess, onFail }) {
           const hit = dist < TARGET_SIZE * 0.75 && velocity >= minVelocity;
 
           if (hit) {
+            doneRef.current = true;
             setDone(true);
             setMessage('Direct hit!');
             onSuccess();
           } else {
-            const remaining = attemptsLeft - 1;
+            const remaining = attemptsLeftRef.current - 1;
+            attemptsLeftRef.current = remaining;
             setAttemptsLeft(remaining);
             if (velocity < minVelocity) {
               setMessage('Too slow! Swipe faster.');
@@ -76,6 +81,7 @@ export default function SlingTask({ config, onSuccess, onFail }) {
             setTimeout(() => {
               pan.setValue({ x: 0, y: 0 });
               if (remaining <= 0) {
+                doneRef.current = true;
                 setDone(true);
                 onFail();
               }

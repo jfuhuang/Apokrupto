@@ -581,7 +581,6 @@ export default function App() {
             isMarked={isMarked}
             token={token}
             lobbyId={currentLobbyId}
-            onContinue={handleRoundSummaryContinue}
             onRoundSetup={handleRoundSetup}
             onGameOver={handleGameOver}
           />

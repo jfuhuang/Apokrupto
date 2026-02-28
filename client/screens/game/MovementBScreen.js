@@ -12,18 +12,47 @@ import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
-import { TASKS } from '../../data/tasks';
+import { TASKS, TASK_CATEGORY, TASK_SPRITE } from '../../data/tasks';
 import { submitMovementBTask } from '../../utils/api';
 import TaskScreen from '../tasks/TaskScreen';
-
-// Only show individual (free_roam) tasks for now
-const INDIVIDUAL_TASKS = TASKS.filter((t) => t.taskType === 'free_roam');
 
 const DIFFICULTY_COLOR = {
   easy:   colors.accent.neonGreen,
   medium: colors.accent.amber,
   hard:   colors.primary.neonRed,
 };
+
+// Category tab definitions
+const CATEGORIES = [
+  {
+    key: TASK_CATEGORY.SCRIPTURE,
+    label: 'SCRIPTURE',
+    icon: '✝️',
+    color: colors.accent.ultraviolet,
+    description: 'Verse recall',
+  },
+  {
+    key: TASK_CATEGORY.TRIVIA,
+    label: 'TRIVIA',
+    icon: '❓',
+    color: colors.accent.amber,
+    description: 'Bible knowledge',
+  },
+  {
+    key: TASK_CATEGORY.CHALLENGES,
+    label: 'CHALLENGES',
+    icon: '⚡',
+    color: colors.primary.electricBlue,
+    description: 'Skill-based',
+  },
+  {
+    key: TASK_CATEGORY.COOPERATIVE,
+    label: 'COOP',
+    icon: '🤝',
+    color: colors.accent.neonGreen,
+    description: 'Group tasks',
+  },
+];
 
 export default function MovementBScreen({
   token,
@@ -34,30 +63,23 @@ export default function MovementBScreen({
   movementBEndsAt: initialEndsAt,
   onMovementComplete,
 }) {
-  // Which task the player is currently playing (null = on selector)
   const [activeTask, setActiveTask] = useState(null);
-  // Set of task IDs completed this session
   const [completedTasks, setCompletedTasks] = useState(new Set());
-  // Points earned this movement
   const [sessionPoints, setSessionPoints] = useState(0);
-  // Countdown
   const [secondsLeft, setSecondsLeft] = useState(null);
-  const endsAtRef = useRef(null);
+  const [selectedCategory, setSelectedCategory] = useState(TASK_CATEGORY.CHALLENGES);
 
+  const endsAtRef = useRef(null);
   const socketRef = useRef(null);
   const timerBarAnim = useRef(new Animated.Value(1)).current;
 
-  // Start the countdown animation + interval from an epoch-ms end time
   const startCountdown = useCallback((endsAt) => {
     if (!endsAt) return;
     endsAtRef.current = endsAt;
     const totalMs = endsAt - Date.now();
     if (totalMs <= 0) return;
-
     setSecondsLeft(Math.ceil(totalMs / 1000));
-
-    // Animate the timer bar from current position to 0
-    timerBarAnim.setValue(totalMs / (5 * 60 * 1000)); // proportion of 5 min
+    timerBarAnim.setValue(totalMs / (5 * 60 * 1000));
     Animated.timing(timerBarAnim, {
       toValue: 0,
       duration: totalMs,
@@ -65,7 +87,6 @@ export default function MovementBScreen({
     }).start();
   }, [timerBarAnim]);
 
-  // Countdown tick
   useEffect(() => {
     if (secondsLeft === null) return;
     if (secondsLeft <= 0) return;
@@ -76,17 +97,14 @@ export default function MovementBScreen({
     return () => clearInterval(id);
   }, [secondsLeft !== null]);
 
-  // Initialize countdown from prop (passed from App.js / RoundHubScreen)
   useEffect(() => {
     if (initialEndsAt && !endsAtRef.current) {
       startCountdown(initialEndsAt);
     }
   }, [initialEndsAt]);
 
-  // Socket connection
   useEffect(() => {
     let socket;
-
     const connect = async () => {
       const baseUrl = await getApiUrl();
       socket = io(baseUrl, {
@@ -100,23 +118,19 @@ export default function MovementBScreen({
         socket.emit('joinRoom', { lobbyId });
       });
 
-      // Initial timer info from movementStart or reconnect
       socket.on('movementStart', ({ movement, movementBEndsAt }) => {
         if (movement === 'B' && movementBEndsAt) {
           startCountdown(movementBEndsAt);
         }
-        // GM advanced past B → exit
         if (movement === 'C') {
           if (onMovementComplete) onMovementComplete();
         }
       });
 
-      // Reconnect: server sends timer info
       socket.on('movementBInfo', ({ movementBEndsAt }) => {
         if (movementBEndsAt) startCountdown(movementBEndsAt);
       });
 
-      // B completed (timer expired or GM force)
       socket.on('movementComplete', ({ movement }) => {
         if (movement === 'B') {
           if (onMovementComplete) onMovementComplete();
@@ -129,7 +143,6 @@ export default function MovementBScreen({
     };
 
     connect().catch(console.error);
-
     return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
@@ -138,12 +151,9 @@ export default function MovementBScreen({
     };
   }, [token, lobbyId]);
 
-  // Task completed successfully
   const handleTaskComplete = useCallback(async (taskId) => {
     setCompletedTasks((prev) => new Set([...prev, taskId]));
     setActiveTask(null);
-
-    // Submit to server for real point award
     try {
       const { ok, data } = await submitMovementBTask(token, gameId, taskId);
       if (ok) {
@@ -154,7 +164,6 @@ export default function MovementBScreen({
     }
   }, [token, gameId]);
 
-  // Task cancelled/failed — return to selector
   const handleTaskCancel = useCallback(() => {
     setActiveTask(null);
   }, []);
@@ -173,7 +182,7 @@ export default function MovementBScreen({
     );
   }
 
-  // ── Render task selector ────────────────────────────────────────────────
+  // ── Helpers ─────────────────────────────────────────────────────────────
   const teamColor =
     currentTeam === 'skotia' ? colors.primary.neonRed : colors.primary.electricBlue;
 
@@ -186,10 +195,15 @@ export default function MovementBScreen({
 
   const timerUrgent = secondsLeft !== null && secondsLeft <= 30;
 
+  const activeCat = CATEGORIES.find((c) => c.key === selectedCategory);
+  const visibleTasks = TASKS.filter((t) => t.category === selectedCategory);
+
+  // ── Render task selector ────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
+
+        {/* ── Header ── */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Text style={styles.headerLabel}>MOVEMENT B</Text>
@@ -212,20 +226,15 @@ export default function MovementBScreen({
                 ]}
               />
             </View>
-            <Text
-              style={[
-                styles.timerText,
-                timerUrgent && { color: colors.primary.neonRed },
-              ]}
-            >
+            <Text style={[styles.timerText, timerUrgent && { color: colors.primary.neonRed }]}>
               {formatTime(secondsLeft)}
             </Text>
           </View>
           <Text style={styles.headerRound}>ROUND {roundNumber}</Text>
         </View>
 
-        {/* Points earned banner */}
-        <View style={styles.pointsBanner}>
+        {/* ── Points banner ── */}
+        <View style={[styles.pointsBanner, { borderBottomColor: teamColor + '40' }]}>
           <Text style={[styles.pointsLabel, { color: teamColor }]}>
             {currentTeam === 'skotia' ? 'ΣΚΟΤΊΑ' : 'ΦΩΣ'} POINTS EARNED
           </Text>
@@ -234,58 +243,132 @@ export default function MovementBScreen({
           </Text>
         </View>
 
-        {/* Task list */}
+        {/* ── Category tabs ── */}
+        <View style={styles.tabRow}>
+          {CATEGORIES.map((cat) => {
+            const isSelected = selectedCategory === cat.key;
+            const tasksDone = TASKS.filter(
+              (t) => t.category === cat.key && completedTasks.has(t.id)
+            ).length;
+            const tasksTotal = TASKS.filter((t) => t.category === cat.key).length;
+            return (
+              <TouchableOpacity
+                key={cat.key}
+                style={[
+                  styles.tab,
+                  isSelected && {
+                    borderColor: cat.color,
+                    backgroundColor: cat.color + '18',
+                  },
+                ]}
+                onPress={() => setSelectedCategory(cat.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.tabIcon}>{cat.icon}</Text>
+                <Text style={[styles.tabLabel, isSelected && { color: cat.color }]}>
+                  {cat.label}
+                </Text>
+                {tasksDone > 0 && (
+                  <View style={[styles.tabBadge, { backgroundColor: cat.color }]}>
+                    <Text style={styles.tabBadgeText}>{tasksDone}/{tasksTotal}</Text>
+                  </View>
+                )}
+                {isSelected && (
+                  <View style={[styles.tabUnderline, { backgroundColor: cat.color }]} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* ── Category description strip ── */}
+        {activeCat && (
+          <View style={[styles.catStrip, { borderLeftColor: activeCat.color }]}>
+            <Text style={[styles.catStripIcon]}>{activeCat.icon}</Text>
+            <View>
+              <Text style={[styles.catStripTitle, { color: activeCat.color }]}>
+                {activeCat.label}
+              </Text>
+              <Text style={styles.catStripDesc}>{activeCat.description}</Text>
+            </View>
+
+            {/* Cooperative coming soon badge */}
+            {selectedCategory === TASK_CATEGORY.COOPERATIVE && (
+              <View style={styles.coopBadge}>
+                <Text style={styles.coopBadgeText}>GROUP</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ── Task grid ── */}
         <ScrollView
           style={styles.taskList}
           contentContainerStyle={styles.taskListContent}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.sectionLabel}>INDIVIDUAL TASKS</Text>
-          {INDIVIDUAL_TASKS.map((task) => {
+          {visibleTasks.length === 0 && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No tasks in this category.</Text>
+            </View>
+          )}
+
+          {visibleTasks.map((task) => {
             const done = completedTasks.has(task.id);
             const diffColor = DIFFICULTY_COLOR[task.difficulty] || colors.text.tertiary;
+            const sprite = TASK_SPRITE[task.id] || '📖';
+            const catDef = CATEGORIES.find((c) => c.key === task.category);
+            const accentColor = catDef ? catDef.color : colors.primary.electricBlue;
+            const isCoopStub = task.category === TASK_CATEGORY.COOPERATIVE;
+
             return (
               <TouchableOpacity
                 key={task.id}
-                style={[styles.taskCard, done && styles.taskCardDone]}
-                onPress={() => !done && setActiveTask(task)}
-                activeOpacity={done ? 1 : 0.7}
-                disabled={done}
+                style={[
+                  styles.taskCard,
+                  done && styles.taskCardDone,
+                  isCoopStub && styles.taskCardCoop,
+                  { borderLeftColor: done ? colors.accent.neonGreen : accentColor },
+                ]}
+                onPress={() => !done && !isCoopStub && setActiveTask(task)}
+                activeOpacity={done || isCoopStub ? 1 : 0.75}
+                disabled={done || isCoopStub}
               >
-                <View style={styles.taskCardTop}>
-                  <Text
-                    style={[styles.taskTitle, done && styles.taskTitleDone]}
-                    numberOfLines={1}
-                  >
-                    {task.title}
-                  </Text>
-                  <View style={styles.taskMeta}>
-                    <Text style={[styles.taskDiff, { color: diffColor }]}>
-                      {task.difficulty.toUpperCase()}
-                    </Text>
-                    <Text style={styles.taskPts}>
-                      {done ? '✓' : `+${task.points.alive}`}
-                    </Text>
-                  </View>
+                {/* Sprite column */}
+                <View style={[styles.spriteCol, { backgroundColor: accentColor + '22' }]}>
+                  <Text style={styles.spriteText}>{sprite}</Text>
+                  {done && <Text style={styles.spriteDone}>✓</Text>}
                 </View>
-                <Text
-                  style={[styles.taskSynopsis, done && styles.taskSynopsisDone]}
-                  numberOfLines={2}
-                >
-                  {task.synopsis}
-                </Text>
-                <Text style={styles.taskRef}>{task.reference}</Text>
+
+                {/* Info column */}
+                <View style={styles.infoCol}>
+                  <View style={styles.infoTop}>
+                    <Text
+                      style={[styles.taskTitle, done && styles.taskTitleDone]}
+                      numberOfLines={1}
+                    >
+                      {task.title}
+                    </Text>
+                    <View style={styles.taskMeta}>
+                      <Text style={[styles.taskDiff, { color: diffColor }]}>
+                        {task.difficulty.toUpperCase()}
+                      </Text>
+                      <Text style={[styles.taskPts, done && { color: colors.accent.neonGreen }]}>
+                        {done ? 'DONE' : `+${task.points.alive}`}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.taskSynopsis, done && styles.taskSynopsisDone]}
+                    numberOfLines={2}>
+                    {isCoopStub
+                      ? task.synopsis + ' (Requires your full group)'
+                      : task.synopsis}
+                  </Text>
+                  <Text style={styles.taskRef}>{task.reference}</Text>
+                </View>
               </TouchableOpacity>
             );
           })}
-
-          {/* Cooperative placeholder */}
-          <Text style={[styles.sectionLabel, { marginTop: 20 }]}>
-            COOPERATIVE TASKS
-          </Text>
-          <View style={styles.comingSoon}>
-            <Text style={styles.comingSoonText}>Coming soon...</Text>
-          </View>
 
           <View style={{ height: 32 }} />
         </ScrollView>
@@ -367,7 +450,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
   },
   pointsLabel: {
     fontFamily: fonts.display.bold,
@@ -380,39 +462,157 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
+  // ── Category tabs ─────────────────────────────────────────────────────
+  tabRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 0,
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    position: 'relative',
+    gap: 2,
+  },
+  tabIcon: {
+    fontSize: 18,
+  },
+  tabLabel: {
+    fontFamily: fonts.display.bold,
+    fontSize: 7,
+    letterSpacing: 1,
+    color: colors.text.tertiary,
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  tabBadgeText: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 7,
+    color: colors.background.space,
+  },
+  tabUnderline: {
+    position: 'absolute',
+    bottom: -1,
+    left: 4,
+    right: 4,
+    height: 2,
+    borderRadius: 1,
+  },
+
+  // ── Category description strip ────────────────────────────────────────
+  catStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderLeftWidth: 3,
+    marginHorizontal: 12,
+    marginTop: 12,
+    marginBottom: 4,
+    backgroundColor: colors.background.void,
+    borderRadius: 6,
+    gap: 10,
+  },
+  catStripIcon: {
+    fontSize: 22,
+  },
+  catStripTitle: {
+    fontFamily: fonts.display.bold,
+    fontSize: 10,
+    letterSpacing: 2,
+  },
+  catStripDesc: {
+    ...typography.small,
+    color: colors.text.tertiary,
+    letterSpacing: 0.5,
+    marginTop: 1,
+  },
+  coopBadge: {
+    marginLeft: 'auto',
+    backgroundColor: colors.accent.neonGreen + '30',
+    borderWidth: 1,
+    borderColor: colors.accent.neonGreen,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  coopBadgeText: {
+    fontFamily: fonts.display.bold,
+    fontSize: 8,
+    letterSpacing: 1,
+    color: colors.accent.neonGreen,
+  },
+
   // ── Task list ─────────────────────────────────────────────────────────
   taskList: {
     flex: 1,
   },
   taskListContent: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-  },
-  sectionLabel: {
-    fontFamily: fonts.display.bold,
-    fontSize: 10,
-    letterSpacing: 3,
-    color: colors.text.tertiary,
-    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingTop: 10,
   },
 
   // ── Task card ─────────────────────────────────────────────────────────
   taskCard: {
+    flexDirection: 'row',
     backgroundColor: colors.background.panel,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border.default,
-    padding: 14,
+    borderLeftWidth: 3,
     marginBottom: 10,
-    gap: 6,
+    overflow: 'hidden',
   },
   taskCardDone: {
-    opacity: 0.45,
-    borderColor: colors.accent.neonGreen,
-    borderLeftWidth: 3,
+    opacity: 0.5,
     borderLeftColor: colors.accent.neonGreen,
   },
-  taskCardTop: {
+  taskCardCoop: {
+    borderStyle: 'dashed',
+    opacity: 0.8,
+  },
+
+  // Sprite column
+  spriteCol: {
+    width: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 4,
+  },
+  spriteText: {
+    fontSize: 26,
+  },
+  spriteDone: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 11,
+    color: colors.accent.neonGreen,
+  },
+
+  // Info column
+  infoCol: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingRight: 12,
+    paddingLeft: 8,
+    gap: 4,
+  },
+  infoTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -420,55 +620,50 @@ const styles = StyleSheet.create({
   taskTitle: {
     fontFamily: fonts.display.bold,
     fontSize: 13,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     color: colors.text.primary,
     flex: 1,
-    marginRight: 8,
+    marginRight: 6,
   },
   taskTitleDone: {
     color: colors.accent.neonGreen,
   },
   taskMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 2,
   },
   taskDiff: {
     fontFamily: fonts.display.bold,
-    fontSize: 8,
+    fontSize: 7,
     letterSpacing: 1,
   },
   taskPts: {
     fontFamily: fonts.accent.bold,
-    fontSize: 14,
+    fontSize: 13,
     color: colors.accent.amber,
   },
   taskSynopsis: {
     ...typography.small,
     color: colors.text.secondary,
-    lineHeight: 16,
+    lineHeight: 15,
   },
   taskSynopsisDone: {
     color: colors.text.disabled,
   },
   taskRef: {
     fontFamily: fonts.accent.semiBold,
-    fontSize: 10,
+    fontSize: 9,
     color: colors.accent.amber,
     letterSpacing: 0.5,
   },
 
-  // ── Cooperative placeholder ───────────────────────────────────────────
-  comingSoon: {
-    backgroundColor: colors.background.void,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    borderStyle: 'dashed',
-    padding: 24,
+  // ── Empty state ────────────────────────────────────────────────────────
+  emptyState: {
     alignItems: 'center',
+    paddingVertical: 40,
   },
-  comingSoonText: {
+  emptyStateText: {
     ...typography.small,
     color: colors.text.disabled,
     fontStyle: 'italic',

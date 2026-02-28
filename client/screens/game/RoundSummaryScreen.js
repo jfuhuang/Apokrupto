@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
@@ -14,7 +14,6 @@ export default function RoundSummaryScreen({
   isMarked,
   token,
   lobbyId,
-  onContinue,
   onRoundSetup,
   onGameOver,
 }) {
@@ -63,7 +62,11 @@ export default function RoundSummaryScreen({
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.body}>
+        <ScrollView
+          contentContainerStyle={styles.body}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           <Text style={styles.roundLabel}>ROUND {roundNumber} OF {totalRounds}</Text>
           <Text style={styles.title}>ROUND COMPLETE</Text>
 
@@ -114,17 +117,8 @@ export default function RoundSummaryScreen({
             </View>
           )}
 
-          <TouchableOpacity
-            style={[styles.continueBtn, !isLastRound && styles.continueBtnDisabled]}
-            onPress={isLastRound ? onContinue : undefined}
-            disabled={!isLastRound}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.continueBtnText, !isLastRound && styles.continueBtnTextDisabled]}>
-              {isLastRound ? 'SEE RESULTS' : 'WAITING FOR GM...'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+          <Text style={styles.waitingLabel}>WAITING FOR GM...</Text>
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
@@ -139,12 +133,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   body: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 28,
     paddingVertical: 28,
-    gap: 22,
+    gap: 18,
   },
   roundLabel: {
     ...typography.subtitle,
@@ -275,33 +269,10 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     textAlign: 'center',
   },
-  continueBtn: {
-    width: '100%',
-    paddingVertical: 16,
-    backgroundColor: colors.primary.electricBlue,
-    borderRadius: 10,
-    alignItems: 'center',
-    shadowColor: colors.shadow.electricBlue,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  continueBtnDisabled: {
-    backgroundColor: colors.background.panel,
-    shadowOpacity: 0,
-    elevation: 0,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-  },
-  continueBtnText: {
+  waitingLabel: {
     fontFamily: fonts.display.bold,
-    fontSize: 14,
-    letterSpacing: 3,
-    color: colors.background.space,
-  },
-  continueBtnTextDisabled: {
-    color: colors.text.disabled,
     fontSize: 11,
+    letterSpacing: 3,
+    color: colors.text.disabled,
   },
 });
