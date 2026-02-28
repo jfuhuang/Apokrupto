@@ -60,6 +60,29 @@ async function init() {
     ALTER TABLE rounds DROP CONSTRAINT IF EXISTS rounds_status_check;
     ALTER TABLE rounds ADD CONSTRAINT rounds_status_check
       CHECK (status IN ('pending', 'active', 'summarizing', 'completed'));
+
+    -- Sketch mode: store normalized SVG path data
+    ALTER TABLE movement_a_submissions
+      ADD COLUMN IF NOT EXISTS sketch_data JSONB;
+
+    -- Tag each prompt as 'word' or 'sketch'
+    ALTER TABLE prompts
+      ADD COLUMN IF NOT EXISTS prompt_mode VARCHAR DEFAULT 'word';
+  `);
+
+  // Sketch mode: allow NULL word — idempotent via information_schema check
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'movement_a_submissions'
+          AND column_name = 'word'
+          AND is_nullable = 'NO'
+      ) THEN
+        ALTER TABLE movement_a_submissions ALTER COLUMN word DROP NOT NULL;
+      END IF;
+    END $$;
   `);
 
   await pool.query(`
@@ -189,22 +212,45 @@ async function init() {
     CREATE INDEX IF NOT EXISTS ix_mark_events    ON mark_events (game_id, round_number);
   `);
 
-  // Seed biblical prompt pairs (only if table is empty)
+  // Seed word prompt pairs (only if table is empty)
   await pool.query(`
-    INSERT INTO prompts (phos_prompt, skotia_prompt, theme_label)
+    INSERT INTO prompts (phos_prompt, skotia_prompt, theme_label, prompt_mode)
     SELECT * FROM (VALUES
-      ('Fruits of the Spirit',         'Things that feel good in the moment',  'Spirit vs. Flesh'),
-      ('Names for Jesus',               'Things people worship instead of God', 'True vs. False Worship'),
-      ('Ways to serve others',          'Ways to put yourself first',           'Service vs. Self'),
-      ('Gifts from God',                'Things money can buy',                 'Grace vs. Wealth'),
-      ('Words from the Beatitudes',     'Things the world calls success',       'Kingdom vs. World'),
-      ('Qualities of the Holy Spirit',  'Things the world calls strength',      'Spirit vs. Power'),
-      ('Things Jesus said',             'Lies the world tells you',             'Truth vs. Deception'),
-      ('Characters from the Gospels',   'Famous people everyone knows',         'Sacred vs. Famous'),
-      ('Books of the Bible',            'Popular books or movies',              'Scripture vs. Culture'),
-      ('Places in the Holy Land',       'Places people dream of visiting',      'Sacred vs. Worldly')
-    ) AS seed(phos_prompt, skotia_prompt, theme_label)
+      ('Sources of lasting joy',              'Things that feel amazing but fade quickly',   'Joy vs. Pleasure',         'word'),
+      ('Things that truly restore you',       'Ways people escape their problems',           'Rest vs. Escape',          'word'),
+      ('Things worth sacrificing for',        'Things people give up just to fit in',        'Sacrifice vs. Conformity', 'word'),
+      ('Signs of genuine courage',            'Things people do for others'' approval',      'Courage vs. Approval',     'word'),
+      ('Things that build real community',    'Things that make you popular',                'Community vs. Popularity', 'word'),
+      ('Things that bring genuine peace',     'Ways people stop themselves from thinking',   'Peace vs. Numbness',       'word'),
+      ('Signs of real growth in a person',    'Things people change to impress others',      'Growth vs. Image',         'word'),
+      ('Things worth dedicating your life to','Things people chase to feel important',       'Purpose vs. Ambition',     'word'),
+      ('Things that make someone feel known', 'Things that make someone feel accepted',      'Belonging vs. Fitting In', 'word'),
+      ('What real forgiveness looks like',    'Ways people just try to move on',             'Forgiveness vs. Moving On','word'),
+      ('Signs of genuine wisdom',             'Things people mistake for wisdom',            'Wisdom vs. Cleverness',    'word'),
+      ('What makes a place feel like home',   'Things that make you feel comfortable',       'Home vs. Comfort',         'word'),
+      ('What real strength looks like',       'Ways people try to appear strong',            'Strength vs. Performance', 'word'),
+      ('Things that bring genuine healing',   'Ways people cope with pain',                  'Healing vs. Coping',       'word'),
+      ('What love actually requires',         'What love feels like',                        'Love vs. Feeling',         'word')
+    ) AS seed(phos_prompt, skotia_prompt, theme_label, prompt_mode)
     WHERE NOT EXISTS (SELECT 1 FROM prompts LIMIT 1)
+  `);
+
+  // Seed sketch prompt pairs (only if no sketch prompts exist yet)
+  await pool.query(`
+    INSERT INTO prompts (phos_prompt, skotia_prompt, theme_label, prompt_mode)
+    SELECT * FROM (VALUES
+      ('A lighthouse',           'A swamp',               'Light vs. Dark',          'sketch'),
+      ('A shepherd',             'A wolf',                'Shepherd vs. Predator',   'sketch'),
+      ('A cross',                'A crown',               'Sacrifice vs. Power',     'sketch'),
+      ('A garden in bloom',      'A withered tree',       'Life vs. Decay',          'sketch'),
+      ('A door open to light',   'A locked door',         'Welcome vs. Barrier',     'sketch'),
+      ('A calm lake',            'A storm cloud',         'Peace vs. Storm',         'sketch'),
+      ('A sunrise',              'A shadow',              'Hope vs. Fear',           'sketch'),
+      ('A bridge',               'A wall',                'Unity vs. Division',      'sketch'),
+      ('A dove',                 'A raven',               'Purity vs. Darkness',     'sketch'),
+      ('A loaf of bread',        'A cracked, empty bowl', 'Sustenance vs. Emptiness','sketch')
+    ) AS seed(phos_prompt, skotia_prompt, theme_label, prompt_mode)
+    WHERE NOT EXISTS (SELECT 1 FROM prompts WHERE prompt_mode = 'sketch' LIMIT 1)
   `);
 
 }

@@ -14,6 +14,8 @@ import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
+import SketchCanvas from '../../components/SketchCanvas';
+import SketchThumbnail from '../../components/SketchThumbnail';
 
 const TURN_TIME_LIMIT = 30;
 
@@ -32,14 +34,17 @@ export default function MovementAScreen({
 }) {
   const [phase, setPhase] = useState('waiting_turn');
   const [prompt, setPrompt] = useState('');
+  const [promptMode, setPromptMode] = useState('word'); // 'word' | 'sketch'
   const [myWord, setMyWord] = useState('');
   const [wordInput, setWordInput] = useState('');
+  const [sketchData, setSketchData] = useState(null); // current drawing (sketch mode)
+  const [allSketches, setAllSketches] = useState([]); // deliberation gallery (sketch mode)
   const [currentTurnPlayerId, setCurrentTurnPlayerId] = useState(null);
   const [currentTurnPlayerName, setCurrentTurnPlayerName] = useState('');
   const [completedCount, setCompletedCount] = useState(0);
   const [turnSecondsLeft, setTurnSecondsLeft] = useState(TURN_TIME_LIMIT);
   const [allWords, setAllWords] = useState([]); // [{ userId, username, word }]
-  const [submittedWords, setSubmittedWords] = useState([]); // live word reveal list
+  const [submittedWords, setSubmittedWords] = useState([]); // live word reveal list (word mode)
   const [deliberationSecondsLeft, setDeliberationSecondsLeft] = useState(null); // null = waiting for server time
   const [submitting, setSubmitting] = useState(false);
   const [submittedIds, setSubmittedIds] = useState(new Set());
@@ -76,7 +81,10 @@ export default function MovementAScreen({
           return;
         }
         const data = await res.json();
-        if (!cancelled && data.prompt) setPrompt(data.prompt);
+        if (!cancelled && data.prompt) {
+          setPrompt(data.prompt);
+          if (data.promptMode) setPromptMode(data.promptMode);
+        }
       } catch (err) {
         if (attempt < 3 && !cancelled) {
           setTimeout(() => fetchPrompt(attempt + 1), 1500);
@@ -158,36 +166,46 @@ export default function MovementAScreen({
             clearInterval(turnTimerRef.current);
             // Auto-submit only if it's still our turn and we haven't submitted yet
             if (String(currentPlayerId) === String(currentUserId) && !submittedRef.current) {
-              handleSubmit(wordInputRef.current.trim() || '—');
+              handleSubmit(wordInputRef.current.trim() || '—'); // word mode fallback; sketch mode ignores this arg
             }
           }
         }, 1000);
       });
 
-      // Server notifies the group immediately when a player submits their word
-      // (fires before the 30-second window expires so everyone can see the word)
+      // Server notifies the group immediately when a player submits.
+      // Word mode: reveals the word; sketch mode: only reveals that the player submitted.
       socket.on('wordSubmitted', ({ userId: submittedUserId, username: submittedUsername, word: submittedWord }) => {
         setSubmittedIds((prev) => new Set([...prev, String(submittedUserId)]));
-        setSubmittedWords((prev) => {
-          if (prev.some((w) => String(w.userId) === String(submittedUserId))) return prev;
-          return [...prev, { userId: String(submittedUserId), username: submittedUsername, word: submittedWord }];
-        });
+        // Only add to live word list in word mode (sketch submissions have no word to reveal)
+        if (submittedWord !== undefined) {
+          setSubmittedWords((prev) => {
+            if (prev.some((w) => String(w.userId) === String(submittedUserId))) return prev;
+            return [...prev, { userId: String(submittedUserId), username: submittedUsername, word: submittedWord }];
+          });
+        }
         // Mark as "done" in prevTurnPlayerIdRef so turnStart's fallback doesn't double-add
         prevTurnPlayerIdRef.current = String(submittedUserId);
       });
 
-      // All players submitted — show words for deliberation.
+      // All players submitted — show content for deliberation.
       // Timer comes separately via deliberationReady (game-level, not per-group).
-      socket.on('deliberationStart', ({ words, lastWord }) => {
+      socket.on('deliberationStart', (data) => {
         clearInterval(turnTimerRef.current);
         setSubmittedIds(new Set((groupMembers || []).map((m) => String(m.id))));
-        if (lastWord) {
-          setSubmittedWords((prev) => {
-            if (prev.some((w) => String(w.userId) === String(lastWord.userId))) return prev;
-            return [...prev, lastWord];
-          });
+
+        if (data.promptMode === 'sketch') {
+          setAllSketches(data.sketches || []);
+        } else {
+          // Word mode
+          if (data.lastWord) {
+            setSubmittedWords((prev) => {
+              if (prev.some((w) => String(w.userId) === String(data.lastWord.userId))) return prev;
+              return [...prev, data.lastWord];
+            });
+          }
+          setAllWords(data.words || []);
         }
-        setAllWords(words || []);
+
         setPhase('deliberation');
         // deliberationSecondsLeft stays null until deliberationReady arrives
       });
@@ -243,27 +261,45 @@ export default function MovementAScreen({
   }, [gameId, groupId, lobbyId, token, currentUserId]);
 
   const handleSubmit = async (word) => {
-    const finalWord = (word ?? wordInput).trim();
     if (submitting) return;
+
+    const isSketch = promptMode === 'sketch';
+
+    let finalWord = null;
+    if (!isSketch) {
+      finalWord = (word ?? wordInput).trim();
+    }
+
+    // In sketch mode, use current drawing or an empty sketch if time ran out
+    const finalSketchData = isSketch ? (sketchData ?? { strokes: [] }) : null;
+
     setSubmitting(true);
     submittedRef.current = true; // prevent auto-submit from triggering again
     // Do NOT clear the turn timer — let it keep counting so waiting_others shows "next turn in Xs"
-    setMyWord(finalWord);
+
+    if (!isSketch) {
+      setMyWord(finalWord);
+    }
     setSubmittedIds((prev) => new Set([...prev, String(currentUserId)]));
-    // Add our own word to the live reveal list
-    const myUsername = groupMembers?.find((m) => String(m.id) === String(currentUserId))?.username || 'You';
-    setSubmittedWords((prev) => {
-      if (prev.some((w) => String(w.userId) === String(currentUserId))) return prev;
-      return [...prev, { userId: String(currentUserId), username: myUsername, word: finalWord }];
-    });
+
+    if (!isSketch) {
+      // Add our own word to the live reveal list
+      const myUsername = groupMembers?.find((m) => String(m.id) === String(currentUserId))?.username || 'You';
+      setSubmittedWords((prev) => {
+        if (prev.some((w) => String(w.userId) === String(currentUserId))) return prev;
+        return [...prev, { userId: String(currentUserId), username: myUsername, word: finalWord }];
+      });
+    }
+
     setPhase('waiting_others');
 
     try {
       const baseUrl = await getApiUrl();
+      const body = isSketch ? { sketchData: finalSketchData } : { word: finalWord };
       await fetch(`${baseUrl}/api/games/${gameId}/movement-a/submit`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: finalWord }),
+        body: JSON.stringify(body),
       });
     } catch (err) {
       console.warn('[MovementA] Submit error:', err.message);
@@ -276,9 +312,19 @@ export default function MovementAScreen({
 
   // ── Group Roster (always visible) ─────────────────────────────────────────
 
-  const renderGroupRoster = () => (
+  const renderGroupRoster = () => {
+    // Sort members by turn order if available
+    const sortedMembers = turnOrder
+      ? [...(groupMembers || [])].sort((a, b) => {
+          const idxA = turnOrder.indexOf(String(a.id));
+          const idxB = turnOrder.indexOf(String(b.id));
+          return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+        })
+      : groupMembers || [];
+
+    return (
     <View style={styles.roster}>
-      {(groupMembers || []).map((member) => {
+      {sortedMembers.map((member) => {
         const memberId = String(member.id);
         const isMe = memberId === String(currentUserId);
         const hasSubmitted = submittedIds.has(memberId);
@@ -320,10 +366,34 @@ export default function MovementAScreen({
       })}
     </View>
   );
+  };
 
-  // ── Submitted Words So Far (shown during turns) ────────────────────────
+  // ── Submitted So Far (shown during turns) ──────────────────────────────
+  // Word mode: shows names + words; sketch mode: shows names with checkmarks only.
 
   const renderSubmittedSoFar = () => {
+    if (promptMode === 'sketch') {
+      // Show submitted players by name (no sketch previews during turn phase)
+      const submittedMembers = (groupMembers || []).filter((m) => submittedIds.has(String(m.id)));
+      if (submittedMembers.length === 0) return null;
+      return (
+        <View style={styles.submittedSection}>
+          <Text style={styles.submittedLabel}>SUBMITTED SO FAR</Text>
+          {submittedMembers.map((member) => {
+            const isMe = String(member.id) === String(currentUserId);
+            return (
+              <View key={member.id} style={styles.submittedRow}>
+                <Text style={[styles.submittedName, isMe && styles.submittedNameMe]} numberOfLines={1}>
+                  {isMe ? 'You' : member.username}
+                </Text>
+                <Text style={styles.rosterCheck}>✓</Text>
+              </View>
+            );
+          })}
+        </View>
+      );
+    }
+
     if (submittedWords.length === 0) return null;
     return (
       <View style={styles.submittedSection}>
@@ -350,11 +420,17 @@ export default function MovementAScreen({
       return (
         <View style={styles.phaseContainer}>
           <View style={styles.promptSection}>
-            <Text style={styles.promptLabel}>YOUR PROMPT</Text>
+            <Text style={styles.promptLabel}>
+              {promptMode === 'sketch' ? 'DRAW' : 'YOUR PROMPT'}
+            </Text>
             <View style={styles.promptBox}>
               <Text style={styles.promptText}>{prompt || '...'}</Text>
             </View>
-            <Text style={styles.promptHint}>Think of your word while you wait.</Text>
+            <Text style={styles.promptHint}>
+              {promptMode === 'sketch'
+                ? 'Think about what you\'ll draw while you wait.'
+                : 'Think of your word while you wait.'}
+            </Text>
           </View>
 
           <View style={styles.turnIndicator}>
@@ -380,26 +456,54 @@ export default function MovementAScreen({
     }
 
     if (phase === 'my_turn') {
+      const myTurnHeader = (
+        <View style={styles.myTurnHeader}>
+          <Text style={styles.yourTurnLabel}>YOUR TURN</Text>
+          <View style={[styles.timerCircle, turnSecondsLeft <= 10 && styles.timerCircleUrgent]}>
+            <Text style={[styles.timerValue, turnSecondsLeft <= 10 && styles.timerValueUrgent]}>
+              {turnSecondsLeft}
+            </Text>
+          </View>
+        </View>
+      );
+
+      const promptDisplay = (
+        <View style={styles.promptSection}>
+          <Text style={styles.promptLabel}>
+            {promptMode === 'sketch' ? 'DRAW' : 'YOUR PROMPT'}
+          </Text>
+          <View style={[styles.promptBox, styles.promptBoxActive]}>
+            <Text style={styles.promptText}>{prompt || '...'}</Text>
+          </View>
+        </View>
+      );
+
+      if (promptMode === 'sketch') {
+        const hasStrokes = sketchData?.strokes?.length > 0;
+        return (
+          <View style={styles.phaseContainer}>
+            {myTurnHeader}
+            {promptDisplay}
+            <SketchCanvas onSketchChange={setSketchData} />
+            <TouchableOpacity
+              style={[styles.submitBtn, !hasStrokes && styles.submitBtnDisabled]}
+              onPress={() => handleSubmit()}
+              disabled={!hasStrokes || submitting}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.submitBtnText}>SUBMIT SKETCH</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
       return (
         <KeyboardAvoidingView
           style={styles.phaseContainer}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View style={styles.myTurnHeader}>
-            <Text style={styles.yourTurnLabel}>YOUR TURN</Text>
-            <View style={[styles.timerCircle, turnSecondsLeft <= 10 && styles.timerCircleUrgent]}>
-              <Text style={[styles.timerValue, turnSecondsLeft <= 10 && styles.timerValueUrgent]}>
-                {turnSecondsLeft}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.promptSection}>
-            <Text style={styles.promptLabel}>YOUR PROMPT</Text>
-            <View style={[styles.promptBox, styles.promptBoxActive]}>
-              <Text style={styles.promptText}>{prompt || '...'}</Text>
-            </View>
-          </View>
+          {myTurnHeader}
+          {promptDisplay}
 
           {renderSubmittedSoFar()}
 
@@ -432,10 +536,17 @@ export default function MovementAScreen({
     if (phase === 'waiting_others') {
       return (
         <View style={styles.phaseContainer}>
-          <View style={styles.myWordSection}>
-            <Text style={styles.myWordLabel}>YOU CHOSE</Text>
-            <Text style={styles.myWordDisplay}>{myWord || '—'}</Text>
-          </View>
+          {promptMode === 'sketch' ? (
+            <View style={styles.myWordSection}>
+              <Text style={styles.myWordLabel}>SKETCH SUBMITTED</Text>
+              <Text style={styles.waitingLabel}>Your drawing has been recorded.</Text>
+            </View>
+          ) : (
+            <View style={styles.myWordSection}>
+              <Text style={styles.myWordLabel}>YOU CHOSE</Text>
+              <Text style={styles.myWordDisplay}>{myWord || '—'}</Text>
+            </View>
+          )}
 
           <Text style={styles.waitingLabel}>
             {turnSecondsLeft > 0
@@ -456,6 +567,56 @@ export default function MovementAScreen({
     }
 
     if (phase === 'deliberation') {
+      const timerRow = (
+        <View style={styles.deliberationTimerRow}>
+          <Text style={styles.deliberationTimerLabel}>Time remaining</Text>
+          {deliberationSecondsLeft === null ? (
+            <Text style={[styles.deliberationTimerValue, { color: colors.text.muted }]}>—:——</Text>
+          ) : (
+            <Text style={[
+              styles.deliberationTimerValue,
+              deliberationSecondsLeft <= 30 && { color: colors.accent.amber },
+            ]}>
+              {Math.floor(deliberationSecondsLeft / 60)}:{String(deliberationSecondsLeft % 60).padStart(2, '0')}
+            </Text>
+          )}
+        </View>
+      );
+
+      if (promptMode === 'sketch') {
+        return (
+          <View style={styles.phaseContainer}>
+            <Text style={styles.deliberationTitle}>DISCUSS</Text>
+            <Text style={styles.deliberationHint}>
+              One of these drawings may not belong. Talk it over.
+            </Text>
+
+            <View style={styles.sketchGallery}>
+              {allSketches.map((entry, i) => {
+                const isMe = String(entry.userId) === String(currentUserId);
+                return (
+                  <View key={i} style={[styles.sketchGalleryItem, isMe && styles.wordItemMe]}>
+                    <Text style={styles.wordItemAuthor}>
+                      {isMe ? 'You' : entry.username}
+                    </Text>
+                    <View style={styles.sketchThumbnailWrapper}>
+                      <SketchThumbnail
+                        sketchData={entry.sketchData}
+                        size={160}
+                        strokeColor={colors.text.primary}
+                        strokeWidth={2}
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+
+            {timerRow}
+          </View>
+        );
+      }
+
       return (
         <View style={styles.phaseContainer}>
           <Text style={styles.deliberationTitle}>DISCUSS</Text>
@@ -477,19 +638,7 @@ export default function MovementAScreen({
             })}
           </View>
 
-          <View style={styles.deliberationTimerRow}>
-            <Text style={styles.deliberationTimerLabel}>Time remaining</Text>
-            {deliberationSecondsLeft === null ? (
-              <Text style={[styles.deliberationTimerValue, { color: colors.text.muted }]}>—:——</Text>
-            ) : (
-              <Text style={[
-                styles.deliberationTimerValue,
-                deliberationSecondsLeft <= 30 && { color: colors.accent.amber },
-              ]}>
-                {Math.floor(deliberationSecondsLeft / 60)}:{String(deliberationSecondsLeft % 60).padStart(2, '0')}
-              </Text>
-            )}
-          </View>
+          {timerRow}
         </View>
       );
     }
@@ -859,6 +1008,30 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.text.primary,
     letterSpacing: 1,
+  },
+
+  // Sketch gallery (deliberation in sketch mode)
+  sketchGallery: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'center',
+  },
+  sketchGalleryItem: {
+    backgroundColor: colors.background.void,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    gap: 8,
+  },
+  sketchThumbnailWrapper: {
+    width: 160,
+    height: 160,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // Deliberation

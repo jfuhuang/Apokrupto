@@ -325,8 +325,9 @@ router.get('/:gameId/movement-a/prompt', auth, async (req, res) => {
     const promptText = team === 'skotia' ? prompt.skotia_prompt : prompt.phos_prompt;
 
     res.json({
-      prompt:       promptText,
-      themeLabel:   prompt.theme_label,
+      prompt:          promptText,
+      themeLabel:      prompt.theme_label,
+      promptMode:      turnState.promptMode || 'word',
       currentPlayerId: String(turnState.turnOrder[turnState.currentIndex]),
       completedCount:  turnState.completedCount,
       totalCount:      turnState.turnOrder.length,
@@ -344,13 +345,9 @@ router.get('/:gameId/movement-a/prompt', auth, async (req, res) => {
 // deliberationStart to the group's socket room.
 // ---------------------------------------------------------------------------
 router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
-  const { gameId }    = req.params;
-  const userId        = req.user.sub;
-  const { word }      = req.body;
-
-  if (!word || !word.trim()) {
-    return res.status(400).json({ error: 'word is required' });
-  }
+  const { gameId }             = req.params;
+  const userId                 = req.user.sub;
+  const { word, sketchData }   = req.body;
 
   try {
     // Get player's current group
@@ -377,6 +374,19 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
       return res.status(400).json({ error: 'Not your turn' });
     }
 
+    const isSketchMode = (turnState.promptMode || 'word') === 'sketch';
+
+    // Validate submission type matches mode
+    if (isSketchMode) {
+      if (!sketchData || typeof sketchData !== 'object') {
+        return res.status(400).json({ error: 'sketchData is required for sketch mode' });
+      }
+    } else {
+      if (!word || !word.trim()) {
+        return res.status(400).json({ error: 'word is required' });
+      }
+    }
+
     // Get active Movement A id
     const movRes = await db.query(
       `SELECT m.id
@@ -391,13 +401,22 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
     }
     const movementId = movRes.rows[0].id;
 
-    // Store submission
-    await db.query(
-      `INSERT INTO movement_a_submissions (movement_id, group_id, user_id, word)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (movement_id, user_id) DO UPDATE SET word = EXCLUDED.word`,
-      [movementId, groupId, userId, word.trim()]
-    );
+    // Store submission — sketch mode stores null word + JSONB sketch_data
+    if (isSketchMode) {
+      await db.query(
+        `INSERT INTO movement_a_submissions (movement_id, group_id, user_id, word, sketch_data)
+         VALUES ($1, $2, $3, NULL, $4)
+         ON CONFLICT (movement_id, user_id) DO UPDATE SET word = NULL, sketch_data = EXCLUDED.sketch_data`,
+        [movementId, groupId, userId, JSON.stringify(sketchData)]
+      );
+    } else {
+      await db.query(
+        `INSERT INTO movement_a_submissions (movement_id, group_id, user_id, word)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (movement_id, user_id) DO UPDATE SET word = EXCLUDED.word`,
+        [movementId, groupId, userId, word.trim()]
+      );
+    }
 
     // Cancel the existing auto-advance (skip) timer — player submitted in time
     clearTurnTimeout(groupId);
@@ -406,11 +425,13 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
     const newCompleted = turnState.completedCount + 1;
     const io           = getIO();
 
-    const lastWord = {
+    // In word mode, include the word in the submission event so group sees it immediately.
+    // In sketch mode, only broadcast that the player submitted — sketches stay hidden.
+    const submissionEvent = {
       userId:   String(userId),
       username: req.user.username,
-      word:     word.trim(),
     };
+    if (!isSketchMode) submissionEvent.word = word.trim();
 
     // Calculate how much of the 30-second turn window remains.
     // The next turn (or deliberation) starts after this delay so all groups
@@ -418,18 +439,18 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
     const elapsed     = turnState.turnStartedAt ? Date.now() - turnState.turnStartedAt : 0;
     const revealDelay = Math.max(1000, 30000 - elapsed);
 
-    // Immediately notify the group that this player submitted (word reveal)
+    submissionEvent.nextTurnInSeconds = Math.ceil(revealDelay / 1000);
+
     if (io) {
-      io.to(`lobby:${groupId}`).emit('wordSubmitted', {
-        ...lastWord,
-        nextTurnInSeconds: Math.ceil(revealDelay / 1000),
-      });
+      io.to(`lobby:${groupId}`).emit('wordSubmitted', submissionEvent);
     }
 
     // Capture variables for the async callback
     const capturedTurnState = turnState;
     const capturedGameId    = gameId;
     const capturedMovId     = movementId;
+    const capturedIsSketch  = isSketchMode;
+    const lastWord          = isSketchMode ? null : submissionEvent;
 
     // After the reveal window expires, advance to the next turn or deliberation
     scheduleRevealTimeout(groupId, revealDelay, async () => {
@@ -440,26 +461,47 @@ router.post('/:gameId/movement-a/submit', auth, async (req, res) => {
       const io2 = getIO();
 
       if (newCompleted >= capturedTurnState.turnOrder.length) {
-        // All players submitted — fetch word list and start deliberation
-        const wordsRes = await db.query(
-          `SELECT mas.word, mas.user_id, u.username
-           FROM movement_a_submissions mas
-           JOIN users u ON u.id = mas.user_id
-           WHERE mas.movement_id = $1 AND mas.group_id = $2
-           ORDER BY mas.submitted_at ASC`,
-          [capturedMovId, groupId]
-        );
-        const words = wordsRes.rows.map((r) => ({
-          userId:   String(r.user_id),
-          username: r.username,
-          word:     r.word,
-        }));
+        // All players submitted — fetch submissions and start deliberation
         setGroupTurnState(groupId, {
           ...freshState,
           currentIndex:   newIndex,
           completedCount: newCompleted,
         });
-        if (io2) io2.to(`lobby:${groupId}`).emit('deliberationStart', { words, lastWord });
+
+        if (capturedIsSketch) {
+          // Sketch mode: reveal all drawings at once as a gallery
+          const sketchRes = await db.query(
+            `SELECT mas.sketch_data, mas.user_id, u.username
+             FROM movement_a_submissions mas
+             JOIN users u ON u.id = mas.user_id
+             WHERE mas.movement_id = $1 AND mas.group_id = $2
+             ORDER BY mas.submitted_at ASC`,
+            [capturedMovId, groupId]
+          );
+          const sketches = sketchRes.rows.map((r) => ({
+            userId:     String(r.user_id),
+            username:   r.username,
+            sketchData: r.sketch_data,
+          }));
+          if (io2) io2.to(`lobby:${groupId}`).emit('deliberationStart', { promptMode: 'sketch', sketches });
+        } else {
+          // Word mode: reveal all words
+          const wordsRes = await db.query(
+            `SELECT mas.word, mas.user_id, u.username
+             FROM movement_a_submissions mas
+             JOIN users u ON u.id = mas.user_id
+             WHERE mas.movement_id = $1 AND mas.group_id = $2
+             ORDER BY mas.submitted_at ASC`,
+            [capturedMovId, groupId]
+          );
+          const words = wordsRes.rows.map((r) => ({
+            userId:   String(r.user_id),
+            username: r.username,
+            word:     r.word,
+          }));
+          if (io2) io2.to(`lobby:${groupId}`).emit('deliberationStart', { promptMode: 'word', words, lastWord });
+        }
+
         emitGmTurnUpdate(capturedGameId, capturedTurnState.lobbyId, newIndex, capturedTurnState.turnOrder.length, 'deliberation', Date.now(), io2);
         notifyGroupDeliberationReady(capturedGameId);
       } else {

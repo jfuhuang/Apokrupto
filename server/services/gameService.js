@@ -13,9 +13,13 @@ const POINTS = {
 
 // ---------------------------------------------------------------------------
 // In-memory turn state for Movement A
-// groupTurnState[groupId] = { turnOrder, currentIndex, completedCount, promptId, gameId, lobbyId, turnStartedAt }
+// groupTurnState[groupId] = { turnOrder, currentIndex, completedCount, promptId, promptMode, gameId, lobbyId, turnStartedAt }
 // ---------------------------------------------------------------------------
 const groupTurnState = new Map();
+
+// Cache round mode so all groups in the same round use the same mode
+// Key: `${gameId}:${roundNumber}` → 'word' | 'sketch'
+const _roundModeCache = new Map();
 
 // Per-group server-side auto-advance timers
 const _turnTimers = new Map(); // groupId → timeoutId
@@ -623,9 +627,24 @@ async function _initTurnState(groups, gameId, lobbyId) {
   // Reset deliberation counter so we wait for all groups this round
   _deliberationGroupsReady.set(String(gameId), { ready: 0, total: groups.length });
 
+  // Determine round mode: all groups in a round share the same word/sketch mode.
+  // Look up current round number from DB to key the cache.
+  const roundRes = await pool.query(
+    'SELECT current_round FROM games WHERE id = $1',
+    [gameId]
+  );
+  const roundNumber = roundRes.rows[0]?.current_round ?? 1;
+  const cacheKey = `${gameId}:${roundNumber}`;
+
+  let promptMode = _roundModeCache.get(cacheKey);
+  if (!promptMode) {
+    promptMode = Math.random() < 0.5 ? 'word' : 'sketch';
+    _roundModeCache.set(cacheKey, promptMode);
+  }
+
   const promptRes = await pool.query(
-    'SELECT id FROM prompts ORDER BY random() LIMIT $1',
-    [groups.length]
+    'SELECT id FROM prompts WHERE prompt_mode = $1 ORDER BY random() LIMIT $2',
+    [promptMode, groups.length]
   );
 
   groups.forEach((group, i) => {
@@ -637,6 +656,7 @@ async function _initTurnState(groups, gameId, lobbyId) {
       currentIndex:   0,
       completedCount: 0,
       promptId,
+      promptMode,
       gameId:         String(gameId),
       lobbyId:        String(lobbyId),
       turnStartedAt:  null,
