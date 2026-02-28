@@ -194,6 +194,64 @@
     #score-bar-phos-pct { color: var(--blue); }
     #score-bar-skotia-pct { color: var(--red); }
 
+    /* ── Round / Movement indicator ── */
+    #round-movement-section {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+      padding: 14px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    #round-movement-section.visible { display: flex; }
+
+    .indicator-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .indicator-label {
+      font-size: 0.6rem;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .pip-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .round-pip, .mov-pip {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: bold;
+      letter-spacing: 1px;
+      color: var(--muted);
+      transition: border-color 0.3s, background 0.3s, color 0.3s, box-shadow 0.3s;
+      flex-shrink: 0;
+    }
+    .round-pip.past, .mov-pip.done {
+      border-color: rgba(0, 255, 159, 0.45);
+      background: rgba(0, 255, 159, 0.08);
+      color: var(--green);
+    }
+    .round-pip.current, .mov-pip.active {
+      border-color: var(--blue);
+      background: rgba(0, 212, 255, 0.12);
+      color: var(--blue);
+      box-shadow: 0 0 10px rgba(0, 212, 255, 0.25);
+    }
+
     /* ── Large Timer ── */
     #timer-section {
       display: none;
@@ -596,6 +654,22 @@
     </div>
   </div>
 
+  <!-- Round & Movement indicator -->
+  <div id="round-movement-section">
+    <div class="indicator-group">
+      <span class="indicator-label">Round</span>
+      <div class="pip-row" id="round-pip-row"></div>
+    </div>
+    <div class="indicator-group">
+      <span class="indicator-label">Movement</span>
+      <div class="pip-row">
+        <div class="mov-pip" id="mov-pip-A">A</div>
+        <div class="mov-pip" id="mov-pip-B">B</div>
+        <div class="mov-pip" id="mov-pip-C">C</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Large Timer -->
   <div id="timer-section">
     <span id="timer-section-label">Time Remaining</span>
@@ -655,6 +729,12 @@
     let pollInterval = null;
     let setupSelectedLobby = null;
 
+    // Round / movement bubble state
+    let _currentRound      = 0;
+    let _totalRounds       = 0;
+    let _activeMovement    = null;
+    let _completedMovements = new Set();
+
     // ── Session persistence ─────────────────────────────────────────────────
     const SESSION_KEY = 'apk_gm_session';
 
@@ -696,6 +776,33 @@
       document.getElementById('setup-login-step').style.display = 'flex';
       document.getElementById('setup-lobby-step').classList.remove('visible');
       document.getElementById('setup-error').textContent = '';
+    }
+
+    // ── Round / movement bubbles ─────────────────────────────────────────────
+    function updateRoundMovementBubbles() {
+      const section = document.getElementById('round-movement-section');
+      if (!_totalRounds) { section.classList.remove('visible'); return; }
+      section.classList.add('visible');
+
+      // Round pips — one circle per round
+      const pipRow = document.getElementById('round-pip-row');
+      let html = '';
+      for (let i = 1; i <= _totalRounds; i++) {
+        let cls = 'round-pip';
+        if (i < _currentRound)      cls += ' past';
+        else if (i === _currentRound) cls += ' current';
+        html += `<div class="${cls}">${i}</div>`;
+      }
+      pipRow.innerHTML = html;
+
+      // Movement pips — A / B / C
+      for (const m of ['A', 'B', 'C']) {
+        const pip = document.getElementById(`mov-pip-${m}`);
+        if (!pip) continue;
+        pip.className = 'mov-pip';
+        if (_completedMovements.has(m))   pip.classList.add('done');
+        else if (_activeMovement === m)   pip.classList.add('active');
+      }
     }
 
     // ── Movement timer ──────────────────────────────────────────────────────
@@ -877,6 +984,11 @@
         if (roundNumber) setText('round-badge', `ROUND ${roundNumber} / ${totalRounds || '?'}`);
         if (movement === 'B' && movementBEndsAt) startTimer(movementBEndsAt);
         else if (movement === 'C' || movement === 'A') stopTimer(); // timer for A is driven by movementATurnUpdate
+        // Update bubble state
+        if (movement) _activeMovement = movement;
+        if (roundNumber) _currentRound = roundNumber;
+        if (totalRounds) _totalRounds = totalRounds;
+        updateRoundMovementBubbles();
         fetchState();
       });
 
@@ -895,6 +1007,8 @@
       socket.on('movementComplete', ({ movement }) => {
         setText('movement-badge', `${movement} COMPLETE`);
         stopTimer();
+        if (movement) { _completedMovements.add(movement); _activeMovement = null; }
+        updateRoundMovementBubbles();
         fetchState();
       });
 
@@ -903,6 +1017,12 @@
         if (roundNumber) setText('round-badge', `ROUND ${roundNumber} / ${totalRounds || '?'}`);
         setText('movement-badge', '—');
         stopTimer();
+        // New round — reset movement pips
+        _completedMovements = new Set();
+        _activeMovement = null;
+        if (roundNumber) _currentRound = roundNumber;
+        if (totalRounds) _totalRounds = totalRounds;
+        updateRoundMovementBubbles();
         fetchState();
       });
 
@@ -945,6 +1065,17 @@
       setText('round-badge',    round ? `ROUND ${round} / ${total}` : '— / —');
       const movLabel = { A: 'MOV A — DEDUCTION', B: 'MOV B — TASKS', C: 'MOV C — VOTING' };
       setText('movement-badge', movLabel[gameState.movement] || '—');
+
+      // Seed bubble state from REST data (handles page refresh / reconnect)
+      if (round)  _currentRound = round;
+      if (total)  _totalRounds  = total;
+      if (gameState.movement && gameState.movement !== _activeMovement) {
+        _activeMovement = gameState.movement;
+      }
+      if (gameState.completedMovements) {
+        for (const m of gameState.completedMovements) _completedMovements.add(m);
+      }
+      updateRoundMovementBubbles();
 
       // Start timer from REST data if not already running (reconnect / page refresh)
       if (movementBEndsAt && movementBEndsAt > Date.now() && !_timerInterval) {
