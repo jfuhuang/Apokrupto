@@ -110,12 +110,22 @@ async function _autoAdvanceTurn(groupId, expectedIndex) {
   const movementId = movRes.rows[0].id;
 
   // Record a skip marker (DO NOTHING if player already submitted)
-  await pool.query(
-    `INSERT INTO movement_a_submissions (movement_id, group_id, user_id, word)
-     VALUES ($1, $2, $3, '—')
-     ON CONFLICT (movement_id, user_id) DO NOTHING`,
-    [movementId, groupId, skippedUserId]
-  );
+  const isSketchMode = (state.promptMode || 'word') === 'sketch';
+  if (isSketchMode) {
+    await pool.query(
+      `INSERT INTO movement_a_submissions (movement_id, group_id, user_id, word, sketch_data)
+       VALUES ($1, $2, $3, NULL, NULL)
+       ON CONFLICT (movement_id, user_id) DO NOTHING`,
+      [movementId, groupId, skippedUserId]
+    );
+  } else {
+    await pool.query(
+      `INSERT INTO movement_a_submissions (movement_id, group_id, user_id, word)
+       VALUES ($1, $2, $3, '—')
+       ON CONFLICT (movement_id, user_id) DO NOTHING`,
+      [movementId, groupId, skippedUserId]
+    );
+  }
 
   // Re-check in case HTTP submit arrived during our DB round-trip
   const fresh = getGroupTurnState(groupId);
@@ -129,22 +139,41 @@ async function _autoAdvanceTurn(groupId, expectedIndex) {
   const io = getIO();
 
   if (newCompleted >= state.turnOrder.length) {
-    // Last player — fetch all words and emit deliberationStart
-    const wordsRes = await pool.query(
-      `SELECT mas.word, mas.user_id, u.username
-       FROM movement_a_submissions mas
-       JOIN users u ON u.id = mas.user_id
-       WHERE mas.movement_id = $1 AND mas.group_id = $2
-       ORDER BY mas.submitted_at ASC`,
-      [movementId, groupId]
-    );
-    const words = wordsRes.rows.map((r) => ({
-      userId:   String(r.user_id),
-      username: r.username,
-      word:     r.word,
-    }));
+    // Last player — fetch all submissions and emit deliberationStart
     setGroupTurnState(groupId, { ...state, currentIndex: newIndex, completedCount: newCompleted });
-    if (io) io.to(`lobby:${groupId}`).emit('deliberationStart', { words });
+
+    if (isSketchMode) {
+      const sketchRes = await pool.query(
+        `SELECT mas.sketch_data, mas.user_id, u.username
+         FROM movement_a_submissions mas
+         JOIN users u ON u.id = mas.user_id
+         WHERE mas.movement_id = $1 AND mas.group_id = $2
+         ORDER BY mas.submitted_at ASC`,
+        [movementId, groupId]
+      );
+      const sketches = sketchRes.rows.map((r) => ({
+        userId:     String(r.user_id),
+        username:   r.username,
+        sketchData: r.sketch_data,
+      }));
+      if (io) io.to(`lobby:${groupId}`).emit('deliberationStart', { promptMode: 'sketch', sketches });
+    } else {
+      const wordsRes = await pool.query(
+        `SELECT mas.word, mas.user_id, u.username
+         FROM movement_a_submissions mas
+         JOIN users u ON u.id = mas.user_id
+         WHERE mas.movement_id = $1 AND mas.group_id = $2
+         ORDER BY mas.submitted_at ASC`,
+        [movementId, groupId]
+      );
+      const words = wordsRes.rows.map((r) => ({
+        userId:   String(r.user_id),
+        username: r.username,
+        word:     r.word,
+      }));
+      if (io) io.to(`lobby:${groupId}`).emit('deliberationStart', { promptMode: 'word', words });
+    }
+
     _emitGmTurnUpdate(state.gameId, state.lobbyId, newIndex, state.turnOrder.length, 'deliberation', Date.now(), io);
     notifyGroupDeliberationReady(state.gameId);
   } else {
@@ -208,14 +237,24 @@ async function _doBotSubmit(groupId, expectedIndex) {
   if (movRes.rows.length === 0) return;
   const movementId = movRes.rows[0].id;
 
-  const word = BOT_WORDS[Math.floor(Math.random() * BOT_WORDS.length)];
+  const isBotSketch = (state.promptMode || 'word') === 'sketch';
+  const word = isBotSketch ? null : BOT_WORDS[Math.floor(Math.random() * BOT_WORDS.length)];
 
-  await pool.query(
-    `INSERT INTO movement_a_submissions (movement_id, group_id, user_id, word)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (movement_id, user_id) DO UPDATE SET word = EXCLUDED.word`,
-    [movementId, groupId, botUserId, word]
-  );
+  if (isBotSketch) {
+    await pool.query(
+      `INSERT INTO movement_a_submissions (movement_id, group_id, user_id, word, sketch_data)
+       VALUES ($1, $2, $3, NULL, NULL)
+       ON CONFLICT (movement_id, user_id) DO UPDATE SET word = NULL, sketch_data = NULL`,
+      [movementId, groupId, botUserId]
+    );
+  } else {
+    await pool.query(
+      `INSERT INTO movement_a_submissions (movement_id, group_id, user_id, word)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (movement_id, user_id) DO UPDATE SET word = EXCLUDED.word`,
+      [movementId, groupId, botUserId, word]
+    );
+  }
 
   clearTurnTimeout(groupId);
 
@@ -230,7 +269,8 @@ async function _doBotSubmit(groupId, expectedIndex) {
   const io = getIO();
 
   const userRes = await pool.query('SELECT username FROM users WHERE id = $1', [botUserId]);
-  const lastWord = { userId: botUserId, username: userRes.rows[0]?.username ?? 'Bot', word };
+  const botUsername = userRes.rows[0]?.username ?? 'Bot';
+  const lastWord = isBotSketch ? null : { userId: botUserId, username: botUsername, word };
 
   // Calculate remaining time in the 30-second turn window, then schedule the advance
   const elapsed     = fresh.turnStartedAt ? Date.now() - fresh.turnStartedAt : 0;
@@ -238,14 +278,14 @@ async function _doBotSubmit(groupId, expectedIndex) {
 
   // Notify the group immediately that this player submitted
   if (io) {
-    io.to(`lobby:${groupId}`).emit('wordSubmitted', {
-      ...lastWord,
-      nextTurnInSeconds: Math.ceil(revealDelay / 1000),
-    });
+    const wordSubmittedPayload = { userId: botUserId, username: botUsername, nextTurnInSeconds: Math.ceil(revealDelay / 1000) };
+    if (!isBotSketch) wordSubmittedPayload.word = word;
+    io.to(`lobby:${groupId}`).emit('wordSubmitted', wordSubmittedPayload);
   }
 
   // Advance to next turn / deliberation after the reveal window expires
   const capturedGameId = state.gameId;
+  const capturedIsBotSketch = isBotSketch;
   scheduleRevealTimeout(groupId, revealDelay, async () => {
     const freshState = getGroupTurnState(groupId);
     if (!freshState || freshState.currentIndex !== expectedIndex) return;
@@ -254,21 +294,39 @@ async function _doBotSubmit(groupId, expectedIndex) {
     const io2 = getIO2();
 
     if (newCompleted >= state.turnOrder.length) {
-      const wordsRes = await pool.query(
-        `SELECT mas.word, mas.user_id, u.username
-         FROM movement_a_submissions mas
-         JOIN users u ON u.id = mas.user_id
-         WHERE mas.movement_id = $1 AND mas.group_id = $2
-         ORDER BY mas.submitted_at ASC`,
-        [movementId, groupId]
-      );
-      const words = wordsRes.rows.map((r) => ({
-        userId:   String(r.user_id),
-        username: r.username,
-        word:     r.word,
-      }));
       setGroupTurnState(groupId, { ...freshState, currentIndex: newIndex, completedCount: newCompleted });
-      if (io2) io2.to(`lobby:${groupId}`).emit('deliberationStart', { words, lastWord });
+
+      if (capturedIsBotSketch) {
+        const sketchRes = await pool.query(
+          `SELECT mas.sketch_data, mas.user_id, u.username
+           FROM movement_a_submissions mas
+           JOIN users u ON u.id = mas.user_id
+           WHERE mas.movement_id = $1 AND mas.group_id = $2
+           ORDER BY mas.submitted_at ASC`,
+          [movementId, groupId]
+        );
+        const sketches = sketchRes.rows.map((r) => ({
+          userId:     String(r.user_id),
+          username:   r.username,
+          sketchData: r.sketch_data,
+        }));
+        if (io2) io2.to(`lobby:${groupId}`).emit('deliberationStart', { promptMode: 'sketch', sketches });
+      } else {
+        const wordsRes = await pool.query(
+          `SELECT mas.word, mas.user_id, u.username
+           FROM movement_a_submissions mas
+           JOIN users u ON u.id = mas.user_id
+           WHERE mas.movement_id = $1 AND mas.group_id = $2
+           ORDER BY mas.submitted_at ASC`,
+          [movementId, groupId]
+        );
+        const words = wordsRes.rows.map((r) => ({
+          userId:   String(r.user_id),
+          username: r.username,
+          word:     r.word,
+        }));
+        if (io2) io2.to(`lobby:${groupId}`).emit('deliberationStart', { promptMode: 'word', words, lastWord });
+      }
       _emitGmTurnUpdate(capturedGameId, freshState.lobbyId, newIndex, state.turnOrder.length, 'deliberation', Date.now(), io2);
       notifyGroupDeliberationReady(capturedGameId);
     } else {
@@ -1222,12 +1280,39 @@ async function _checkSupermajority(client, gameId) {
 }
 
 // ---------------------------------------------------------------------------
+// cleanupGameData — delete heavy round/group/submission data after a game ends.
+// Keeps games, game_teams, game_players for score display.
+// ---------------------------------------------------------------------------
+async function cleanupGameData(gameId) {
+  const key = String(gameId);
+  // Cancel all per-group timers before clearing groupTurnState
+  clearAllGroupTimersForGame(key);
+  clearDeliberationTimer(key);
+  clearMovementBTimer(key);
+  clearVotingTimer(key);
+  // Clear in-memory state for this game
+  _roundModeCache.forEach((_, k) => { if (k.startsWith(`${key}:`)) _roundModeCache.delete(k); });
+  for (const [groupId, state] of groupTurnState.entries()) {
+    if (state && String(state.gameId) === key) groupTurnState.delete(groupId);
+  }
+  // Delete DB rows (rounds cascades → movements → movement_a_submissions + movement_c_votes)
+  await pool.query('DELETE FROM rounds WHERE game_id = $1', [key]);
+  await pool.query('DELETE FROM game_groups WHERE game_id = $1', [key]);
+  await pool.query('DELETE FROM mark_events WHERE game_id = $1', [key]);
+}
+
+// ---------------------------------------------------------------------------
 // _endGame — inner helper (runs inside an existing transaction)
 // ---------------------------------------------------------------------------
 async function _endGame(client, gameId, winner, condition) {
   await client.query(
     "UPDATE games SET status = 'completed', winner = $1, win_condition = $2 WHERE id = $3",
     [winner, condition, gameId]
+  );
+
+  // Clean up heavy round/group/submission data. Non-fatal.
+  await cleanupGameData(String(gameId)).catch((err) =>
+    console.error('[_endGame] cleanup error (non-fatal):', err.message)
   );
 
   const skotiaRes = await client.query(
@@ -1417,4 +1502,5 @@ module.exports = {
   scheduleVotingTimer,
   emitGmTurnUpdate: _emitGmTurnUpdate,
   getMovementATurnInfo,
+  cleanupGameData,
 };

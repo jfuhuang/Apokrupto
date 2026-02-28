@@ -295,8 +295,9 @@ export default function MovementAScreen({
 
     try {
       const baseUrl = await getApiUrl();
+      const endpoint = isSketch ? 'submit/sketch' : 'submit/word';
       const body = isSketch ? { sketchData: finalSketchData } : { word: finalWord };
-      await fetch(`${baseUrl}/api/games/${gameId}/movement-a/submit`, {
+      await fetch(`${baseUrl}/api/games/${gameId}/movement-a/${endpoint}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

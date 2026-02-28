@@ -657,6 +657,13 @@ router.post('/:id/force-end', requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     const { getIO } = require('../websocket/lobbySocket');
+    const { cleanupGameData } = require('../services/gameService');
+
+    // Find active game(s) for this lobby before updating
+    const gRes = await pool.query(
+      "SELECT id FROM games WHERE lobby_id = $1 AND status = 'active'",
+      [id]
+    );
 
     // Mark any active game for this lobby as completed
     await pool.query(
@@ -664,6 +671,13 @@ router.post('/:id/force-end', requireAdmin, async (req, res) => {
        WHERE lobby_id = $1 AND status = 'active'`,
       [id]
     );
+
+    // Cleanup heavy data for each active game
+    for (const { id: gId } of gRes.rows) {
+      await cleanupGameData(String(gId)).catch((err) =>
+        console.error(`[force-end] cleanup error for game ${gId} (non-fatal):`, err.message)
+      );
+    }
 
     // Reset lobby status to waiting so it can be reused
     await pool.query(
