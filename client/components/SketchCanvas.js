@@ -24,6 +24,7 @@ export default function SketchCanvas({ onSketchChange }) {
   const canvasSizeRef = useRef({ width: 1, height: 1 });
   const currentStrokeRef = useRef([]); // mirror of currentStroke to avoid stale closure
   const modeRef = useRef('draw'); // mirror of mode to avoid stale closure in PanResponder
+  const strokesAfterReleaseRef = useRef([]); // holds computed next-strokes value across the updater/notify boundary
 
   const panResponder = useRef(
     PanResponder.create({
@@ -50,6 +51,11 @@ export default function SketchCanvas({ onSketchChange }) {
         const stroke = currentStrokeRef.current;
         if (stroke.length === 0) return;
 
+        // Compute the new strokes value first, then call setStrokes and
+        // onSketchChange separately.  Calling onSketchChange (which calls
+        // setSketchData in the parent) from *inside* a setState functional
+        // updater triggers React's "update a component while rendering
+        // another component" error because updaters run during reconciliation.
         if (modeRef.current === 'erase') {
           setStrokes((prev) => {
             const next = prev.filter(
@@ -57,14 +63,23 @@ export default function SketchCanvas({ onSketchChange }) {
                 stroke.some((ep) => Math.hypot(sp.x - ep.x, sp.y - ep.y) < ERASE_RADIUS)
               )
             );
-            if (onSketchChange) onSketchChange({ strokes: next });
+            // Store result so we can notify the parent after the state update.
+            strokesAfterReleaseRef.current = next;
             return next;
           });
         } else {
           setStrokes((prev) => {
             const next = [...prev, stroke];
-            if (onSketchChange) onSketchChange({ strokes: next });
+            strokesAfterReleaseRef.current = next;
             return next;
+          });
+        }
+        // Notify parent outside the updater so it doesn't trigger a
+        // cross-component setState during reconciliation.
+        if (onSketchChange) {
+          // Use a microtask so the strokes state has been committed first.
+          Promise.resolve().then(() => {
+            if (onSketchChange) onSketchChange({ strokes: strokesAfterReleaseRef.current });
           });
         }
 

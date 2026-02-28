@@ -154,6 +154,10 @@ router.post('/:gameId/advance', auth, async (req, res) => {
 
     res.json({ ok: true, ...result });
   } catch (err) {
+    if (err.message.includes('advanceMovement race:')) {
+      console.warn('[POST /games/:id/advance] duplicate ignored:', err.message);
+      return res.json({ ok: true, step: 'noop' });
+    }
     console.error('[POST /games/:id/advance]', err.message);
     res.status(400).json({ error: err.message });
   }

@@ -513,8 +513,15 @@ function setupLobbySocket(httpServer) {
 
         if (callback) callback({ ok: true, ...result });
       } catch (err) {
-        console.error('[WS] gmAdvance error:', err.message);
-        if (callback) callback({ error: err.message });
+        // Race-detection throws a descriptive message when two concurrent calls
+        // both reach the same step — this is a no-op, not a real error.
+        if (err.message.includes('advanceMovement race:')) {
+          console.warn('[WS] gmAdvance duplicate ignored:', err.message);
+          if (callback) callback({ ok: true, step: 'noop' });
+        } else {
+          console.error('[WS] gmAdvance error:', err.message);
+          if (callback) callback({ error: err.message });
+        }
       }
     });
 

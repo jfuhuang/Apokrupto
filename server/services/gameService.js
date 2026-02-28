@@ -923,6 +923,24 @@ async function advanceMovement(gameId) {
     // ── Phase 2: execute the applicable step in a transaction ─────────────
     await client.query('BEGIN');
 
+    // Lock the round row so concurrent advanceMovement calls serialize.
+    // Re-read roundStatus from the locked row — if a concurrent call already
+    // mutated the round between our Phase-1 read and this BEGIN, we will
+    // see the updated status here and throw, preventing double execution.
+    const lockedRoundRes = await client.query(
+      'SELECT status FROM rounds WHERE id = $1 FOR UPDATE',
+      [roundId]
+    );
+    const lockedRoundStatus = lockedRoundRes.rows[0]?.status;
+    if (!lockedRoundStatus) throw new Error('Round disappeared mid-transaction');
+    if (lockedRoundStatus !== roundStatus) {
+      await client.query('ROLLBACK');
+      throw new Error(
+        `advanceMovement race: round ${roundId} status changed from ` +
+        `'${roundStatus}' to '${lockedRoundStatus}' before lock acquired — ignoring duplicate advance`
+      );
+    }
+
     // ── activateA: Movement A pending → GM activates it ───────────────────
     if (movA && movA.status === 'pending') {
       await client.query(
@@ -1010,7 +1028,10 @@ async function advanceMovement(gameId) {
     if (movC && movC.status === 'completed' && roundStatus === 'active') {
       const votingResult = await _resolveVoting(client, gameId, roundNumber);
       console.log(`[Game] Voting resolved game=${gameId} round=${roundNumber}: marks=${votingResult.marksApplied} unmarks=${votingResult.unmarksApplied} phos=+${votingResult.phosPointsEarned} skotia=+${votingResult.skotiaPointsEarned}`);
-      const supermajority = await _checkSupermajority(client, gameId);
+      // Supermajority is only an instant-win condition on the final round.
+      // Mid-game it would prematurely end rounds that the players haven't finished.
+      const isFinalRound = roundNumber >= totalRounds;
+      const supermajority = isFinalRound && await _checkSupermajority(client, gameId);
       if (supermajority) console.log(`[Game] SUPERMAJORITY detected game=${gameId} — Phos wins!`);
 
       // Build per-player mark status map after voting resolves

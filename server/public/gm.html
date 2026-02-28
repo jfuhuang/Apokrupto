@@ -285,6 +285,61 @@
       text-shadow: 0 0 30px rgba(220,20,60,0.5);
     }
 
+    /* ── Movement A turn progress row ── */
+    #mova-turn-row {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    #mova-turn-row.visible { display: flex; }
+    #mova-turn-label {
+      font-size: 0.65rem;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    #mova-turn-label.deliberation { color: var(--amber); }
+    #mova-slot-dots {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .slot-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.55rem;
+      font-weight: bold;
+      color: var(--muted);
+      transition: border-color 0.3s, background 0.3s, color 0.3s, box-shadow 0.3s;
+      flex-shrink: 0;
+    }
+    .slot-dot.done {
+      border-color: rgba(0,255,159,0.45);
+      background: rgba(0,255,159,0.08);
+      color: var(--green);
+    }
+    .slot-dot.active {
+      border-color: var(--blue);
+      background: rgba(0,212,255,0.15);
+      color: var(--blue);
+      box-shadow: 0 0 8px rgba(0,212,255,0.35);
+    }
+    .slot-dot.deliberation {
+      border-color: var(--amber);
+      background: rgba(255,215,0,0.12);
+      color: var(--amber);
+    }
+
     /* ── Game-over overlay ── */
     #game-over-overlay {
       display: none;
@@ -674,10 +729,11 @@
   <div id="timer-section">
     <span id="timer-section-label">Time Remaining</span>
     <span id="timer-section-value">--:--</span>
-  </div>
-
-  <!-- Groups section -->
-  <div id="groups-section">
+    <!-- Movement A turn progress -->
+    <div id="mova-turn-row">
+      <div id="mova-slot-dots"></div>
+      <span id="mova-turn-label">TURN — / —</span>
+    </div>
     <div class="groups-header">
       <span class="groups-header-label">Groups</span>
       <span class="groups-round-badge" id="groups-round-badge">—</span>
@@ -844,6 +900,47 @@
       document.getElementById('timer-section-value').textContent = '--:--';
     }
 
+    // ── Movement A turn-progress row ────────────────────────────────────────
+    function updateMovATurnRow(phase, turnIndex, totalTurns) {
+      const row   = document.getElementById('mova-turn-row');
+      const label = document.getElementById('mova-turn-label');
+      const dots  = document.getElementById('mova-slot-dots');
+      if (totalTurns == null) { row.classList.remove('visible'); return; }
+
+      row.classList.add('visible');
+
+      // Build slot dots
+      let html = '';
+      for (let i = 0; i < totalTurns; i++) {
+        let cls = 'slot-dot';
+        if (phase === 'deliberation') {
+          cls += ' deliberation';
+        } else if (i < turnIndex) {
+          cls += ' done';
+        } else if (i === turnIndex) {
+          cls += ' active';
+        }
+        html += `<div class="${cls}">${i + 1}</div>`;
+      }
+      dots.innerHTML = html;
+
+      // Label
+      if (phase === 'deliberation') {
+        label.textContent = 'DELIBERATION';
+        label.classList.add('deliberation');
+      } else {
+        label.textContent = `TURN ${(turnIndex ?? 0) + 1} / ${totalTurns}`;
+        label.classList.remove('deliberation');
+      }
+    }
+
+    function clearMovATurnRow() {
+      document.getElementById('mova-turn-row').classList.remove('visible');
+      document.getElementById('mova-turn-label').textContent = 'TURN — / —';
+      document.getElementById('mova-slot-dots').innerHTML = '';
+      setText('timer-section-label', 'Time Remaining');
+    }
+
     // ── Init ────────────────────────────────────────────────────────────────
     function launchDashboard() {
       document.getElementById('setup-screen').classList.add('hidden');
@@ -982,8 +1079,9 @@
         const movLabel = { A: 'MOV A — DEDUCTION', B: 'MOV B — TASKS', C: 'MOV C — VOTING' };
         if (movement) setText('movement-badge', movLabel[movement] || '—');
         if (roundNumber) setText('round-badge', `ROUND ${roundNumber} / ${totalRounds || '?'}`);
-        if (movement === 'B' && movementBEndsAt) startTimer(movementBEndsAt);
-        else if (movement === 'C' || movement === 'A') stopTimer(); // timer for A is driven by movementATurnUpdate
+        if (movement === 'B' && movementBEndsAt) { clearMovATurnRow(); startTimer(movementBEndsAt); }
+        else if (movement === 'C') { clearMovATurnRow(); stopTimer(); }
+        else if (movement === 'A') stopTimer(); // timer for A is driven by movementATurnUpdate
         // Update bubble state
         if (movement) _activeMovement = movement;
         if (roundNumber) _currentRound = roundNumber;
@@ -992,12 +1090,17 @@
         fetchState();
       });
 
-      socket.on('movementATurnUpdate', ({ phase, slotStartedAt, timeLimit }) => {
+      socket.on('movementATurnUpdate', ({ phase, slotStartedAt, timeLimit, turnIndex, totalTurns }) => {
         if (phase === 'active') {
           startTimer((slotStartedAt || Date.now()) + (timeLimit || 30) * 1000);
+          setText('timer-section-label', 'SLOT TIME — MOVEMENT A');
         } else {
-          stopTimer(); // deliberation phase — no countdown
+          stopTimer(); // deliberation — no countdown
+          setText('timer-section-label', 'DELIBERATION');
+          // Show timer section without a running clock
+          document.getElementById('timer-section').classList.add('visible');
         }
+        updateMovATurnRow(phase, turnIndex, totalTurns);
       });
 
       socket.on('votingReady', ({ votingEndsAt }) => {
@@ -1007,6 +1110,7 @@
       socket.on('movementComplete', ({ movement }) => {
         setText('movement-badge', `${movement} COMPLETE`);
         stopTimer();
+        if (movement === 'A') clearMovATurnRow();
         if (movement) { _completedMovements.add(movement); _activeMovement = null; }
         updateRoundMovementBubbles();
         fetchState();
@@ -1017,6 +1121,7 @@
         if (roundNumber) setText('round-badge', `ROUND ${roundNumber} / ${totalRounds || '?'}`);
         setText('movement-badge', '—');
         stopTimer();
+        clearMovATurnRow();
         // New round — reset movement pips
         _completedMovements = new Set();
         _activeMovement = null;
