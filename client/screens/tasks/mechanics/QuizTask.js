@@ -3,7 +3,16 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
-export default function QuizTask({ config, onSuccess, onFail }) {
+const QUIZ_BANNERS = {
+  ten_commandments: { icon: '📜', color: '#FFA63D', label: 'EXODUS 20'   },
+  rebuilding_wall:  { icon: '🧱', color: '#8B6914', label: 'NEHEMIAH'    },
+  jesus_miracles:   { icon: '✨', color: '#00D4FF', label: 'JOHN 20:30'  },
+  prophets_quiz:    { icon: '🔥', color: '#FF6600', label: 'HEBREWS 1:1' },
+  parables_quiz:    { icon: '🌾', color: '#A0C040', label: 'MATTHEW 13'  },
+  acts_quiz:        { icon: '⛵', color: '#00D4FF', label: 'ACTS 1:8'    },
+};
+
+export default function QuizTask({ config, onSuccess, onFail, taskId }) {
   const { questions } = config;
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selected, setSelected] = useState(null);
@@ -45,6 +54,8 @@ export default function QuizTask({ config, onSuccess, onFail }) {
     return [styles.optionText, { color: colors.text.disabled }];
   };
 
+  const banner = QUIZ_BANNERS[taskId];
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.progressRow}>
@@ -59,6 +70,13 @@ export default function QuizTask({ config, onSuccess, onFail }) {
           />
         ))}
       </View>
+
+      {banner && (
+        <View style={[styles.banner, { borderColor: banner.color + '60', backgroundColor: banner.color + '15' }]}>
+          <Text style={styles.bannerIcon}>{banner.icon}</Text>
+          <Text style={[styles.bannerLabel, { color: banner.color }]}>{banner.label}</Text>
+        </View>
+      )}
 
       <Text style={styles.qNum}>Question {currentIdx + 1} of {questions.length}</Text>
       <Text style={styles.prompt}>{question.prompt}</Text>
@@ -100,6 +118,24 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     backgroundColor: colors.background.frost,
+  },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 4,
+  },
+  bannerIcon: {
+    fontSize: 20,
+  },
+  bannerLabel: {
+    fontFamily: fonts.display.bold,
+    fontSize: 11,
+    letterSpacing: 2,
   },
   progressDotDone: {
     backgroundColor: colors.accent.neonGreen,

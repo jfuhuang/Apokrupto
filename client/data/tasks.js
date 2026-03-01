@@ -8,6 +8,7 @@ export const MECHANIC = {
   QUIZ: 'QUIZ',
   MATCH_PAIR: 'MATCH_PAIR',
   HOLD: 'HOLD',
+  TRACE: 'TRACE',
 };
 
 export const TASK_TYPE = {
@@ -804,16 +805,18 @@ export const TASKS = [
   {
     id: 'circle_of_prayer',
     title: 'Circle of Prayer',
-    synopsis: 'Pray together without ceasing. Every member must hold at the same time for 5 full seconds.',
+    synopsis: 'Draw a prayer circle together. Trace a complete circle to unite the group in prayer.',
     reference: '1 Thessalonians 5:17',
-    mechanic: MECHANIC.HOLD,
+    mechanic: MECHANIC.TRACE,
     taskType: TASK_TYPE.STATION,
     category: TASK_CATEGORY.COOPERATIVE,
     points: { alive: 160, dead: 96 },
     difficulty: 'medium',
     timeLimit: 0,
     config: {
-      duration: 5,
+      minPoints: 20,
+      closureThreshold: 65,
+      circularityThreshold: 0.58,
       cooperative: true,
       minPlayers: 3,
     },

@@ -1,7 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-native';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
+
+const TILE_BACKS = {
+  fruits_of_spirit: '🍇',
+  noahs_animals:    '🚢',
+};
 
 function shuffle(arr) {
   const a = [...arr];
@@ -12,27 +17,42 @@ function shuffle(arr) {
   return a;
 }
 
-export default function MatchPairTask({ config, onSuccess, onFail }) {
+export default function MatchPairTask({ config, onSuccess, onFail, taskId }) {
   const { pairs } = config;
 
-  // Build flat tile list: each pair generates two tiles (term + definition)
   const [tiles] = useState(() => {
     const items = pairs.flatMap((p, i) => [
-      { id: `t${i}`, pairId: i, label: p.term,       side: 'term' },
-      { id: `d${i}`, pairId: i, label: p.definition,  side: 'def' },
+      { id: `t${i}`, pairId: i, label: p.term,      side: 'term' },
+      { id: `d${i}`, pairId: i, label: p.definition, side: 'def'  },
     ]);
     return shuffle(items);
   });
 
-  const [revealed, setRevealed]   = useState(new Set()); // tile ids shown face-up
-  const [matched, setMatched]     = useState(new Set()); // tile ids permanently matched
-  const [selected, setSelected]   = useState(null);       // currently flipped tile id
-  const [checking, setChecking]   = useState(false);
+  const [revealed,  setRevealed]  = useState(new Set());
+  const [matched,   setMatched]   = useState(new Set());
+  const [selected,  setSelected]  = useState(null);
+  const [checking,  setChecking]  = useState(false);
+
+  // Per-tile scaleX flip animation (starts at 1)
+  const flipAnims = useRef(
+    new Map(tiles.map((t) => [t.id, new Animated.Value(1)]))
+  ).current;
+
+  const flipTile = (tileId) => {
+    const anim = flipAnims.get(tileId);
+    if (!anim) return;
+    Animated.sequence([
+      Animated.timing(anim, { toValue: 0.1, duration: 100, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: 1,   duration: 100, useNativeDriver: true }),
+    ]).start();
+  };
 
   const handleTap = (tile) => {
     if (checking) return;
     if (matched.has(tile.id)) return;
     if (tile.id === selected) return;
+
+    flipTile(tile.id);
 
     if (!selected) {
       setSelected(tile.id);
@@ -40,27 +60,29 @@ export default function MatchPairTask({ config, onSuccess, onFail }) {
       return;
     }
 
-    // Second tap — compare
     setChecking(true);
     const firstTile = tiles.find((t) => t.id === selected);
     setRevealed((r) => new Set([...r, tile.id]));
 
     setTimeout(() => {
       if (firstTile.pairId === tile.pairId) {
-        // Match!
         const newMatched = new Set([...matched, selected, tile.id]);
         setMatched(newMatched);
         if (newMatched.size === tiles.length) {
           onSuccess();
         }
       } else {
-        // No match — hide both after a pause
-        setRevealed((r) => {
-          const next = new Set(r);
-          next.delete(selected);
-          next.delete(tile.id);
-          return next;
-        });
+        // Flip back both tiles
+        flipTile(selected);
+        flipTile(tile.id);
+        setTimeout(() => {
+          setRevealed((r) => {
+            const next = new Set(r);
+            next.delete(selected);
+            next.delete(tile.id);
+            return next;
+          });
+        }, 100);
       }
       setSelected(null);
       setChecking(false);
@@ -78,6 +100,8 @@ export default function MatchPairTask({ config, onSuccess, onFail }) {
     ];
   };
 
+  const backIcon = TILE_BACKS[taskId] || '?';
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.hint}>Tap two tiles to match a term with its meaning</Text>
@@ -87,20 +111,25 @@ export default function MatchPairTask({ config, onSuccess, onFail }) {
       <View style={styles.grid}>
         {tiles.map((tile) => {
           const isRevealed = revealed.has(tile.id) || matched.has(tile.id);
+          const flipAnim   = flipAnims.get(tile.id);
           return (
-            <TouchableOpacity
+            <Animated.View
               key={tile.id}
-              style={tileStyle(tile)}
-              onPress={() => handleTap(tile)}
-              activeOpacity={0.8}
-              disabled={matched.has(tile.id)}
+              style={{ transform: [{ scaleX: flipAnim }], width: '44%' }}
             >
-              {isRevealed ? (
-                <Text style={styles.tileLabel} numberOfLines={3}>{tile.label}</Text>
-              ) : (
-                <Text style={styles.tileBack}>?</Text>
-              )}
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={tileStyle(tile)}
+                onPress={() => handleTap(tile)}
+                activeOpacity={0.8}
+                disabled={matched.has(tile.id)}
+              >
+                {isRevealed ? (
+                  <Text style={styles.tileLabel} numberOfLines={3}>{tile.label}</Text>
+                ) : (
+                  <Text style={styles.tileBack}>{backIcon}</Text>
+                )}
+              </TouchableOpacity>
+            </Animated.View>
           );
         })}
       </View>
@@ -133,7 +162,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tile: {
-    width: '44%',
+    width: '100%',
     minHeight: 80,
     backgroundColor: colors.background.panel,
     borderRadius: 12,
@@ -156,9 +185,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,255,159,0.08)',
   },
   tileBack: {
-    fontFamily: fonts.display.bold,
     fontSize: 28,
-    color: colors.text.disabled,
   },
   tileLabel: {
     fontFamily: fonts.ui.medium,

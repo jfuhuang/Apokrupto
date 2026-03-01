@@ -1,32 +1,284 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+  Dimensions,
+} from 'react-native';
+import Svg, { Path, Circle, Rect, Ellipse, Line, G } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
-export default function RapidTapTask({ config, onSuccess, onFail, timeLimit }) {
+const { width: W, height: H } = Dimensions.get('window');
+
+// ── SVG tap button components ─────────────────────────────────────────────
+
+function BasketButton({ done }) {
+  const c = done ? colors.accent.neonGreen : '#FFA63D';
+  return (
+    <Svg width={180} height={180} viewBox="0 0 180 180">
+      {/* Basket body — woven */}
+      <Path d="M40 80 Q30 130 35 160 L145 160 Q150 130 140 80Z" fill={c} opacity="0.85" />
+      {/* Weave lines horizontal */}
+      <Line x1="36" y1="100" x2="144" y2="100" stroke="#0B0C10" strokeWidth="1.5" opacity="0.4" />
+      <Line x1="34" y1="120" x2="146" y2="120" stroke="#0B0C10" strokeWidth="1.5" opacity="0.4" />
+      <Line x1="33" y1="140" x2="147" y2="140" stroke="#0B0C10" strokeWidth="1.5" opacity="0.4" />
+      {/* Weave lines vertical */}
+      <Line x1="60"  y1="80" x2="52"  y2="160" stroke="#0B0C10" strokeWidth="1.2" opacity="0.3" />
+      <Line x1="90"  y1="80" x2="90"  y2="160" stroke="#0B0C10" strokeWidth="1.2" opacity="0.3" />
+      <Line x1="120" y1="80" x2="128" y2="160" stroke="#0B0C10" strokeWidth="1.2" opacity="0.3" />
+      {/* Rim */}
+      <Ellipse cx="90" cy="80" rx="50" ry="14" fill={c} />
+      <Ellipse cx="90" cy="78" rx="48" ry="12" fill={c} opacity="0.7" />
+      {/* Fish peeking over rim */}
+      <Path d="M60 66 Q76 54 92 66 Q76 78 60 66Z" fill={c} opacity="0.9" />
+      <Path d="M54 66 L60 58 L60 74Z"             fill={c} />
+      {/* Loaf peeking */}
+      <Ellipse cx="115" cy="64" rx="22" ry="14" fill={c} opacity="0.85" />
+      {/* Handle arc */}
+      <Path d="M55 80 Q90 40 125 80" stroke={c} strokeWidth="6" fill="none" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function WallButton({ taps, targetTaps, done }) {
+  const pct   = Math.min(taps / targetTaps, 1);
+  const stage = Math.floor(pct * 4); // 0–3
+  const c     = done ? colors.accent.neonGreen : colors.primary.electricBlue;
+
+  // Crack opacity increases with stage
+  const crackOpacity = Math.min(pct * 1.5, 0.9);
+  const fallingOpacity = stage >= 3 ? 0.9 : 0;
+
+  return (
+    <Svg width={180} height={180} viewBox="0 0 180 180">
+      {/* Brick rows */}
+      {[0, 1, 2, 3, 4].map((row) => {
+        const y    = 20 + row * 32;
+        const xOff = row % 2 === 0 ? 0 : 22;
+        return (
+          <G key={row}>
+            {[-1, 0, 1, 2, 3].map((col) => {
+              const x = col * 44 + xOff + 10;
+              if (x > 175 || x + 40 < 5) return null;
+              return (
+                <Rect
+                  key={col}
+                  x={Math.max(5, x)}
+                  y={y}
+                  width={Math.min(42, 175 - Math.max(5, x))}
+                  height={26}
+                  rx="2"
+                  fill={c}
+                  opacity={0.8}
+                />
+              );
+            })}
+          </G>
+        );
+      })}
+      {/* Mortar lines */}
+      {[0, 1, 2, 3, 4].map((row) => (
+        <Line key={row} x1="5" y1={20 + row * 32} x2="175" y2={20 + row * 32}
+          stroke="#0B0C10" strokeWidth="4" />
+      ))}
+      {/* Vertical mortar alternating */}
+      {[0, 1, 2, 3, 4].map((row) => {
+        const xOff = row % 2 === 0 ? 0 : 22;
+        return [0, 1, 2, 3].map((col) => (
+          <Line key={`${row}-${col}`}
+            x1={col * 44 + xOff + 52}
+            y1={20 + row * 32}
+            x2={col * 44 + xOff + 52}
+            y2={20 + (row + 1) * 32}
+            stroke="#0B0C10" strokeWidth="3" />
+        ));
+      })}
+      {/* Crack down the middle */}
+      {stage >= 1 && (
+        <Path
+          d="M90 20 L87 50 L93 80 L85 115 L92 145 L88 165"
+          stroke="#0B0C10"
+          strokeWidth={4 + stage * 2}
+          fill="none"
+          strokeLinecap="round"
+          opacity={crackOpacity}
+        />
+      )}
+      {/* Falling bricks at base */}
+      {stage >= 3 && (
+        <G opacity={fallingOpacity}>
+          <Rect x="50"  y="152" width="38" height="20" rx="2" fill={c} opacity="0.7" transform="rotate(-8 60 160)" />
+          <Rect x="95"  y="155" width="38" height="20" rx="2" fill={c} opacity="0.6" transform="rotate(5 115 165)" />
+          <Rect x="130" y="150" width="30" height="18" rx="2" fill={c} opacity="0.5" transform="rotate(-12 145 158)" />
+        </G>
+      )}
+    </Svg>
+  );
+}
+
+function RockButton({ done }) {
+  const c = done ? colors.accent.neonGreen : '#8B9CB0';
+  return (
+    <Svg width={180} height={180} viewBox="0 0 180 180">
+      <Path d="M35 150 Q20 110 30 70 Q40 35 70 25 Q100 15 130 30 Q160 45 162 80 Q164 120 148 150Z" fill={c} />
+      <Path d="M40 150 Q28 112 38 74 Q47 38 73 28 Q99 18 127 32 Q155 48 157 82 Q158 118 144 150Z" fill="#9AACC0" />
+      {/* Crack */}
+      <Path d="M90 25 L85 60 L92 90 L85 120" stroke="#0B0C10" strokeWidth="3" fill="none" strokeLinecap="round" />
+      {/* Water streams */}
+      <Path d="M75 95  Q55 120 45 150" stroke="#87CEEB" strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.8" />
+      <Path d="M90 100 Q85 130 80 155"  stroke="#87CEEB" strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.7" />
+      <Path d="M105 95 Q125 120 135 150" stroke="#87CEEB" strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.8" />
+      {/* Rock highlight */}
+      <Ellipse cx="72" cy="52" rx="20" ry="12" fill="#B8C8D8" opacity="0.5" />
+    </Svg>
+  );
+}
+
+function BucketButton({ done }) {
+  const c = done ? colors.accent.neonGreen : colors.primary.electricBlue;
+  return (
+    <Svg width={180} height={180} viewBox="0 0 180 180">
+      {/* Handle */}
+      <Path d="M50 60 Q90 20 130 60" stroke={c} strokeWidth="8" fill="none" strokeLinecap="round" />
+      {/* Bucket body */}
+      <Path d="M45 65 Q40 130 50 155 L130 155 Q140 130 135 65Z" fill={c} opacity="0.85" />
+      {/* Rim */}
+      <Ellipse cx="90" cy="65" rx="45" ry="13" fill={c} />
+      {/* Water bands */}
+      <Ellipse cx="90" cy="100" rx="38" ry="8" fill="#0B0C10" opacity="0.25" />
+      <Ellipse cx="90" cy="125" rx="40" ry="8" fill="#0B0C10" opacity="0.2" />
+      {/* Wave label */}
+      <Path d="M55 90 Q70 84 85 90 Q100 96 115 90" stroke="#87CEEB" strokeWidth="2" fill="none" opacity="0.6" />
+    </Svg>
+  );
+}
+
+function DefaultButton({ done }) {
+  return (
+    <View style={[
+      styles.tapBtn,
+      done && styles.tapBtnDone,
+    ]}>
+      <Text style={styles.tapBtnText}>TAP!</Text>
+    </View>
+  );
+}
+
+// ── Wave animation for jonah ──────────────────────────────────────────────
+
+function WaveBackground({ taps, targetTaps }) {
+  const waveAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(waveAnim, { toValue: 1, duration: 1200, useNativeDriver: false })
+    ).start();
+  }, []);
+
+  // Amplitude decreases as taps increase
+  const progress    = Math.min(taps / targetTaps, 1);
+  const translateX  = waveAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -30] });
+  const waveOpacity = waveAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.8, 1, 0.8] });
+
+  const amps = ['20', String(Math.max(5, 20 - progress * 15)), '14'];
+
+  return (
+    <Animated.View
+      style={[StyleSheet.absoluteFill, { transform: [{ translateX }], opacity: waveOpacity }]}
+      pointerEvents="none"
+    >
+      <Svg style={StyleSheet.absoluteFill} viewBox={`0 0 ${W} ${H}`}>
+        {/* Large front wave */}
+        <Path
+          d={`M0 ${H*0.3} Q${W*0.25} ${H*0.3 - amps[0]} ${W*0.5} ${H*0.3} Q${W*0.75} ${H*0.3 + amps[0]} ${W} ${H*0.3} L${W} ${H} L0 ${H}Z`}
+          fill="#003060"
+          opacity="0.5"
+        />
+        {/* Mid wave */}
+        <Path
+          d={`M-30 ${H*0.4} Q${W*0.25} ${H*0.4 - amps[1]} ${W*0.5} ${H*0.4} Q${W*0.75} ${H*0.4 + amps[1]} ${W+30} ${H*0.4} L${W+30} ${H} L-30 ${H}Z`}
+          fill="#004080"
+          opacity="0.4"
+        />
+        {/* Back wave */}
+        <Path
+          d={`M-60 ${H*0.22} Q${W*0.25} ${H*0.22 - amps[2]} ${W*0.5} ${H*0.22} Q${W*0.75} ${H*0.22 + amps[2]} ${W+60} ${H*0.22} L${W+60} ${H} L-60 ${H}Z`}
+          fill="#002050"
+          opacity="0.35"
+        />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+// ── Particle system ───────────────────────────────────────────────────────
+
+const particleId = { current: 0 };
+
+function useParticles(taskId, taps) {
+  const [particles, setParticles] = useState([]);
+  const prevTaps = useRef(0);
+
+  useEffect(() => {
+    if (taps <= prevTaps.current) return;
+    prevTaps.current = taps;
+
+    const hasParticles = taskId === 'feeding_five_thousand' || taskId === 'water_from_rock';
+    if (!hasParticles) return;
+
+    const id = ++particleId.current;
+    const cx = W * 0.35 + Math.random() * W * 0.3;
+    const posAnim = new Animated.ValueXY({ x: cx, y: 0 });
+    const opAnim  = new Animated.Value(1);
+    const emoji   = taskId === 'water_from_rock' ? '💧' : taps % 2 === 0 ? '🍞' : '🐟';
+
+    setParticles((p) => [...p, { id, posAnim, opAnim, emoji }]);
+
+    Animated.parallel([
+      Animated.timing(posAnim, {
+        toValue:  { x: cx + (Math.random() - 0.5) * 80, y: -130 },
+        duration: 800,
+        useNativeDriver: false,
+      }),
+      Animated.timing(opAnim, {
+        toValue:  0,
+        duration: 800,
+        useNativeDriver: false,
+      }),
+    ]).start(() => {
+      setParticles((p) => p.filter((q) => q.id !== id));
+    });
+  }, [taps]);
+
+  return particles;
+}
+
+// ── Main component ────────────────────────────────────────────────────────
+
+export default function RapidTapTask({ config, onSuccess, onFail, timeLimit, taskId }) {
   const { targetTaps } = config;
   const [taps, setTaps] = useState(0);
   const [done, setDone] = useState(false);
-  const fillAnim = useRef(new Animated.Value(0)).current;
+  const fillAnim  = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const particles = useParticles(taskId, taps);
 
-  // Time is managed by TaskHeader; we just respond to the task completing
   const handleTap = () => {
     if (done) return;
     const next = taps + 1;
     setTaps(next);
 
-    // Animate fill bar
     Animated.timing(fillAnim, {
-      toValue: Math.min(next / targetTaps, 1),
+      toValue:  Math.min(next / targetTaps, 1),
       duration: 80,
       useNativeDriver: false,
     }).start();
 
-    // Button pulse
     Animated.sequence([
       Animated.timing(scaleAnim, { toValue: 0.93, duration: 60, useNativeDriver: true }),
-      Animated.timing(scaleAnim, { toValue: 1, duration: 60, useNativeDriver: true }),
+      Animated.timing(scaleAnim, { toValue: 1,    duration: 60, useNativeDriver: true }),
     ]).start();
 
     if (next >= targetTaps) {
@@ -35,16 +287,48 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit }) {
     }
   };
 
-  // Called by TaskHeader via onTimeUp — parent passes this down indirectly
-  // We expose a prop; TaskScreen wires it up
-  useEffect(() => {
-    return () => {};
-  }, []);
-
   const pct = Math.round((taps / targetTaps) * 100);
+
+  // Per-task button
+  const renderButton = () => {
+    const wrapped = (children) => (
+      <Animated.View style={{ transform: [{ scale: scaleAnim }], marginTop: 16 }}>
+        <TouchableOpacity onPress={handleTap} activeOpacity={0.8} disabled={done}>
+          {children}
+        </TouchableOpacity>
+      </Animated.View>
+    );
+
+    switch (taskId) {
+      case 'feeding_five_thousand':
+        return wrapped(<BasketButton done={done} />);
+      case 'walls_of_jericho':
+        return wrapped(<WallButton taps={taps} targetTaps={targetTaps} done={done} />);
+      case 'water_from_rock':
+        return wrapped(<RockButton done={done} />);
+      case 'jonah_storm':
+        return wrapped(<BucketButton done={done} />);
+      default:
+        return (
+          <Animated.View style={{ transform: [{ scale: scaleAnim }], marginTop: 32 }}>
+            <TouchableOpacity
+              style={[styles.tapBtn, done && styles.tapBtnDone]}
+              onPress={handleTap}
+              activeOpacity={0.8}
+              disabled={done}
+            >
+              <Text style={styles.tapBtnText}>TAP!</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        );
+    }
+  };
 
   return (
     <View style={styles.container}>
+      {/* Wave background for jonah_storm */}
+      {taskId === 'jonah_storm' && <WaveBackground taps={taps} targetTaps={targetTaps} />}
+
       <Text style={styles.counter}>{taps} / {targetTaps}</Text>
       <View style={styles.barTrack}>
         <Animated.View
@@ -52,7 +336,7 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit }) {
             styles.barFill,
             {
               width: fillAnim.interpolate({
-                inputRange: [0, 1],
+                inputRange:  [0, 1],
                 outputRange: ['0%', '100%'],
               }),
             },
@@ -61,16 +345,23 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit }) {
       </View>
       <Text style={styles.pct}>{pct}%</Text>
 
-      <Animated.View style={{ transform: [{ scale: scaleAnim }], marginTop: 32 }}>
-        <TouchableOpacity
-          style={[styles.tapBtn, done && styles.tapBtnDone]}
-          onPress={handleTap}
-          activeOpacity={0.8}
-          disabled={done}
+      {renderButton()}
+
+      {/* Floating particles */}
+      {particles.map((p) => (
+        <Animated.Text
+          key={p.id}
+          style={{
+            position:  'absolute',
+            bottom:    p.posAnim.y,
+            left:      p.posAnim.x,
+            opacity:   p.opAnim,
+            fontSize:  26,
+          }}
         >
-          <Text style={styles.tapBtnText}>TAP!</Text>
-        </TouchableOpacity>
-      </Animated.View>
+          {p.emoji}
+        </Animated.Text>
+      ))}
     </View>
   );
 }

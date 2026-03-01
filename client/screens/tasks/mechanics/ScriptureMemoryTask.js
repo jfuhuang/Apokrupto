@@ -13,7 +13,18 @@ import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 import { scoreVerse } from '../../../utils/scriptureUtils';
 
-export default function ScriptureMemoryTask({ config, onSuccess, onFail }) {
+const SCRIPTURE_SEALS = {
+  scripture_memory:  '✝️',
+  john_3_16:         '❤️',
+  psalm_23:          '🌿',
+  romans_8_28:       '⚓',
+  philippians_4_13:  '💪',
+  isaiah_40_31:      '🦅',
+  hebrews_11_1:      '⭐',
+};
+
+export default function ScriptureMemoryTask({ config, onSuccess, onFail, taskId }) {
+  const waxSeal = SCRIPTURE_SEALS[taskId] || '📖';
   const [typed, setTyped] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState(null);
@@ -64,17 +75,22 @@ export default function ScriptureMemoryTask({ config, onSuccess, onFail }) {
           </>
         )}
 
-        <TextInput
-          style={styles.input}
-          value={typed}
-          onChangeText={setTyped}
-          placeholder="Start typing the verse..."
-          placeholderTextColor={colors.text.placeholder}
-          multiline
-          autoCorrect={false}
-          spellCheck={false}
-          editable={!submitted || (submitted && result && !result.passed)}
-        />
+        <View style={styles.parchment}>
+          <View style={styles.scrollCurl} />
+          <Text style={styles.waxSeal}>{waxSeal}</Text>
+          <TextInput
+            style={styles.input}
+            value={typed}
+            onChangeText={setTyped}
+            placeholder="Start typing the verse..."
+            placeholderTextColor={colors.text.placeholder}
+            multiline
+            autoCorrect={false}
+            spellCheck={false}
+            editable={!submitted || (submitted && result && !result.passed)}
+          />
+          <View style={styles.scrollCurl} />
+        </View>
 
         {score && !submitted && (
           <Text style={[styles.accuracy, { color: accuracyColor }]}>
@@ -143,18 +159,37 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: colors.accent.amber,
   },
-  input: {
-    backgroundColor: colors.input.background,
+  parchment: {
+    backgroundColor: '#1A1500',
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.input.border,
-    borderRadius: 10,
+    borderColor: '#6B4A10',
+    padding: 16,
+    marginTop: 8,
+  },
+  scrollCurl: {
+    height: 8,
+    backgroundColor: '#6B4A10',
+    borderRadius: 4,
+    opacity: 0.6,
+    marginVertical: 10,
+  },
+  waxSeal: {
+    fontSize: 28,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: '#6B4A10',
+    borderRadius: 6,
     padding: 14,
     fontFamily: fonts.ui.regular,
     fontSize: 15,
     color: colors.text.primary,
-    minHeight: 120,
+    minHeight: 100,
     textAlignVertical: 'top',
-    marginTop: 8,
   },
   accuracy: {
     fontFamily: fonts.accent.semiBold,

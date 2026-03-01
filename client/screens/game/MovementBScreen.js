@@ -12,9 +12,10 @@ import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
-import { TASKS, TASK_CATEGORY, TASK_SPRITE } from '../../data/tasks';
+import { TASKS, TASK_CATEGORY } from '../../data/tasks';
 import { submitMovementBTask } from '../../utils/api';
 import TaskScreen from '../tasks/TaskScreen';
+import TaskSprite from '../../components/TaskSprite';
 
 const DIFFICULTY_COLOR = {
   easy:   colors.accent.neonGreen,
@@ -316,7 +317,6 @@ export default function MovementBScreen({
           {visibleTasks.map((task) => {
             const done = completedTasks.has(task.id);
             const diffColor = DIFFICULTY_COLOR[task.difficulty] || colors.text.tertiary;
-            const sprite = TASK_SPRITE[task.id] || '📖';
             const catDef = CATEGORIES.find((c) => c.key === task.category);
             const accentColor = catDef ? catDef.color : colors.primary.electricBlue;
             const isCoopStub = task.category === TASK_CATEGORY.COOPERATIVE;
@@ -336,7 +336,7 @@ export default function MovementBScreen({
               >
                 {/* Sprite column */}
                 <View style={[styles.spriteCol, { backgroundColor: accentColor + '22' }]}>
-                  <Text style={styles.spriteText}>{sprite}</Text>
+                  <TaskSprite taskId={task.id} size={28} color={accentColor} />
                   {done && <Text style={styles.spriteDone}>✓</Text>}
                 </View>
 

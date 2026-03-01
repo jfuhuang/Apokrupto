@@ -1,20 +1,123 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated, PanResponder } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, StyleSheet, Animated, PanResponder, Dimensions } from 'react-native';
+import Svg, { Circle, Path, Ellipse, Rect, Line, G } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
-const SIZE = 180;
+const SIZE   = 180;
 const STROKE = 14;
-const RADIUS = (SIZE - STROKE) / 2;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+const R      = (SIZE - STROKE) / 2;
+const CIRC   = 2 * Math.PI * R;
 
-export default function HoldTask({ config, onSuccess, onFail }) {
-  const { duration } = config; // seconds
+const { width: W } = Dimensions.get('window');
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+// ── Task-specific center content ─────────────────────────────────────────
+
+function TorchCenter({ fillAnim, color }) {
+  const flameH = fillAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 48] });
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <Svg width={40} height={24} viewBox="0 0 40 24">
+        {/* Handle */}
+        <Rect x="17" y="10" width="6" height="14" rx="3" fill={color} />
+        {/* Wrap */}
+        <Rect x="14" y="6"  width="12" height="6" rx="1" fill={color} opacity="0.8" />
+      </Svg>
+      <Animated.View style={{ height: flameH, overflow: 'hidden' }}>
+        <Svg width={32} height={50} viewBox="0 0 32 50">
+          <Path d="M16 50 C10 40 8 28 12 18 C12 26 16 26 15 18 C16 24 18 24 17 18 C20 28 22 40 16 50Z" fill="#FFA63D" />
+          <Path d="M16 44 C13 36 14 28 16 22 C18 28 19 36 16 44Z" fill="#FFE082" opacity="0.9" />
+        </Svg>
+      </Animated.View>
+    </View>
+  );
+}
+
+function FurnaceCenter({ fillAnim }) {
+  const fireH = fillAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 46] });
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <Svg width={60} height={30} viewBox="0 0 60 30">
+        {/* Furnace arch */}
+        <Path d="M5 30 L5 18 Q5 5 30 5 Q55 5 55 18 L55 30Z" fill="#A04020" />
+        {/* Dark opening */}
+        <Path d="M15 30 L15 20 Q15 12 30 12 Q45 12 45 20 L45 30Z" fill="#1A0A00" />
+      </Svg>
+      <Animated.View style={{ height: fireH, overflow: 'hidden' }}>
+        <Svg width={32} height={50} viewBox="0 0 32 50">
+          <Path d="M16 50 C10 40 8 28 12 18 C12 26 16 26 15 18 C16 24 18 24 17 18 C20 28 22 40 16 50Z" fill="#FF5500" />
+          <Path d="M16 44 C13 36 14 28 16 22 C18 28 19 36 16 44Z" fill="#FFA63D" opacity="0.9" />
+        </Svg>
+      </Animated.View>
+    </View>
+  );
+}
+
+function WaterCenter({ fillAnim }) {
+  const waveAnim = useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    Animated.loop(
+      Animated.timing(waveAnim, { toValue: 1, duration: 1400, useNativeDriver: false })
+    ).start();
+  }, []);
+
+  const translateX = waveAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -20] });
+
+  return (
+    <View style={{ alignItems: 'center' }}>
+      {/* Figure silhouette */}
+      <Svg width={32} height={48} viewBox="0 0 32 48">
+        {/* Head */}
+        <Circle cx="16" cy="8" r="6" fill="#00D4FF" />
+        {/* Body */}
+        <Path d="M10 14 Q10 28 16 30 Q22 28 22 14Z" fill="#00D4FF" />
+        {/* Legs */}
+        <Line x1="13" y1="30" x2="11" y2="44" stroke="#00D4FF" strokeWidth="3" strokeLinecap="round" />
+        <Line x1="19" y1="30" x2="21" y2="44" stroke="#00D4FF" strokeWidth="3" strokeLinecap="round" />
+      </Svg>
+      {/* Animated waves */}
+      <Animated.View style={{ transform: [{ translateX }] }}>
+        <Svg width={80} height={20} viewBox="0 0 80 20">
+          <Path d="M0 10 Q10 4 20 10 Q30 16 40 10 Q50 4 60 10 Q70 16 80 10" stroke="#00D4FF" strokeWidth="2" fill="none" />
+          <Path d="M0 14 Q10 8 20 14 Q30 20 40 14 Q50 8 60 14" stroke="#00D4FF" strokeWidth="1.5" fill="none" opacity="0.5" />
+        </Svg>
+      </Animated.View>
+    </View>
+  );
+}
+
+function PrayerCenter({ color }) {
+  return (
+    <Svg width={60} height={60} viewBox="0 0 60 60">
+      <Circle cx="30" cy="30" r="22" stroke={color} strokeWidth="3" fill="none" />
+      <Ellipse cx="30" cy="7"  rx="5" ry="4" fill={color} />
+      <Ellipse cx="30" cy="53" rx="5" ry="4" fill={color} />
+      <Ellipse cx="7"  cy="30" rx="4" ry="5" fill={color} />
+      <Ellipse cx="53" cy="30" rx="4" ry="5" fill={color} />
+      <Ellipse cx="14" cy="14" rx="4" ry="4" fill={color} />
+      <Ellipse cx="46" cy="14" rx="4" ry="4" fill={color} />
+      <Ellipse cx="14" cy="46" rx="4" ry="4" fill={color} />
+      <Ellipse cx="46" cy="46" rx="4" ry="4" fill={color} />
+    </Svg>
+  );
+}
+
+const TASK_RING_COLOR = {
+  gideons_torch:   '#FFA63D',  // amber
+  fiery_furnace:   '#FF5500',  // orange-red
+  walking_on_water:'#0080FF',  // ocean blue
+  circle_of_prayer:'#8B5CF6',  // ultraviolet
+};
+
+export default function HoldTask({ config, onSuccess, onFail, taskId }) {
+  const { duration } = config;
   const fillAnim = useRef(new Animated.Value(0)).current;
-  const animRef = useRef(null);
-  const [holding, setHolding] = useState(false);
+  const animRef  = useRef(null);
+  const [holding,   setHolding]   = useState(false);
   const [completed, setCompleted] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed,    setFailed]    = useState(false);
 
   const startHold = () => {
     if (completed || failed) return;
@@ -39,7 +142,6 @@ export default function HoldTask({ config, onSuccess, onFail }) {
       animRef.current = null;
     }
     setHolding(false);
-    // Reset the arc
     Animated.timing(fillAnim, {
       toValue: 0,
       duration: 300,
@@ -52,15 +154,15 @@ export default function HoldTask({ config, onSuccess, onFail }) {
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: startHold,
-      onPanResponderRelease: endHold,
+      onPanResponderGrant:    startHold,
+      onPanResponderRelease:  endHold,
       onPanResponderTerminate: endHold,
     })
   ).current;
 
-  const strokeDashoffset = fillAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [CIRCUMFERENCE, 0],
+  const dashOffset = fillAnim.interpolate({
+    inputRange:  [0, 1],
+    outputRange: [CIRC, 0],
   });
 
   const ringColor = completed
@@ -69,7 +171,32 @@ export default function HoldTask({ config, onSuccess, onFail }) {
     ? colors.state.error
     : holding
     ? colors.accent.amber
-    : colors.primary.electricBlue;
+    : TASK_RING_COLOR[taskId] || colors.primary.electricBlue;
+
+  // Center content per task
+  const renderCenter = () => {
+    if (completed || failed) {
+      return (
+        <Text style={[styles.holdText, { color: ringColor }]}>
+          {completed ? '✓' : '✕'}
+        </Text>
+      );
+    }
+    switch (taskId) {
+      case 'gideons_torch':
+        return <TorchCenter fillAnim={fillAnim} color={ringColor} />;
+      case 'fiery_furnace':
+        return <FurnaceCenter fillAnim={fillAnim} />;
+      case 'walking_on_water':
+        return <WaterCenter fillAnim={fillAnim} />;
+      case 'circle_of_prayer':
+        return <PrayerCenter color={ringColor} />;
+      default:
+        return (
+          <Text style={[styles.holdText, { color: ringColor }]}>HOLD</Text>
+        );
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -82,34 +209,32 @@ export default function HoldTask({ config, onSuccess, onFail }) {
       </Text>
 
       <View style={styles.ringWrapper} {...panResponder.panHandlers}>
-        {/* Background circle */}
-        <View
-          style={[
-            styles.circle,
-            {
-              borderColor: colors.background.frost,
-              borderWidth: STROKE,
-            },
-          ]}
-        />
-        {/* Filled arc using border hack — approximate with opacity change */}
-        <Animated.View
-          style={[
-            styles.fillIndicator,
-            {
-              opacity: fillAnim.interpolate({ inputRange: [0, 0.01], outputRange: [0, 1] }),
-              borderColor: ringColor,
-              borderWidth: STROKE,
-              // We clip to progress using a rotation trick isn't ideal in RN without SVG
-              // Simple approach: scale the height to show progress
-            },
-          ]}
-        />
-
+        <Svg width={SIZE} height={SIZE}>
+          {/* Background track */}
+          <Circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={R}
+            stroke={colors.background.frost}
+            strokeWidth={STROKE}
+            fill="none"
+          />
+          {/* Animated progress arc */}
+          <AnimatedCircle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={R}
+            stroke={ringColor}
+            strokeWidth={STROKE}
+            fill="none"
+            strokeDasharray={`${CIRC}`}
+            strokeDashoffset={dashOffset}
+            strokeLinecap="round"
+            transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
+          />
+        </Svg>
         <View style={styles.centerContent}>
-          <Text style={[styles.holdText, { color: ringColor }]}>
-            {completed ? '✓' : failed ? '✕' : 'HOLD'}
-          </Text>
+          {renderCenter()}
         </View>
       </View>
 
@@ -140,19 +265,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  circle: {
-    position: 'absolute',
-    width: SIZE - STROKE,
-    height: SIZE - STROKE,
-    borderRadius: (SIZE - STROKE) / 2,
-  },
-  fillIndicator: {
-    position: 'absolute',
-    width: SIZE - STROKE,
-    height: SIZE - STROKE,
-    borderRadius: (SIZE - STROKE) / 2,
-  },
   centerContent: {
+    position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',
   },
