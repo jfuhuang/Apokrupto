@@ -240,11 +240,6 @@ export default function MovementAScreen({
           if (onMovementComplete) onMovementComplete();
         }
       });
-      socket.on('movementAComplete', () => {
-        clearInterval(deliberationTimerRef.current);
-        if (onMovementComplete) onMovementComplete();
-      });
-
       socket.on('connect_error', (err) => console.warn('[MovementA] Socket error:', err.message));
     };
 

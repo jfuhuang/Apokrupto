@@ -100,12 +100,6 @@ export async function submitTaskCompletion(token, lobbyId, taskId) {
   });
 }
 
-export async function fetchGameState(token, lobbyId) {
-  return request(`/api/lobbies/${lobbyId}/gamestate`, {
-    headers: authHeader(token),
-  });
-}
-
 export async function fetchPlayerGameState(token, gameId) {
   return request(`/api/games/${gameId}/state`, {
     headers: authHeader(token),
@@ -120,9 +114,3 @@ export async function submitMovementBTask(token, gameId, taskId) {
   });
 }
 
-export async function submitSabotagefix(token, lobbyId) {
-  return request(`/api/lobbies/${lobbyId}/sabotage/fix`, {
-    method: 'POST',
-    headers: { ...jsonHeaders, ...authHeader(token) },
-  });
-}

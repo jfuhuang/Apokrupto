@@ -1,91 +1,53 @@
 const pool = require('./db');
 
 async function init() {
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        username VARCHAR(50) UNIQUE,
-        password_hash VARCHAR(255),
-        created_at TIMESTAMPTZ DEFAULT now()
-        );
-
-        CREATE TABLE IF NOT EXISTS user_providers (
-        id SERIAL PRIMARY KEY,
-        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        provider VARCHAR(50) NOT NULL,      -- provider name, e.g. 'github'
-        provider_id VARCHAR(255) NOT NULL,  -- provider-specific user id (string)
-        provider_profile JSONB,             -- store returned profile (name, avatar, etc)
-        created_at TIMESTAMPTZ DEFAULT now(),
-        last_seen_at TIMESTAMPTZ
-        );
-
-        -- ensure each external account maps to at most one local user
-        CREATE UNIQUE INDEX IF NOT EXISTS ux_user_providers_provider_providerid ON user_providers (provider, provider_id);
-        CREATE INDEX IF NOT EXISTS ix_user_providers_user_id ON user_providers (user_id);
-
-        CREATE TABLE IF NOT EXISTS lobbies (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        max_players INT NOT NULL CHECK (max_players >= 4 AND max_players <= 15),
-        created_by INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        status VARCHAR(20) DEFAULT 'waiting' CHECK (status IN ('waiting', 'in_progress', 'completed')),
-        created_at TIMESTAMPTZ DEFAULT now()
-        );
-
-        CREATE TABLE IF NOT EXISTS lobby_players (
-        id SERIAL PRIMARY KEY,
-        lobby_id INT NOT NULL REFERENCES lobbies(id) ON DELETE CASCADE,
-        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        joined_at TIMESTAMPTZ DEFAULT now(),
-        role VARCHAR(20),
-        UNIQUE (lobby_id, user_id)
-        );
-
-        CREATE INDEX IF NOT EXISTS ix_lobbies_status ON lobbies (status);
-        CREATE INDEX IF NOT EXISTS ix_lobby_players_lobby_id ON lobby_players (lobby_id);
-        CREATE INDEX IF NOT EXISTS ix_lobby_players_user_id ON lobby_players (user_id);
-  `);
-
-  // Incremental migrations — safe to run on every startup
   await pool.query(`
-    ALTER TABLE lobby_players ADD COLUMN IF NOT EXISTS role    VARCHAR(20);
-    ALTER TABLE lobby_players ADD COLUMN IF NOT EXISTS points  INT     NOT NULL DEFAULT 0;
-    ALTER TABLE lobby_players ADD COLUMN IF NOT EXISTS is_alive BOOLEAN NOT NULL DEFAULT TRUE;
+    CREATE TABLE IF NOT EXISTS users (
+      id            SERIAL PRIMARY KEY,
+      username      VARCHAR(50) UNIQUE,
+      password_hash VARCHAR(255),
+      created_at    TIMESTAMPTZ DEFAULT now()
+    );
 
-    -- Expand max_players from 4–15 to 5–80
-    ALTER TABLE lobbies DROP CONSTRAINT IF EXISTS lobbies_max_players_check;
-    ALTER TABLE lobbies ADD CONSTRAINT lobbies_max_players_check CHECK (max_players >= 5 AND max_players <= 80);
+    CREATE TABLE IF NOT EXISTS user_providers (
+      id               SERIAL PRIMARY KEY,
+      user_id          INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      provider         VARCHAR(50) NOT NULL,
+      provider_id      VARCHAR(255) NOT NULL,
+      provider_profile JSONB,
+      created_at       TIMESTAMPTZ DEFAULT now(),
+      last_seen_at     TIMESTAMPTZ
+    );
 
-    -- Add 'summarizing' to rounds.status allowed values
-    ALTER TABLE rounds DROP CONSTRAINT IF EXISTS rounds_status_check;
-    ALTER TABLE rounds ADD CONSTRAINT rounds_status_check
-      CHECK (status IN ('pending', 'active', 'summarizing', 'completed'));
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_user_providers_provider_providerid
+      ON user_providers (provider, provider_id);
+    CREATE INDEX IF NOT EXISTS ix_user_providers_user_id ON user_providers (user_id);
 
-    -- Sketch mode: store normalized SVG path data
-    ALTER TABLE movement_a_submissions
-      ADD COLUMN IF NOT EXISTS sketch_data JSONB;
+    CREATE TABLE IF NOT EXISTS lobbies (
+      id          SERIAL PRIMARY KEY,
+      name        VARCHAR(100) NOT NULL,
+      max_players INT NOT NULL CHECK (max_players >= 5 AND max_players <= 80),
+      created_by  INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status      VARCHAR(20) DEFAULT 'waiting'
+                    CHECK (status IN ('waiting', 'in_progress', 'completed')),
+      created_at  TIMESTAMPTZ DEFAULT now()
+    );
 
-    -- Tag each prompt as 'word' or 'sketch'
-    ALTER TABLE prompts
-      ADD COLUMN IF NOT EXISTS prompt_mode VARCHAR DEFAULT 'word';
-  `);
+    CREATE TABLE IF NOT EXISTS lobby_players (
+      id        SERIAL PRIMARY KEY,
+      lobby_id  INT NOT NULL REFERENCES lobbies(id) ON DELETE CASCADE,
+      user_id   INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      joined_at TIMESTAMPTZ DEFAULT now(),
+      role      VARCHAR(20),
+      points    INT NOT NULL DEFAULT 0,
+      is_alive  BOOLEAN NOT NULL DEFAULT TRUE,
+      UNIQUE (lobby_id, user_id)
+    );
 
-  // Sketch mode: allow NULL word — idempotent via information_schema check
-  await pool.query(`
-    DO $$
-    BEGIN
-      IF EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'movement_a_submissions'
-          AND column_name = 'word'
-          AND is_nullable = 'NO'
-      ) THEN
-        ALTER TABLE movement_a_submissions ALTER COLUMN word DROP NOT NULL;
-      END IF;
-    END $$;
-  `);
+    CREATE INDEX IF NOT EXISTS ix_lobbies_status       ON lobbies (status);
+    CREATE INDEX IF NOT EXISTS ix_lobby_players_lobby  ON lobby_players (lobby_id);
+    CREATE INDEX IF NOT EXISTS ix_lobby_players_user   ON lobby_players (user_id);
 
-  await pool.query(`
     CREATE TABLE IF NOT EXISTS player_task_completions (
       id            SERIAL PRIMARY KEY,
       lobby_id      INT NOT NULL REFERENCES lobbies(id)  ON DELETE CASCADE,
@@ -96,27 +58,24 @@ async function init() {
       UNIQUE (lobby_id, user_id, task_id)
     );
     CREATE INDEX IF NOT EXISTS ix_ptc_lobby_user ON player_task_completions (lobby_id, user_id);
-  `);
 
-  // --- New game tables ---
-  await pool.query(`
     CREATE TABLE IF NOT EXISTS games (
-      id              SERIAL PRIMARY KEY,
-      lobby_id        INT NOT NULL REFERENCES lobbies(id) ON DELETE CASCADE,
-      status          VARCHAR(20) NOT NULL DEFAULT 'active'
-                        CHECK (status IN ('active', 'completed')),
-      total_rounds    INT NOT NULL DEFAULT 4,
-      current_round   INT NOT NULL DEFAULT 1,
-      winner          VARCHAR(10) CHECK (winner IN ('phos', 'skotia')),
-      win_condition   VARCHAR(20) CHECK (win_condition IN ('points', 'supermajority')),
-      created_at      TIMESTAMPTZ DEFAULT now()
+      id            SERIAL PRIMARY KEY,
+      lobby_id      INT NOT NULL REFERENCES lobbies(id) ON DELETE CASCADE,
+      status        VARCHAR(20) NOT NULL DEFAULT 'active'
+                      CHECK (status IN ('active', 'completed')),
+      total_rounds  INT NOT NULL DEFAULT 4,
+      current_round INT NOT NULL DEFAULT 1,
+      winner        VARCHAR(10) CHECK (winner IN ('phos', 'skotia')),
+      win_condition VARCHAR(20) CHECK (win_condition IN ('points', 'supermajority')),
+      created_at    TIMESTAMPTZ DEFAULT now()
     );
 
     CREATE TABLE IF NOT EXISTS game_teams (
-      id       SERIAL PRIMARY KEY,
-      game_id  INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-      team     VARCHAR(10) NOT NULL CHECK (team IN ('phos', 'skotia')),
-      points   INT NOT NULL DEFAULT 0,
+      id      SERIAL PRIMARY KEY,
+      game_id INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+      team    VARCHAR(10) NOT NULL CHECK (team IN ('phos', 'skotia')),
+      points  INT NOT NULL DEFAULT 0,
       UNIQUE (game_id, team)
     );
 
@@ -130,36 +89,36 @@ async function init() {
     );
 
     CREATE TABLE IF NOT EXISTS game_groups (
-      id            SERIAL PRIMARY KEY,
-      game_id       INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-      round_number  INT NOT NULL,
-      group_index   INT NOT NULL
+      id           SERIAL PRIMARY KEY,
+      game_id      INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+      round_number INT NOT NULL,
+      group_index  INT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS game_group_members (
-      id        SERIAL PRIMARY KEY,
-      group_id  INT NOT NULL REFERENCES game_groups(id) ON DELETE CASCADE,
-      user_id   INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      id       SERIAL PRIMARY KEY,
+      group_id INT NOT NULL REFERENCES game_groups(id) ON DELETE CASCADE,
+      user_id  INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       UNIQUE (group_id, user_id)
     );
 
     CREATE TABLE IF NOT EXISTS rounds (
-      id            SERIAL PRIMARY KEY,
-      game_id       INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-      round_number  INT NOT NULL,
-      status        VARCHAR(20) NOT NULL DEFAULT 'pending'
-                      CHECK (status IN ('pending', 'active', 'completed')),
+      id           SERIAL PRIMARY KEY,
+      game_id      INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+      round_number INT NOT NULL,
+      status       VARCHAR(20) NOT NULL DEFAULT 'pending'
+                     CHECK (status IN ('pending', 'active', 'summarizing', 'completed')),
       UNIQUE (game_id, round_number)
     );
 
     CREATE TABLE IF NOT EXISTS movements (
-      id             SERIAL PRIMARY KEY,
-      round_id       INT NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
-      movement_type  CHAR(1) NOT NULL CHECK (movement_type IN ('A', 'B', 'C')),
-      status         VARCHAR(20) NOT NULL DEFAULT 'pending'
-                       CHECK (status IN ('pending', 'active', 'completed')),
-      started_at     TIMESTAMPTZ,
-      completed_at   TIMESTAMPTZ,
+      id            SERIAL PRIMARY KEY,
+      round_id      INT NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+      movement_type CHAR(1) NOT NULL CHECK (movement_type IN ('A', 'B', 'C')),
+      status        VARCHAR(20) NOT NULL DEFAULT 'pending'
+                      CHECK (status IN ('pending', 'active', 'completed')),
+      started_at    TIMESTAMPTZ,
+      completed_at  TIMESTAMPTZ,
       UNIQUE (round_id, movement_type)
     );
 
@@ -167,7 +126,8 @@ async function init() {
       id            SERIAL PRIMARY KEY,
       phos_prompt   TEXT NOT NULL,
       skotia_prompt TEXT NOT NULL,
-      theme_label   TEXT NOT NULL
+      theme_label   TEXT NOT NULL,
+      prompt_mode   VARCHAR DEFAULT 'word'
     );
 
     CREATE TABLE IF NOT EXISTS movement_a_submissions (
@@ -175,7 +135,8 @@ async function init() {
       movement_id  INT NOT NULL REFERENCES movements(id) ON DELETE CASCADE,
       group_id     INT NOT NULL REFERENCES game_groups(id) ON DELETE CASCADE,
       user_id      INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      word         TEXT NOT NULL,
+      word         TEXT,
+      sketch_data  JSONB,
       submitted_at TIMESTAMPTZ DEFAULT now(),
       UNIQUE (movement_id, user_id)
     );
@@ -192,24 +153,24 @@ async function init() {
     );
 
     CREATE TABLE IF NOT EXISTS mark_events (
-      id              SERIAL PRIMARY KEY,
-      game_id         INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-      game_player_id  INT NOT NULL REFERENCES game_players(id) ON DELETE CASCADE,
-      round_number    INT NOT NULL,
-      action          VARCHAR(10) NOT NULL CHECK (action IN ('mark', 'unmark')),
-      was_correct     BOOLEAN NOT NULL,
-      created_at      TIMESTAMPTZ DEFAULT now()
+      id             SERIAL PRIMARY KEY,
+      game_id        INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+      game_player_id INT NOT NULL REFERENCES game_players(id) ON DELETE CASCADE,
+      round_number   INT NOT NULL,
+      action         VARCHAR(10) NOT NULL CHECK (action IN ('mark', 'unmark')),
+      was_correct    BOOLEAN NOT NULL,
+      created_at     TIMESTAMPTZ DEFAULT now()
     );
 
-    CREATE INDEX IF NOT EXISTS ix_games_lobby    ON games (lobby_id);
-    CREATE INDEX IF NOT EXISTS ix_game_players   ON game_players (game_id, user_id);
-    CREATE INDEX IF NOT EXISTS ix_game_groups    ON game_groups (game_id, round_number);
-    CREATE INDEX IF NOT EXISTS ix_ggm_group      ON game_group_members (group_id);
-    CREATE INDEX IF NOT EXISTS ix_ggm_user       ON game_group_members (user_id);
-    CREATE INDEX IF NOT EXISTS ix_movements      ON movements (round_id);
-    CREATE INDEX IF NOT EXISTS ix_mv_a_sub       ON movement_a_submissions (movement_id, group_id);
-    CREATE INDEX IF NOT EXISTS ix_mv_c_votes     ON movement_c_votes (movement_id, group_id);
-    CREATE INDEX IF NOT EXISTS ix_mark_events    ON mark_events (game_id, round_number);
+    CREATE INDEX IF NOT EXISTS ix_games_lobby   ON games (lobby_id);
+    CREATE INDEX IF NOT EXISTS ix_game_players  ON game_players (game_id, user_id);
+    CREATE INDEX IF NOT EXISTS ix_game_groups   ON game_groups (game_id, round_number);
+    CREATE INDEX IF NOT EXISTS ix_ggm_group     ON game_group_members (group_id);
+    CREATE INDEX IF NOT EXISTS ix_ggm_user      ON game_group_members (user_id);
+    CREATE INDEX IF NOT EXISTS ix_movements     ON movements (round_id);
+    CREATE INDEX IF NOT EXISTS ix_mv_a_sub      ON movement_a_submissions (movement_id, group_id);
+    CREATE INDEX IF NOT EXISTS ix_mv_c_votes    ON movement_c_votes (movement_id, group_id);
+    CREATE INDEX IF NOT EXISTS ix_mark_events   ON mark_events (game_id, round_number);
   `);
 
   // Seed word prompt pairs (only if table is empty)
@@ -252,7 +213,6 @@ async function init() {
     ) AS seed(phos_prompt, skotia_prompt, theme_label, prompt_mode)
     WHERE NOT EXISTS (SELECT 1 FROM prompts WHERE prompt_mode = 'sketch' LIMIT 1)
   `);
-
 }
 
 module.exports = init;

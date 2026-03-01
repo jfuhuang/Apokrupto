@@ -22,6 +22,8 @@ export default function VotingScreen({
   roundNumber,
   groupMembers,
   onMovementComplete,
+  onRoundSummary,
+  onGameOver,
 }) {
   const [phase, setPhase] = useState('voting'); // 'voting' | 'waiting' | 'preview'
   const [myVotes, setMyVotes] = useState({});        // { [playerId]: 'phos' | 'skotia' }
@@ -63,19 +65,32 @@ export default function VotingScreen({
         votingTimerRef.current = setInterval(tick, 1000);
       });
 
-      // Per-group mark results (show preview, but navigation is driven by movementComplete)
+      // Per-group mark results — show preview and wait for roundSummary to navigate
       socket.on('votingComplete', ({ markResults: results }) => {
         setMarkResults(results || []);
         setPhase('preview');
-        // Navigation happens via movementComplete C — NOT a timer here
+        // Navigation is now driven by roundSummary, NOT movementComplete
       });
 
-      // Voting timer expired (or GM force-advanced C) — return to RoundHub
+      // Voting timer expired (or GM force-advanced C) — stay on screen, wait for roundSummary
       socket.on('movementComplete', ({ movement }) => {
         if (movement === 'C') {
           clearInterval(votingTimerRef.current);
-          if (onMovementComplete) onMovementComplete();
+          // Do NOT navigate away yet — roundSummary (emitted on the next GM advance)
+          // will drive the transition. Navigating here causes a socket reconnection gap
+          // that loses the roundSummary event.
+          setPhase((prev) => (prev === 'voting' || prev === 'waiting' ? 'waitingForSummary' : prev));
         }
+      });
+
+      // GM resolved votes and summarized the round — navigate to round summary screen
+      socket.on('roundSummary', (summary) => {
+        if (onRoundSummary) onRoundSummary(summary);
+      });
+
+      // Game ended directly (supermajority or edge case) — forward to App.js
+      socket.on('gameOver', (result) => {
+        if (onGameOver) onGameOver(result);
       });
 
       socket.on('connect_error', (err) => console.warn('[Voting] Socket error:', err.message));
@@ -172,7 +187,11 @@ export default function VotingScreen({
   const renderPreview = () => (
     <View style={styles.previewContainer}>
       <Text style={styles.previewTitle}>ROUND RESULTS</Text>
-      <Text style={styles.previewHint}>This round in your group:</Text>
+      {phase === 'waitingForSummary' ? (
+        <Text style={styles.previewHint}>Voting has ended. Waiting for Game Master...</Text>
+      ) : (
+        <Text style={styles.previewHint}>This round in your group:</Text>
+      )}
       {markResults.length === 0 ? (
         <Text style={styles.previewNoChange}>No changes this round.</Text>
       ) : (
@@ -204,7 +223,7 @@ export default function VotingScreen({
           <Text style={styles.headerRound}>ROUND {roundNumber}</Text>
         </View>
 
-        {phase === 'preview' ? renderPreview() : (
+        {(phase === 'preview' || phase === 'waitingForSummary') ? renderPreview() : (
           <>
             <View style={styles.instructionBox}>
               <Text style={styles.instructionText}>

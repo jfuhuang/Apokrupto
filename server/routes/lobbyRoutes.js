@@ -1,7 +1,8 @@
 const express = require('express');
 const pool = require('../db');
 const authenticateToken = require('../middleware/auth');
-const { broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage, broadcastPlayerKicked } = require('../websocket/lobbySocket');
+const { GM_USERNAMES, ADMIN_USERNAMES } = require('../utils/config');
+const { broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, broadcastPlayerKicked } = require('../websocket/lobbySocket');
 const { getTask } = require('../data/tasks');
 
 const router = express.Router();
@@ -9,14 +10,7 @@ const router = express.Router();
 // All lobby routes require authentication
 router.use(authenticateToken);
 
-// Admin-only middleware — checks req.user.username against ADMIN_USERNAMES env var
-const ADMIN_USERNAMES = new Set(
-  (process.env.ADMIN_USERNAMES || '').split(',').map(s => s.trim()).filter(Boolean)
-);
-
-const GM_USERNAMES = new Set(
-  (process.env.GM_USERNAMES || '').split(',').map(s => s.trim()).filter(Boolean)
-);
+// Admin-only middleware
 function requireAdmin(req, res, next) {
   if (!ADMIN_USERNAMES.has(req.user.username)) {
     return res.status(403).json({ error: 'Admin access required' });
@@ -92,41 +86,6 @@ router.get('/current', async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Authoritative game state for in-progress polling
-router.get('/:id/gamestate', async (req, res) => {
-  const { id } = req.params;
-  try {
-    const result = await pool.query(
-      `SELECT u.id, u.username, lp.is_alive, lp.points, lp.role
-       FROM lobby_players lp
-       JOIN users u ON u.id = lp.user_id
-       WHERE lp.lobby_id = $1`,
-      [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Lobby not found' });
-    }
-
-    const totalInnocentPoints = result.rows
-      .filter((p) => p.role === 'innocent')
-      .reduce((sum, p) => sum + parseInt(p.points || 0), 0);
-
-    res.json({
-      totalInnocentPoints,
-      players: result.rows.map((p) => ({
-        id: p.id,
-        username: p.username,
-        isAlive: p.is_alive,
-      })),
-      activeSabotage: getActiveSabotage(id),
-    });
-  } catch (err) {
-    console.error('[gamestate]', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -458,52 +417,6 @@ router.post('/:id/tasks/complete', async (req, res) => {
   }
 });
 
-// Fix the active sabotage
-router.post('/:id/sabotage/fix', async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user.sub;
-
-  try {
-    // 1. Verify lobby is in_progress
-    const lobbyResult = await pool.query(
-      'SELECT status FROM lobbies WHERE id = $1',
-      [id]
-    );
-    if (lobbyResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Lobby not found' });
-    }
-    if (lobbyResult.rows[0].status !== 'in_progress') {
-      return res.status(400).json({ error: 'Game is not in progress' });
-    }
-
-    // 2. Verify player is in lobby and is alive
-    const playerResult = await pool.query(
-      'SELECT is_alive FROM lobby_players WHERE lobby_id = $1 AND user_id = $2',
-      [id, userId]
-    );
-    if (playerResult.rows.length === 0) {
-      return res.status(403).json({ error: 'Not in this lobby' });
-    }
-    if (!playerResult.rows[0].is_alive) {
-      return res.status(400).json({ error: 'Dead players cannot fix sabotages' });
-    }
-
-    // 3. Clear the sabotage (in-memory)
-    const cleared = clearSabotage(id);
-    if (!cleared) {
-      return res.status(400).json({ error: 'No active sabotage' });
-    }
-
-    // 4. Broadcast fix to all players in the room
-    broadcastSabotageFixed(id, cleared.type);
-
-    res.json({ ok: true, type: cleared.type });
-  } catch (err) {
-    console.error('[sabotage/fix] error:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
 // ADMIN — add a throwaway dummy player to a lobby for testing
 {
   const BOT_NAMES = [
@@ -656,7 +569,7 @@ router.post('/:id/sabotage/fix', async (req, res) => {
 router.post('/:id/force-end', requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
-    const { getIO } = require('../websocket/lobbySocket');
+    const { getIO } = require('../websocket/io');
     const { cleanupGameData } = require('../services/gameService');
 
     // Find active game(s) for this lobby before updating

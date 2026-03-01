@@ -1,10 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const auth    = require('../middleware/auth');
-
-const GM_USERNAMES = new Set(
-  (process.env.GM_USERNAMES || '').split(',').map(s => s.trim()).filter(Boolean)
-);
+const { GM_USERNAMES } = require('../utils/config');
 const db      = require('../db');
 const {
   createGame,
@@ -29,7 +26,8 @@ const {
   getMovementBEndsAt,
   getVotingEndsAt,
 } = require('../services/gameService');
-const { getIO, emitAdvanceEvents } = require('../websocket/lobbySocket');
+const { emitAdvanceEvents } = require('../websocket/lobbySocket');
+const { getIO } = require('../websocket/io');
 const { getTask } = require('../data/tasks');
 
 // ---------------------------------------------------------------------------
@@ -156,6 +154,10 @@ router.post('/:gameId/advance', auth, async (req, res) => {
   } catch (err) {
     if (err.message.includes('advanceMovement race:')) {
       console.warn('[POST /games/:id/advance] duplicate ignored:', err.message);
+      return res.json({ ok: true, step: 'noop' });
+    }
+    if (err.message.includes('is already completed')) {
+      console.warn('[POST /games/:id/advance] game already completed, ignored:', err.message);
       return res.json({ ok: true, step: 'noop' });
     }
     console.error('[POST /games/:id/advance]', err.message);
@@ -613,6 +615,9 @@ router.post('/:gameId/movement-c/vote', auth, async (req, res) => {
     const otherIds  = memberIds.filter((id) => id !== String(userId));
 
     for (const targetId of Object.keys(votes)) {
+      if (!/^\d+$/.test(targetId)) {
+        return res.status(400).json({ error: `Invalid target ID: ${targetId}` });
+      }
       if (!otherIds.includes(String(targetId))) {
         return res.status(400).json({ error: `Target ${targetId} is not in your group` });
       }
@@ -718,7 +723,7 @@ router.post('/:gameId/movement-b/complete', auth, async (req, res) => {
 // ---------------------------------------------------------------------------
 router.post('/:gameId/broadcast', auth, async (req, res) => {
   const { message, lobbyId } = req.body;
-  if (!message || !message.trim()) {
+  if (!message || typeof message !== 'string' || !message.trim()) {
     return res.status(400).json({ error: 'message is required' });
   }
   if (!lobbyId) {

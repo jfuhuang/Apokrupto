@@ -121,6 +121,13 @@ export const colors = {
     border: 'rgba(255, 255, 255, 0.1)',
   },
 
+  // Semantic weak-opacity backgrounds for team cards
+  backgrounds: {
+    phosWeak:   'rgba(0, 212, 255, 0.1)',
+    skotiaWeak: 'rgba(255, 51, 102, 0.12)',
+    phosStrong: 'rgba(0, 212, 255, 0.2)',
+  },
+
   // Neon Glows - For special effects
   glow: {
     red: {

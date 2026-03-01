@@ -1,24 +1,15 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
-const { getSabotage } = require('../data/sabotages');
+const { GM_USERNAMES, JWT_SECRET } = require('../utils/config');
+const ioModule = require('./io');
 const gameService = require('../services/gameService');
-
-const GM_USERNAMES = new Set(
-  (process.env.GM_USERNAMES || '').split(',').map(s => s.trim()).filter(Boolean)
-);
 
 // In-memory map of lobbyId -> Set of connected userIds (as strings)
 const lobbyConnections = new Map();
 
-// In-memory map of lobbyId -> { type, isCritical, timerId, expiresAt, label }
-const activeSabotages = new Map();
-
 // Tracks which entries in lobbyConnections are fake (bot) connections
 const fakeConnections = new Map();
-
-// Module-level io reference so helpers outside this file can broadcast
-let _io = null;
 
 /**
  * Query Postgres for the current lobby state and annotate each player
@@ -157,54 +148,37 @@ function addFakeConnection(lobbyId, userId) {
 }
 
 async function broadcastLobbyUpdate(lobbyId) {
-  if (!_io) return;
+  const io = ioModule.getIO();
+  if (!io) return;
   try {
     const state = await getLobbyState(lobbyId);
-    if (state) _io.to(`lobby:${String(lobbyId)}`).emit('lobbyUpdate', state);
+    if (state) io.to(`lobby:${String(lobbyId)}`).emit('lobbyUpdate', state);
   } catch (err) {
     console.error('[WS] broadcastLobbyUpdate error:', err);
   }
 }
 
 function broadcastPointsUpdate(lobbyId, payload) {
-  if (!_io) return;
-  _io.to(`lobby:${String(lobbyId)}`).emit('pointsUpdate', payload);
-}
-
-/**
- * Clear an active sabotage (called from lobbyRoutes after a successful fix).
- * Returns the cleared sabotage object, or null if none was active.
- */
-function clearSabotage(lobbyId) {
-  const roomKey = String(lobbyId);
-  const entry = activeSabotages.get(roomKey);
-  if (!entry) return null;
-  if (entry.timerId) clearTimeout(entry.timerId);
-  activeSabotages.delete(roomKey);
-  return entry;
-}
-
-function broadcastSabotageFixed(lobbyId, type) {
-  if (!_io) return;
-  _io.to(`lobby:${String(lobbyId)}`).emit('sabotageFixed', { type });
+  const io = ioModule.getIO();
+  if (!io) return;
+  io.to(`lobby:${String(lobbyId)}`).emit('pointsUpdate', payload);
 }
 
 function broadcastPlayerKicked(lobbyId, userId) {
-  if (!_io) return;
-  _io.to(`lobby:${String(lobbyId)}`).emit('playerKicked', { userId: String(userId) });
+  const io = ioModule.getIO();
+  if (!io) return;
+  io.to(`lobby:${String(lobbyId)}`).emit('playerKicked', { userId: String(userId) });
 }
 
 function setupLobbySocket(httpServer) {
-  _io = new Server(httpServer, {
+  const io = new Server(httpServer, {
     cors: {
       origin: '*',
       methods: ['GET', 'POST'],
     },
     transports: ['websocket', 'polling'],
   });
-  const io = _io; // local alias so handlers below continue to work
-
-  const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+  ioModule.setIO(io);
 
   // JWT authentication middleware
   io.use((socket, next) => {
@@ -397,91 +371,6 @@ function setupLobbySocket(httpServer) {
       }
     });
 
-    // Deceiver activates a sabotage
-    socket.on('activateSabotage', async ({ lobbyId, sabotageType } = {}, callback) => {
-      try {
-        const roomKey = String(lobbyId);
-
-        // 1. Validate lobby is in_progress
-        const lobbyResult = await pool.query(
-          'SELECT status FROM lobbies WHERE id = $1',
-          [lobbyId]
-        );
-        if (lobbyResult.rows.length === 0) {
-          return callback && callback({ error: 'Lobby not found' });
-        }
-        if (lobbyResult.rows[0].status !== 'in_progress') {
-          return callback && callback({ error: 'Game is not in progress' });
-        }
-
-        // 2. Validate socket user is a deceiver in this lobby
-        const playerResult = await pool.query(
-          'SELECT role FROM lobby_players WHERE lobby_id = $1 AND user_id = $2',
-          [lobbyId, socket.userId]
-        );
-        if (playerResult.rows.length === 0) {
-          return callback && callback({ error: 'Not in this lobby' });
-        }
-        if (playerResult.rows[0].role !== 'deceiver') {
-          return callback && callback({ error: 'Only deceivers can activate sabotages' });
-        }
-
-        // 3. Reject if a sabotage is already active
-        if (activeSabotages.has(roomKey)) {
-          return callback && callback({ error: 'A sabotage is already active' });
-        }
-
-        // 4. Load sabotage definition
-        const sabotage = getSabotage(sabotageType);
-        if (!sabotage) {
-          return callback && callback({ error: 'Unknown sabotage type' });
-        }
-
-        // 5. Store in activeSabotages
-        const startedAt = Date.now();
-        const expiresAt = sabotage.isCritical ? startedAt + sabotage.duration * 1000 : null;
-        const entry = { type: sabotageType, isCritical: sabotage.isCritical, startedAt, expiresAt, label: sabotage.label, timerId: null };
-
-        if (sabotage.isCritical) {
-          entry.timerId = setTimeout(async () => {
-            activeSabotages.delete(roomKey);
-            try {
-              await pool.query("UPDATE lobbies SET status='completed' WHERE id=$1", [lobbyId]);
-              await pool.query(
-                `DELETE FROM users WHERE id IN (
-                  SELECT lp.user_id FROM lobby_players lp
-                  JOIN users u ON u.id = lp.user_id
-                  WHERE lp.lobby_id = $1 AND u.password_hash IS NULL
-                )`,
-                [lobbyId]
-              );
-            } catch (err) {
-              console.error('[WS] gameOver DB update error:', err);
-            }
-            io.to(`lobby:${roomKey}`).emit('gameOver', { winner: 'deceivers', reason: sabotage.label });
-            console.log(`[WS] Sabotage ${sabotageType} expired — deceivers win in lobby ${lobbyId}`);
-          }, sabotage.duration * 1000);
-        }
-
-        activeSabotages.set(roomKey, entry);
-
-        // 6. Broadcast sabotageActive to lobby room
-        io.to(`lobby:${roomKey}`).emit('sabotageActive', {
-          type: sabotageType,
-          isCritical: sabotage.isCritical,
-          startedAt,
-          expiresAt,
-          label: sabotage.label,
-        });
-
-        console.log(`[WS] Sabotage ${sabotageType} activated in lobby ${lobbyId} by user ${socket.userId}`);
-        if (callback) callback({ ok: true });
-      } catch (err) {
-        console.error('[WS] activateSabotage error:', err);
-        if (callback) callback({ error: 'Server error' });
-      }
-    });
-
     // GM advances the game to the next movement/phase
     socket.on('gmAdvance', async ({ gameId } = {}, callback) => {
       try {
@@ -517,6 +406,10 @@ function setupLobbySocket(httpServer) {
         // both reach the same step — this is a no-op, not a real error.
         if (err.message.includes('advanceMovement race:')) {
           console.warn('[WS] gmAdvance duplicate ignored:', err.message);
+          if (callback) callback({ ok: true, step: 'noop' });
+        // Guard fires when GM clicks advance after the game is already completed.
+        } else if (err.message.includes('is already completed')) {
+          console.warn('[WS] gmAdvance on completed game ignored:', err.message);
           if (callback) callback({ ok: true, step: 'noop' });
         } else {
           console.error('[WS] gmAdvance error:', err.message);
@@ -559,15 +452,6 @@ function setupLobbySocket(httpServer) {
 
   return io;
 }
-
-function getActiveSabotage(lobbyId) {
-  const entry = activeSabotages.get(String(lobbyId));
-  if (!entry) return null;
-  const { timerId, ...rest } = entry; // strip non-serialisable timer handle
-  return rest;
-}
-
-function getIO() { return _io; }
 
 /**
  * Emit a gameStateUpdate snapshot to the lobby room so all clients
@@ -789,4 +673,4 @@ function _emitAdvanceEvents(io, result) {
   }
 }
 
-module.exports = { setupLobbySocket, getIO, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, clearSabotage, broadcastSabotageFixed, getActiveSabotage, broadcastPlayerKicked, emitAdvanceEvents: _emitAdvanceEvents };
+module.exports = { setupLobbySocket, broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, broadcastPlayerKicked, emitAdvanceEvents: _emitAdvanceEvents };

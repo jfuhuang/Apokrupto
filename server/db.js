@@ -13,6 +13,12 @@ const pool = new Pool(
       }
 );
 
+pool.on('connect', (client) => {
+  client.query('SET statement_timeout = 30000').catch((err) =>
+    console.error('[DB] Failed to set statement_timeout:', err.message)
+  );
+});
+
 // Test the connection but keep the pool open for the app to use.
 pool.query('SELECT NOW()')
   .then(res => console.log('Connected! Server time:', res.rows[0].now))

@@ -36,6 +36,8 @@ import GameOverScreen from './screens/game/GameOverScreen';
 import DevMenuScreen from './screens/dev/DevMenuScreen';
 import { colors } from './theme/colors';
 import { fetchCurrentLobby, fetchPlayerGameState } from './utils/api';
+import { useGameState } from './hooks/useGameState';
+import { GameContext } from './context/GameContext';
 
 function parseJwt(token) {
   try {
@@ -56,32 +58,20 @@ export default function App() {
   // Lobby
   const [currentLobbyId, setCurrentLobbyId] = useState(null);
 
-  // Game session
-  const [gameId, setGameId] = useState(null);
-  const [totalRounds, setTotalRounds] = useState(4);
-  const [currentRound, setCurrentRound] = useState(1);
-  const [currentMovement, setCurrentMovement] = useState(null); // 'A' | 'B' | 'C'
-
-  // Player identity
-  const [currentTeam, setCurrentTeam] = useState(null); // 'phos' | 'skotia'
-  const [skotiaTeammates, setSkotiaTeammates] = useState([]);
-  const [isMarked, setIsMarked] = useState(false);
-  const [isGm, setIsGm] = useState(false);
-
-  // Group (changes each round)
-  const [currentGroupId, setCurrentGroupId] = useState(null);       // DB id, used for socket rooms
-  const [currentGroupNumber, setCurrentGroupNumber] = useState(null); // 1-indexed display label
-  const [currentGroupMembers, setCurrentGroupMembers] = useState([]);
-
-  // Scores (team-level only)
-  const [teamPoints, setTeamPoints] = useState({ phos: 0, skotia: 0 });
-
-  // Movement B timer
-  const [movementBEndsAt, setMovementBEndsAt] = useState(null);
-
-  // Round summary & game over
-  const [roundSummary, setRoundSummary] = useState(null);
-  const [gameOverResult, setGameOverResult] = useState(null);
+  // All game state + handlers in one hook
+  const { state, handlers, resetGameState, setters } = useGameState({ setCurrentScreen });
+  const {
+    gameId, currentTeam, skotiaTeammates, isMarked, isGm,
+    currentGroupId, currentGroupNumber, currentGroupMembers,
+    teamPoints, currentRound, totalRounds, currentMovement,
+    movementBEndsAt, roundSummary, gameOverResult,
+  } = state;
+  const {
+    handleTeamAssigned, handleGameStarted, handleMovementReady,
+    handleMovementAComplete, handleMovementCComplete, handleMarkStatusUpdate,
+    handleRoundSummary, handleGameStateUpdate, handleRoundSetup,
+    handleGameOver, handleDevNavigate,
+  } = handlers;
 
   const [fontsLoaded] = useFonts({
     Orbitron_400Regular,
@@ -101,28 +91,21 @@ export default function App() {
   }, []);
 
   // ── Server sync (10 s polling safety net) ────────────────────────────────
-  // Screens where we deliberately do NOT force-navigate:
-  //   transitional  → let the animation/timer finish naturally
-  //   pre-game      → no game state to sync against
   const SYNC_SKIP_SCREENS = [
     'loading', 'welcome', 'login', 'register', 'lobbyList',
     'countdown', 'roleReveal', 'roundSummary', 'gameOver', 'devMenu',
   ];
 
-  // "Latest callback ref" pattern — updated on every render so the stable
-  // interval always calls a closure that has access to fresh state & setters.
   const syncCallbackRef = useRef(null);
   useEffect(() => {
     syncCallbackRef.current = async () => {
       if (!token || SYNC_SKIP_SCREENS.includes(currentScreen)) return;
       try {
-        // Step 1 — lobby/game membership check
         const { ok: lobbyOk, data: lobbyData } = await fetchCurrentLobby(token);
         if (!lobbyOk) return;
 
         const lobby = lobbyData.lobby;
 
-        // No active lobby → kick to lobby list
         if (!lobby) {
           if (currentScreen !== 'lobbyList') {
             setCurrentLobbyId(null);
@@ -144,73 +127,63 @@ export default function App() {
           return;
         }
 
-        // lobby.status === 'in_progress'
         const gId = lobby.gameId || gameId;
         if (!gId) return;
-        setGameId(gId);
-        setIsGm(lobby.isGm || false);
+        setters.setGameId(gId);
+        setters.setIsGm(lobby.isGm || false);
 
         if (lobby.isGm) {
           if (currentScreen !== 'gmDashboard') setCurrentScreen('gmDashboard');
           return;
         }
 
-        // If player is still on the lobby screen and game just started,
-        // route through countdown → roleReveal flow instead of jumping
-        // straight into the game. This prevents the sync loop from racing
-        // with the socket gameStarted event and skipping the countdown.
-        // Also fetch player state so team/group info is available for roleReveal.
         if (currentScreen === 'lobby') {
           const { ok: earlyOk, data: earlyState } = await fetchPlayerGameState(token, gId);
           if (earlyOk && earlyState) {
-            if (earlyState.team)         setCurrentTeam(earlyState.team);
-            if (earlyState.groupId)      setCurrentGroupId(String(earlyState.groupId));
-            if (earlyState.groupMembers) setCurrentGroupMembers(earlyState.groupMembers);
-            if (earlyState.groupIndex != null) setCurrentGroupNumber(earlyState.groupIndex);
+            if (earlyState.team)         setters.setCurrentTeam(earlyState.team);
+            if (earlyState.groupId)      setters.setCurrentGroupId(String(earlyState.groupId));
+            if (earlyState.groupMembers) setters.setCurrentGroupMembers(earlyState.groupMembers);
+            if (earlyState.groupIndex != null) setters.setCurrentGroupNumber(earlyState.groupIndex);
           }
           setCurrentScreen('countdown');
           return;
         }
 
-        // Step 2 — per-player game state
-        const { ok: stateOk, data: state } = await fetchPlayerGameState(token, gId);
+        const { ok: stateOk, data: stateData } = await fetchPlayerGameState(token, gId);
         if (!stateOk) return;
 
-        // Sync all relevant state fields before any navigation
-        if (state.team)                  setCurrentTeam(state.team);
-        if (state.isMarked !== undefined) setIsMarked(state.isMarked);
-        if (state.teamPoints)            setTeamPoints(state.teamPoints);
-        if (state.currentRound)          setCurrentRound(state.currentRound);
-        if (state.totalRounds)           setTotalRounds(state.totalRounds);
-        if (state.groupId) {
-          setCurrentGroupId(String(state.groupId));
-          setCurrentGroupNumber(state.groupIndex ?? null);
+        if (stateData.team)                  setters.setCurrentTeam(stateData.team);
+        if (stateData.isMarked !== undefined) setters.setIsMarked(stateData.isMarked);
+        if (stateData.teamPoints)            setters.setTeamPoints(stateData.teamPoints);
+        if (stateData.currentRound)          setters.setCurrentRound(stateData.currentRound);
+        if (stateData.totalRounds)           setters.setTotalRounds(stateData.totalRounds);
+        if (stateData.groupId) {
+          setters.setCurrentGroupId(String(stateData.groupId));
+          setters.setCurrentGroupNumber(stateData.groupIndex ?? null);
         }
-        if (state.groupMembers)          setCurrentGroupMembers(state.groupMembers);
+        if (stateData.groupMembers) setters.setCurrentGroupMembers(stateData.groupMembers);
 
-        // Map server movement → expected client screen
         const targetScreen =
-          state.currentMovement === 'A' ? 'movementA' :
-          state.currentMovement === 'B' ? 'movementB' :
-          state.currentMovement === 'C' ? 'movementC' :
+          stateData.currentMovement === 'A' ? 'movementA' :
+          stateData.currentMovement === 'B' ? 'movementB' :
+          stateData.currentMovement === 'C' ? 'movementC' :
           'roundHub';
 
-        if (state.currentMovement === 'B' && state.movementBEndsAt) {
-          setMovementBEndsAt(state.movementBEndsAt);
+        if (stateData.currentMovement === 'B' && stateData.movementBEndsAt) {
+          setters.setMovementBEndsAt(stateData.movementBEndsAt);
         }
 
         if (currentScreen !== targetScreen) {
-          console.log(`[GameSync] ${currentScreen} → ${targetScreen} (movement: ${state.currentMovement})`);
-          setCurrentMovement(state.currentMovement);
+          console.log(`[GameSync] ${currentScreen} → ${targetScreen} (movement: ${stateData.currentMovement})`);
+          setters.setCurrentMovement(stateData.currentMovement);
           setCurrentScreen(targetScreen);
         }
       } catch (err) {
         console.warn('[GameSync] poll error:', err.message);
       }
     };
-  }); // intentionally no deps — re-runs after every render to stay fresh
+  }); // intentionally no deps
 
-  // Stable interval: created once, always calls the latest callback
   useEffect(() => {
     const id = setInterval(() => { syncCallbackRef.current?.(); }, 10_000);
     return () => clearInterval(id);
@@ -230,8 +203,8 @@ export default function App() {
       if (ok && data.lobby) {
         setCurrentLobbyId(data.lobby.id);
         if (data.lobby.status === 'in_progress') {
-          setCurrentTeam(data.lobby.team);
-          setIsGm(data.lobby.isGm || false);
+          setters.setCurrentTeam(data.lobby.team);
+          setters.setIsGm(data.lobby.isGm || false);
           setCurrentScreen(data.lobby.isGm ? 'gmDashboard' : 'roundHub');
           return;
         }
@@ -284,20 +257,6 @@ export default function App() {
 
   // ── Pre-game ──────────────────────────────────────────────────────────────
 
-  const handleTeamAssigned = (team, teammates = [], gmFlag = false, groupId = null, groupNumber = null, groupMembers = []) => {
-    setCurrentTeam(team);
-    setSkotiaTeammates(teammates);
-    setIsGm(gmFlag);
-    if (groupId) setCurrentGroupId(groupId);
-    if (groupNumber != null) setCurrentGroupNumber(groupNumber);
-    if (groupMembers.length > 0) setCurrentGroupMembers(groupMembers);
-  };
-
-  const handleGameStarted = (gId) => {
-    if (gId) setGameId(gId);
-    setCurrentScreen('countdown');
-  };
-
   const handleCountdownComplete = () => setCurrentScreen('roleReveal');
 
   const handleRoleRevealComplete = () => {
@@ -305,120 +264,24 @@ export default function App() {
   };
 
   const handleRejoinGame = (team, gmFlag = false) => {
-    setCurrentTeam(team);
-    setIsGm(gmFlag);
+    setters.setCurrentTeam(team);
+    setters.setIsGm(gmFlag);
     setCurrentScreen(gmFlag ? 'gmDashboard' : 'roundHub');
   };
 
-  // ── Round / Movement flow ─────────────────────────────────────────────────
-
-  // Called by RoundHubScreen when the server announces the next movement
-  const handleMovementReady = (movement, groupId, groupMembers, groupNumber, extra = {}) => {
-    setCurrentMovement(movement);
-    if (groupId) setCurrentGroupId(groupId);
-    if (groupMembers) setCurrentGroupMembers(groupMembers);
-    if (groupNumber != null) setCurrentGroupNumber(groupNumber);
-
-    if (movement === 'B' && extra.movementBEndsAt) {
-      setMovementBEndsAt(extra.movementBEndsAt);
-    }
-
-    if (movement === 'A') setCurrentScreen('movementA');
-    else if (movement === 'B') setCurrentScreen('movementB');
-    else if (movement === 'C') setCurrentScreen('movementC');
-  };
-
-  const handleMovementAComplete = () => setCurrentScreen('roundHub');
-
-  // Movement C voting timer (or GM force) ended — return to RoundHub for GM to resolve
-  const handleMovementCComplete = () => {
-    setCurrentScreen('roundHub');
-  };
-
-  // RoundHubScreen received markStatusUpdate event — update personal mark status
-  const handleMarkStatusUpdate = (marked) => setIsMarked(marked);
-
-  // RoundHubScreen received roundSummary event — navigate to summary screen
-  const handleRoundSummary = (summary) => {
-    setRoundSummary(summary || null);
-    setCurrentScreen('roundSummary');
-  };
-
-  // Called by RoundHubScreen when game/group state updates arrive via socket
-  const handleGameStateUpdate = ({ gameId: gId, totalRounds: tr, currentRound: cr, teamPoints: tp, isMarked: im, isGm: gm }) => {
-    if (gId !== undefined) setGameId(gId);
-    if (tr !== undefined) setTotalRounds(tr);
-    if (cr !== undefined) setCurrentRound(cr);
-    if (tp !== undefined) setTeamPoints(tp);
-    if (im !== undefined) setIsMarked(im);
-    if (gm !== undefined) setIsGm(gm);
-  };
-
-  // Called from RoundSummaryScreen roundSetup socket event or button (last round only)
-  const handleRoundSetup = ({ roundNumber, groupId, groupNumber, groupMembers, teamPoints: tp }) => {
-    if (roundNumber) setCurrentRound(roundNumber);
-    if (groupId) setCurrentGroupId(String(groupId));
-    if (groupNumber != null) setCurrentGroupNumber(groupNumber);
-    if (groupMembers) setCurrentGroupMembers(groupMembers);
-    if (tp) setTeamPoints(tp);
-    setRoundSummary(null);
-    setCurrentScreen('roundHub');
-  };
-
   const handleRoundSummaryContinue = () => {
-    // Button fallback (only enabled on last round → goes to gameOver)
     if (currentRound >= totalRounds) {
       setCurrentScreen('gameOver');
     } else {
-      setRoundSummary(null);
       setCurrentScreen('roundHub');
     }
   };
 
-  const handleGameOver = ({ winner, reason, phosPoints, skotiaPoints, skotiaPlayers, condition } = {}) => {
-    setGameOverResult({ winner, reason, phosPoints, skotiaPoints, skotiaPlayers, condition });
-    setCurrentScreen('gameOver');
-  };
+  // ── Dev menu ──────────────────────────────────────────────────────────────
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
-  const resetGameState = () => {
-    setGameId(null);
-    setTotalRounds(4);
-    setCurrentRound(1);
-    setCurrentMovement(null);
-    setCurrentTeam(null);
-    setSkotiaTeammates([]);
-    setIsMarked(false);
-    setIsGm(false);
-    setCurrentGroupId(null);
-    setCurrentGroupNumber(null);
-    setCurrentGroupMembers([]);
-    setTeamPoints({ phos: 0, skotia: 0 });
-    setMovementBEndsAt(null);
-    setRoundSummary(null);
-    setGameOverResult(null);
-  };
-
-  // Dev menu — saves current screen so closing returns to it
   const handleOpenDevMenu = () => {
     setPreviousScreen(currentScreen);
     setCurrentScreen('devMenu');
-  };
-
-  const handleDevNavigate = (screen, params = {}) => {
-    if (params.team !== undefined) setCurrentTeam(params.team);
-    if (params.skotiaTeammates !== undefined) setSkotiaTeammates(params.skotiaTeammates);
-    if (params.isGm !== undefined) setIsGm(params.isGm);
-    if (params.currentRound !== undefined) setCurrentRound(params.currentRound);
-    if (params.totalRounds !== undefined) setTotalRounds(params.totalRounds);
-    if (params.teamPoints !== undefined) setTeamPoints(params.teamPoints);
-    if (params.isMarked !== undefined) setIsMarked(params.isMarked);
-    if (params.currentGroupMembers !== undefined) setCurrentGroupMembers(params.currentGroupMembers);
-    if (params.groupNumber !== undefined) setCurrentGroupNumber(params.groupNumber);
-    if (params.roundSummary !== undefined) setRoundSummary(params.roundSummary);
-    if (params.gameOverResult !== undefined) setGameOverResult(params.gameOverResult);
-    setCurrentScreen(screen);
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -568,6 +431,8 @@ export default function App() {
             roundNumber={currentRound}
             groupMembers={currentGroupMembers}
             onMovementComplete={handleMovementCComplete}
+            onRoundSummary={handleRoundSummary}
+            onGameOver={handleGameOver}
           />
         );
 
@@ -583,6 +448,7 @@ export default function App() {
             lobbyId={currentLobbyId}
             onRoundSetup={handleRoundSetup}
             onGameOver={handleGameOver}
+            onContinue={handleRoundSummaryContinue}
           />
         );
 
@@ -613,23 +479,33 @@ export default function App() {
     }
   };
 
-  // Screens where the floating DEV button should not appear
   const noDevBtn = ['loading', 'devMenu', 'welcome', 'login', 'register'];
 
+  const contextValue = {
+    ...state,
+    ...handlers,
+    token,
+    lobbyId: currentLobbyId,
+    currentUserId: token ? String(parseJwt(token).sub) : null,
+    resetGameState,
+  };
+
   return (
-    <View style={styles.root}>
-      <StatusBar style="auto" />
-      {renderScreen()}
-      {__DEV__ && !noDevBtn.includes(currentScreen) && (
-        <TouchableOpacity
-          style={styles.floatingDevBtn}
-          onPress={handleOpenDevMenu}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.floatingDevBtnText}>DEV</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+    <GameContext.Provider value={contextValue}>
+      <View style={styles.root}>
+        <StatusBar style="auto" />
+        {renderScreen()}
+        {__DEV__ && !noDevBtn.includes(currentScreen) && (
+          <TouchableOpacity
+            style={styles.floatingDevBtn}
+            onPress={handleOpenDevMenu}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.floatingDevBtnText}>DEV</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </GameContext.Provider>
   );
 }
 
