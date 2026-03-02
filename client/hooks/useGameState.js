@@ -116,21 +116,6 @@ export function useGameState({ setCurrentScreen }) {
     setCurrentScreen('gameOver');
   };
 
-  const handleDevNavigate = (screen, params = {}) => {
-    if (params.team                !== undefined) setCurrentTeam(params.team);
-    if (params.skotiaTeammates     !== undefined) setSkotiaTeammates(params.skotiaTeammates);
-    if (params.isGm                !== undefined) setIsGm(params.isGm);
-    if (params.currentRound        !== undefined) setCurrentRound(params.currentRound);
-    if (params.totalRounds         !== undefined) setTotalRounds(params.totalRounds);
-    if (params.teamPoints          !== undefined) setTeamPoints(params.teamPoints);
-    if (params.isMarked            !== undefined) setIsMarked(params.isMarked);
-    if (params.currentGroupMembers !== undefined) setCurrentGroupMembers(params.currentGroupMembers);
-    if (params.groupNumber         !== undefined) setCurrentGroupNumber(params.groupNumber);
-    if (params.roundSummary        !== undefined) setRoundSummary(params.roundSummary);
-    if (params.gameOverResult      !== undefined) setGameOverResult(params.gameOverResult);
-    setCurrentScreen(screen);
-  };
-
   const state = {
     gameId, currentTeam, skotiaTeammates, isMarked, isGm,
     currentGroupId, currentGroupNumber, currentGroupMembers,
@@ -142,7 +127,7 @@ export function useGameState({ setCurrentScreen }) {
     handleTeamAssigned, handleGameStarted, handleMovementReady,
     handleMovementAComplete, handleMovementCComplete, handleMarkStatusUpdate,
     handleRoundSummary, handleGameStateUpdate, handleRoundSetup,
-    handleRoundSummaryContinue, handleGameOver, handleDevNavigate,
+    handleRoundSummaryContinue, handleGameOver,
   };
 
   // Expose individual setters for App.js sync polling and checkExistingToken

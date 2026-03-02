@@ -103,11 +103,12 @@ async function init() {
     );
 
     CREATE TABLE IF NOT EXISTS rounds (
-      id           SERIAL PRIMARY KEY,
-      game_id      INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-      round_number INT NOT NULL,
-      status       VARCHAR(20) NOT NULL DEFAULT 'pending'
-                     CHECK (status IN ('pending', 'active', 'summarizing', 'completed')),
+      id             SERIAL PRIMARY KEY,
+      game_id        INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+      round_number   INT NOT NULL,
+      status         VARCHAR(20) NOT NULL DEFAULT 'pending'
+                       CHECK (status IN ('pending', 'active', 'summarizing', 'completed')),
+      voting_summary JSONB,
       UNIQUE (game_id, round_number)
     );
 
@@ -171,6 +172,21 @@ async function init() {
     CREATE INDEX IF NOT EXISTS ix_mv_a_sub      ON movement_a_submissions (movement_id, group_id);
     CREATE INDEX IF NOT EXISTS ix_mv_c_votes    ON movement_c_votes (movement_id, group_id);
     CREATE INDEX IF NOT EXISTS ix_mark_events   ON mark_events (game_id, round_number);
+  `);
+
+  // Migrate existing rounds table — add voting_summary column if absent (safe on fresh DBs too)
+  await pool.query(`
+    ALTER TABLE rounds ADD COLUMN IF NOT EXISTS voting_summary JSONB;
+  `);
+
+  // Migrate existing prompts table — add prompt_mode column if absent.
+  // Without this, initTurnState's WHERE prompt_mode = $1 query would throw on old DBs,
+  // leaving groupTurnState unpopulated even though Movement A was committed as active.
+  await pool.query(`
+    ALTER TABLE prompts ADD COLUMN IF NOT EXISTS prompt_mode VARCHAR DEFAULT 'word';
+  `);
+  await pool.query(`
+    UPDATE prompts SET prompt_mode = 'word' WHERE prompt_mode IS NULL;
   `);
 
   // Seed word prompt pairs (only if table is empty)

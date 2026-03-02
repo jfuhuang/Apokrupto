@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import {
   useFonts,
   Orbitron_400Regular,
@@ -34,7 +34,6 @@ import VotingScreen from './screens/game/VotingScreen';
 import RoundSummaryScreen from './screens/game/RoundSummaryScreen';
 import GmWaitingScreen from './screens/game/GmWaitingScreen';
 import GameOverScreen from './screens/game/GameOverScreen';
-import DevMenuScreen from './screens/dev/DevMenuScreen';
 import { colors } from './theme/colors';
 import { fetchCurrentLobby, fetchPlayerGameState } from './utils/api';
 import { useGameState } from './hooks/useGameState';
@@ -51,7 +50,6 @@ function parseJwt(token) {
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('loading');
-  const [previousScreen, setPreviousScreen] = useState(null);
 
   // Auth
   const [token, setToken] = useState(null);
@@ -71,7 +69,7 @@ export default function App() {
     handleTeamAssigned, handleGameStarted, handleMovementReady,
     handleMovementAComplete, handleMovementCComplete, handleMarkStatusUpdate,
     handleRoundSummary, handleGameStateUpdate, handleRoundSetup,
-    handleGameOver, handleDevNavigate,
+    handleGameOver,
   } = handlers;
 
   const [fontsLoaded] = useFonts({
@@ -94,7 +92,7 @@ export default function App() {
   // ── Server sync (10 s polling safety net) ────────────────────────────────
   const SYNC_SKIP_SCREENS = [
     'loading', 'welcome', 'login', 'register', 'lobbyList',
-    'countdown', 'roleReveal', 'roundSummary', 'gameOver', 'devMenu',
+    'countdown', 'roleReveal', 'roundSummary', 'gameOver',
     'taskRush',
   ];
 
@@ -279,13 +277,6 @@ export default function App() {
     }
   };
 
-  // ── Dev menu ──────────────────────────────────────────────────────────────
-
-  const handleOpenDevMenu = () => {
-    setPreviousScreen(currentScreen);
-    setCurrentScreen('devMenu');
-  };
-
   // ── Render ────────────────────────────────────────────────────────────────
 
   const renderScreen = () => {
@@ -312,7 +303,6 @@ export default function App() {
           <WelcomeScreen
             onCreateAccount={() => setCurrentScreen('register')}
             onLogin={() => setCurrentScreen('login')}
-            onOpenDevMenu={handleOpenDevMenu}
           />
         );
 
@@ -448,6 +438,7 @@ export default function App() {
             roundNumber={currentRound}
             groupMembers={currentGroupMembers}
             onMovementComplete={handleMovementCComplete}
+            onMovementReady={handleMovementReady}
             onRoundSummary={handleRoundSummary}
             onGameOver={handleGameOver}
           />
@@ -483,20 +474,10 @@ export default function App() {
           />
         );
 
-      case 'devMenu':
-        return (
-          <DevMenuScreen
-            onNavigate={handleDevNavigate}
-            onClose={() => setCurrentScreen(previousScreen || 'welcome')}
-          />
-        );
-
       default:
         return <WelcomeScreen />;
     }
   };
-
-  const noDevBtn = ['loading', 'devMenu', 'welcome', 'login', 'register'];
 
   const contextValue = {
     ...state,
@@ -512,15 +493,6 @@ export default function App() {
       <View style={styles.root}>
         <StatusBar style="auto" />
         {renderScreen()}
-        {__DEV__ && !noDevBtn.includes(currentScreen) && (
-          <TouchableOpacity
-            style={styles.floatingDevBtn}
-            onPress={handleOpenDevMenu}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.floatingDevBtnText}>DEV</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </GameContext.Provider>
   );
@@ -535,23 +507,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.space,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  floatingDevBtn: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: colors.accent.amber,
-    borderStyle: 'dashed',
-    backgroundColor: 'rgba(13, 15, 26, 0.85)',
-  },
-  floatingDevBtnText: {
-    fontFamily: 'Orbitron_700Bold',
-    fontSize: 9,
-    letterSpacing: 2,
-    color: colors.accent.amber,
   },
 });

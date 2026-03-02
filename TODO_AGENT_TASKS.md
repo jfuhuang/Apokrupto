@@ -9,7 +9,7 @@
 
 ---
 
-## TASK 1 — Stage Naming Refactor + Movement Order Swap
+## ✅ TASK 1 — Stage Naming Refactor + Movement Order Swap *(COMPLETE)*
 
 > **Do this task first** before touching any game logic.  
 > Later tasks reference the renamed stages, so naming must be canonical before they are implemented.
@@ -70,9 +70,9 @@ module.exports = { MOVEMENT_NAMES };
 - `server/websocket/lobbySocket.js` — any `console.log` or socket payload comments (non-functional, cosmetic)
 
 **Acceptance criteria:**
-- [ ] `MOVEMENT_NAMES` imported from the new constants file wherever a stage label is displayed
-- [ ] No hard-coded strings "Movement A", "Movement B", "Movement C" remain in client UI code
-- [ ] All existing tests (manual) still pass — no runtime errors from the rename
+- [x] `MOVEMENT_NAMES` imported from the new constants file wherever a stage label is displayed
+- [x] No hard-coded strings "Movement A", "Movement B", "Movement C" remain in client UI code
+- [x] All existing tests (manual) still pass — no runtime errors from the rename
 
 ---
 
@@ -164,11 +164,11 @@ is called after C resolves (which is now mid-round), and the player should **not
 - Ensure the existing `movementStart { movement: 'B' }` → navigate to movementB screen
 
 **Acceptance criteria:**
-- [ ] A full round follows the order: Impostor Stage → Voting Stage → Challenges Stage
-- [ ] Marks are applied before Challenges begin (vote resolution is visible on RoundHub before B)
-- [ ] Round Summary screen appears after Challenges complete, not after Voting
-- [ ] Game still progresses to next round / game over correctly
-- [ ] Supermajority check still works (it's part of the old `summarizeRound`; move the check into
+- [x] A full round follows the order: Impostor Stage → Voting Stage → Challenges Stage
+- [x] Marks are applied before Challenges begin (vote resolution is visible on RoundHub before B)
+- [x] Round Summary screen appears after Challenges complete, not after Voting
+- [x] Game still progresses to next round / game over correctly
+- [x] Supermajority check still works (it's part of the old `summarizeRound`; move the check into
       the new `completeC` resolution block)
 
 ---
@@ -513,6 +513,256 @@ const SpriteComponent = SPRITES[spriteKey] || SPRITES['_fallback'];
 - [ ] Every sprite has a one-line description comment
 - [ ] A `_fallback` sprite exists and is used when an unknown key is requested
 - [ ] All shapes render within the `0 0 32 32` viewBox
+
+---
+
+## TASK 7 — Jonah Bail-Water Task: Pick Up → Fill → Dump Mechanic
+
+> Standalone task. No dependency on other tasks.  
+> The `jonah_storm` task currently uses `MECHANIC.RAPID_TAP` (tap 40 times). This task replaces
+> that with a custom three-step drag mechanic that physically simulates bailing water.
+
+### Overview of the interaction loop
+
+The player repeats this 3-step cycle **N times** (configurable, default 6) to succeed:
+
+```
+Step 1 — PICK UP:   Drag the empty bucket from the ship deck up to the side rail.
+Step 2 — FILL:      Hold the bucket over the churning water until it fills (~1.5 s hold).
+Step 3 — DUMP:      Drag/fling the full bucket from the rail back over to the other side to dump it.
+```
+
+Each completed cycle advances a "water level" gauge downward. Complete all N cycles before the
+time limit to win.
+
+---
+
+### 7A — Add the new mechanic constant
+
+**File: `client/data/tasks.js`**
+
+Add `BAIL_WATER` to the `MECHANIC` export object:
+```js
+export const MECHANIC = {
+  // ... existing entries ...
+  BAIL_WATER: 'BAIL_WATER',   // Jonah bail-water: pick up → fill → dump loop
+};
+```
+
+---
+
+### 7B — Update the `jonah_storm` task definition
+
+**File: `client/data/tasks.js`**
+
+Replace the current `jonah_storm` entry (which uses `MECHANIC.RAPID_TAP`) with:
+```js
+{
+  id: 'jonah_storm',
+  title: 'Jonah in the Storm',
+  synopsis: 'The ship is sinking! Grab the bucket, fill it with seawater, and heave it overboard — fast!',
+  reference: 'Jonah 1:4–5',
+  mechanic: MECHANIC.BAIL_WATER,
+  taskType: TASK_TYPE.FREE_ROAM,
+  category: TASK_CATEGORY.CHALLENGES,
+  points: { alive: 60, dead: 36 },
+  difficulty: 'medium',
+  timeLimit: 25,           // seconds — slightly generous to allow learning the gesture
+  config: {
+    cyclesRequired: 6,     // number of full pick-up→fill→dump cycles to win
+    fillDurationMs: 1500,  // ms the player must hold over water to fill bucket
+  },
+},
+```
+
+Also add a proper SVG sprite key to `TASK_SPRITE` (replacing the generic `'🌊'`):
+```js
+jonah_storm: 'bucket',  // will match a SPRITES entry in TaskSprite.js
+```
+
+---
+
+### 7C — Create `BailWaterTask.js`
+
+**Create `client/screens/tasks/mechanics/BailWaterTask.js`**
+
+#### Visual layout (portrait phone, full screen below `TaskHeader`)
+
+```
+┌──────────────────────────────┐
+│  WATER LEVEL gauge (top)     │  ← vertical bar on left, shows how much bailing remains
+│                              │
+│    Ship deck scene           │
+│    ┌────────────────────┐    │
+│    │  stormy ocean waves│    │  ← animated SVG waves (reuse or adapt WaveBackground idea)
+│    └────────────────────┘    │
+│                              │
+│   [ BUCKET ]   [RAIL DROP]   │  ← two hot-zones: bucket start pos (left) + rail/ocean (right)
+│                              │
+│  Step indicator:             │
+│  ○ PICK UP  ○ FILL  ○ DUMP   │  ← 3 dots highlight current step
+└──────────────────────────────┘
+```
+
+#### State machine
+
+Use a `useState` for `step` (`'pickup' | 'fill' | 'dump' | 'done'`) and `cyclesCompleted`.
+
+```
+'pickup':
+  - Bucket SVG rendered at BUCKET_START_POS (bottom-left zone)
+  - Player uses PanResponder to drag it toward RAIL_ZONE (right side / top-right)
+  - On release: if gesture endpoint is within RAIL_ZONE hitbox → advance to 'fill'
+  - Else: bucket snaps back to start with a shake animation
+
+'fill':
+  - Bucket is docked at the rail, visually tilted over the waves
+  - Player must HOLD (press and hold) the bucket for `fillDurationMs` ms without releasing
+  - Show a radial fill progress ring around the bucket (similar to HoldTask approach)
+  - On hold complete: bucket shows a "full" visual (water visible inside) → advance to 'dump'
+  - On release early: reset to 'pickup' (bucket slips back)
+
+'dump':
+  - Full bucket is at the rail
+  - Player drags/swipes it LEFT or UP (back across the deck in the dump direction)
+  - On release past DUMP_THRESHOLD: play a splash animation → increment cyclesCompleted
+  - If cyclesCompleted >= config.cyclesRequired → call onSuccess
+  - Else: reset bucket to BUCKET_START_POS, step → 'pickup'
+```
+
+#### Key implementation details
+
+**PanResponder (re-used pattern from `DragPlaceTask.js`):**
+- Bucket position driven by `new Animated.ValueXY()`
+- `onPanResponderRelease` checks `(gestureState.moveX, gestureState.moveY)` against zone hitboxes
+
+**Zone hitboxes (example, adjust to taste):**
+```js
+const BUCKET_START  = { x: W * 0.15, y: H * 0.65 };
+const RAIL_ZONE     = { x: W * 0.6,  y: H * 0.35, w: W * 0.35, h: H * 0.25 };
+const DUMP_THRESHOLD_X = W * 0.35;  // dragging past this x while in 'dump' counts as dumped
+```
+
+**Water level gauge:**  
+A vertical bar on the left edge. Height interpolates from `100%` down to `0%` as
+`cyclesCompleted` increases. Color: `colors.primary.electricBlue`. When it reaches `0%` the
+player has bailed out the boat and `onSuccess` fires.
+
+**Bucket SVG (inline, ~60×60):**  
+- Empty bucket: a trapezoidal bucket shape with a handle arc, no fill color inside
+- Full bucket: same shape with a blue water-fill ellipse inside and a few drop marks at rim
+- Use `colors.primary.electricBlue` for water, `'#C09030'` for bucket body (wood-and-metal)
+
+**Animated waves (background):**
+- Low-fidelity: two sinusoidal `Path` elements using `Animated.loop` on a translateX value
+  (same approach as the `WaveBackground` component already in `RapidTapTask.js` — copy, adapt,
+   or import it if it is exported)
+- Wave amplitude should ramp up as time runs out (read the `timeLimit` prop via a passed-down
+  elapsed counter) to create urgency
+
+**Step indicator:**
+- Three labeled dots: `PICK UP`, `FILL`, `DUMP`
+- Active step dot: `colors.primary.electricBlue`, size 14
+- Inactive dots: `colors.text.muted`, size 10
+
+**Splash animation on successful dump:**
+- 4–6 `Animated.Text` nodes showing `💧` or `🌊` flying outward from the dump point using
+  `Animated.parallel` on position + opacity (same splash pattern as RapidTapTask floating particles)
+
+**Failure path:**
+- If `timeLimit` runs out → `onFail()` (handled by `TaskHeader`'s `onTimeUp` → passed down through
+  `TaskScreen` as `handleTimeUp`)
+- No in-task fail state; the only way to fail is time expiry
+
+#### Props contract (same as all other mechanic components)
+
+```js
+BailWaterTask.propTypes = {
+  config:    PropTypes.shape({
+    cyclesRequired: PropTypes.number,
+    fillDurationMs: PropTypes.number,
+  }),
+  onSuccess: PropTypes.func.isRequired,
+  onFail:    PropTypes.func.isRequired,
+  timeLimit: PropTypes.number,
+  taskId:    PropTypes.string,
+};
+```
+
+---
+
+### 7D — Register the new mechanic in `TaskScreen.js`
+
+**File: `client/screens/tasks/TaskScreen.js`**
+
+1. Import the new component:
+```js
+import BailWaterTask from './mechanics/BailWaterTask';
+```
+
+2. Add a case to the `switch (task.mechanic)` block:
+```js
+case MECHANIC.BAIL_WATER:
+  return <BailWaterTask {...props} />;
+```
+
+---
+
+### 7E — Add the bucket sprite to `TaskSprite.js`
+
+**File: `client/components/TaskSprite.js`**
+
+Add a `bucket` entry to the `SPRITES` object under the `// ── CHALLENGES ──` section:
+```js
+// Wooden water bucket with handle — used by jonah_storm
+bucket: (c) => (
+  <G>
+    {/* Bucket body (trapezoid: wider at top) */}
+    <Path d="M8 10 L7 26 L25 26 L24 10 Z" fill={c} />
+    {/* Rim at top */}
+    <Ellipse cx="16" cy="10" rx="8" ry="2.5" fill={c} />
+    {/* Bottom */}
+    <Ellipse cx="16" cy="26" rx="9" ry="2.5" fill={c} opacity="0.8" />
+    {/* Handle arc */}
+    <Path d="M8 10 Q16 3 24 10" stroke={c} strokeWidth="2" fill="none" strokeLinecap="round" />
+    {/* Metal band (accent stripe) */}
+    <Path d="M7.5 18 L24.5 18" stroke={BG} strokeWidth="1.5" opacity="0.5" />
+    {/* Water inside (shown as a highlight) */}
+    <Ellipse cx="16" cy="14" rx="5.5" ry="2" fill="#00D4FF" opacity="0.45" />
+  </G>
+),
+```
+
+Also update the `TASK_SPRITE` map in `client/data/tasks.js` so `jonah_storm` points to `'bucket'`
+(as noted in 7B above) — confirm the `TaskSprite` component renders it correctly by key lookup.
+
+---
+
+### 7F — Remove the `jonah_storm` special case from `RapidTapTask.js`
+
+**File: `client/screens/tasks/mechanics/RapidTapTask.js`**
+
+The `jonah_storm` task no longer uses `RAPID_TAP`. Clean up:
+- Remove the `case 'jonah_storm':` branch from `renderButton()` — the `BucketButton` component it
+  renders is no longer needed here (it can be deleted or moved to `BailWaterTask.js` for reuse)
+- Remove the `{taskId === 'jonah_storm' && <WaveBackground … />}` line from the render
+
+If `BucketButton` and `WaveBackground` are only used by `jonah_storm` in this file, either delete
+them or relocate them to `BailWaterTask.js` for internal use there.
+
+---
+
+**Acceptance criteria:**
+- [ ] `jonah_storm` task uses `MECHANIC.BAIL_WATER` and no longer appears in `RapidTapTask.js`
+- [ ] Playing the task requires completing a pick-up → fill → dump cycle 6 times
+- [ ] Dragging the bucket outside the rail zone snaps it back to the start position
+- [ ] Releasing early during fill resets to the pick-up step
+- [ ] A water level gauge decreases visibly with each successful cycle
+- [ ] Step indicator correctly highlights the current step
+- [ ] A splash particle animation plays on each successful dump
+- [ ] `onSuccess` is called after 6 completed cycles; `onFail` is called on time expiry
+- [ ] The bucket sprite renders correctly at the standard 32×32 viewBox in task card thumbnails
+- [ ] No regressions in other tasks that use `RAPID_TAP`
 
 ---
 

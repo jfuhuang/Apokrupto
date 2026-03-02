@@ -11,6 +11,7 @@ import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
+import { MOVEMENT_NAMES } from '../../constants/movementNames';
 
 export default function VotingScreen({
   token,
@@ -22,6 +23,7 @@ export default function VotingScreen({
   roundNumber,
   groupMembers,
   onMovementComplete,
+  onMovementReady,
   onRoundSummary,
   onGameOver,
 }) {
@@ -65,25 +67,32 @@ export default function VotingScreen({
         votingTimerRef.current = setInterval(tick, 1000);
       });
 
-      // Per-group mark results — show preview and wait for roundSummary to navigate
+      // Per-group mark results — show preview; Challenges Stage (B) follows next
       socket.on('votingComplete', ({ markResults: results }) => {
         setMarkResults(results || []);
         setPhase('preview');
-        // Navigation is now driven by roundSummary, NOT movementComplete
+        clearInterval(votingTimerRef.current);
+        // Navigation to Challenges Stage is driven by movementStart{B} below.
       });
 
-      // Voting timer expired (or GM force-advanced C) — stay on screen, wait for roundSummary
+      // Voting timer expired (or GM force-advanced C) — stay on screen until B starts
       socket.on('movementComplete', ({ movement }) => {
         if (movement === 'C') {
           clearInterval(votingTimerRef.current);
-          // Do NOT navigate away yet — roundSummary (emitted on the next GM advance)
-          // will drive the transition. Navigating here causes a socket reconnection gap
-          // that loses the roundSummary event.
           setPhase((prev) => (prev === 'voting' || prev === 'waiting' ? 'waitingForSummary' : prev));
         }
       });
 
-      // GM resolved votes and summarized the round — navigate to round summary screen
+      // Challenges Stage (B) is starting — navigate away from Voting screen
+      // In the A→C→B order, B always follows C, so this drives the transition.
+      socket.on('movementStart', ({ movement, movementBEndsAt }) => {
+        if (movement === 'B') {
+          if (onMovementReady) onMovementReady('B', null, null, null, { movementBEndsAt });
+        }
+      });
+
+      // Round summary is emitted after B completes (handled by RoundHubScreen at that point).
+      // VotingScreen should not be mounted then, but guard just in case.
       socket.on('roundSummary', (summary) => {
         if (onRoundSummary) onRoundSummary(summary);
       });
@@ -209,7 +218,7 @@ export default function VotingScreen({
           ))}
         </View>
       )}
-      <Text style={styles.previewCountdown}>Continuing shortly...</Text>
+      <Text style={styles.previewCountdown}>Challenges Stage starting soon...</Text>
     </View>
   );
 
@@ -219,7 +228,7 @@ export default function VotingScreen({
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <Text style={styles.headerLabel}>MOVEMENT C — VOTING</Text>
+          <Text style={styles.headerLabel}>{MOVEMENT_NAMES.C.toUpperCase()}</Text>
           <Text style={styles.headerRound}>ROUND {roundNumber}</Text>
         </View>
 

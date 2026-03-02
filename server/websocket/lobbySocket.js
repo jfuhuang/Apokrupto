@@ -544,13 +544,44 @@ function _emitAdvanceEvents(io, result) {
     }
   }
 
-  // ── completeA: deliberation timer (or GM force) finished A ────────────────
+  // ── completeA: deliberation timer (or GM force) finished Impostor Stage ──
   else if (result.step === 'completeA') {
     io.to(lobbyRoom).emit('movementComplete', { movement: 'A' });
     console.log(`[Socket] completeA → movementComplete {A} to ${lobbyRoom}`);
   }
 
-  // ── activateB: GM started Movement B + task assignments ───────────────────
+  // ── activateC: GM started Voting Stage — now the SECOND step (A → C → B) ─
+  else if (result.step === 'activateC') {
+    io.to(lobbyRoom).emit('movementStart', { movement: 'C', roundNumber: result.roundNumber });
+    io.to(lobbyRoom).emit('votingReady', { votingEndsAt: result.votingEndsAt });
+    gameService.scheduleVotingTimer(result.gameId, result.votingEndsAt);
+    console.log(`[Socket] activateC → movementStart {C} + votingReady to ${lobbyRoom} (votingEndsAt=${result.votingEndsAt})`);
+  }
+
+  // ── completeC: votes resolved + marks applied — broadcast results before Challenges ──
+  // In the A→C→B order, vote resolution happens here so Sus status is known before Challenges.
+  else if (result.step === 'completeC') {
+    if (result.groupResults) {
+      for (const [gId, actions] of result.groupResults) {
+        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
+      }
+      console.log(`[Socket] completeC → votingComplete to ${result.groupResults.size || 0} groups`);
+    }
+    // Push per-player mark status so clients show Sus indicator before Challenges start
+    if (result.isMarkedMap) {
+      let markCount = 0;
+      for (const [, sock] of io.sockets.sockets) {
+        if (!sock.rooms.has(lobbyRoom)) continue;
+        const marked = result.isMarkedMap.get(sock.userId);
+        if (marked !== undefined) { sock.emit('markStatusUpdate', { isMarked: marked }); markCount++; }
+      }
+      console.log(`[Socket] completeC → markStatusUpdate per-socket to ${markCount} players`);
+    }
+    io.to(lobbyRoom).emit('movementComplete', { movement: 'C' });
+    console.log(`[Socket] completeC → movementComplete {C} to ${lobbyRoom}`);
+  }
+
+  // ── activateB: GM started Challenges Stage — now the THIRD step (A → C → B) ─
   else if (result.step === 'activateB') {
     // Schedule timer first so getMovementBEndsAt is available for the emit
     gameService.scheduleMovementBAutoAdvance(result.gameId);
@@ -563,44 +594,14 @@ function _emitAdvanceEvents(io, result) {
     console.log(`[Socket] activateB → movementStart {B} to ${lobbyRoom} (endsAt=${movementBEndsAt})`);
   }
 
-  // ── completeB: B timer (or GM force) finished B ───────────────────────────
+  // ── completeB: B timer (or GM force) finished Challenges Stage ───────────
   else if (result.step === 'completeB') {
     io.to(lobbyRoom).emit('movementComplete', { movement: 'B' });
     console.log(`[Socket] completeB → movementComplete {B} to ${lobbyRoom}`);
   }
 
-  // ── activateC: GM started voting + voting timer ───────────────────────────
-  else if (result.step === 'activateC') {
-    io.to(lobbyRoom).emit('movementStart', { movement: 'C', roundNumber: result.roundNumber });
-    io.to(lobbyRoom).emit('votingReady', { votingEndsAt: result.votingEndsAt });
-    gameService.scheduleVotingTimer(result.gameId, result.votingEndsAt);
-    console.log(`[Socket] activateC → movementStart {C} + votingReady to ${lobbyRoom} (votingEndsAt=${result.votingEndsAt})`);
-  }
-
-  // ── completeC: voting timer (or GM force) finished C ─────────────────────
-  else if (result.step === 'completeC') {
-    io.to(lobbyRoom).emit('movementComplete', { movement: 'C' });
-    console.log(`[Socket] completeC → movementComplete {C} to ${lobbyRoom}`);
-  }
-
-  // ── summarizeRound: GM resolved votes → show round summary ───────────────
+  // ── summarizeRound: GM triggers summary screen — voting events already sent at completeC ──
   else if (result.step === 'summarizeRound') {
-    if (result.groupResults) {
-      for (const [gId, actions] of result.groupResults) {
-        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
-      }
-      console.log(`[Socket] summarizeRound → votingComplete to ${result.groupResults.size || 0} groups`);
-    }
-    // Emit personal mark status to each connected lobby member before roundSummary
-    if (result.isMarkedMap) {
-      let markCount = 0;
-      for (const [, sock] of io.sockets.sockets) {
-        if (!sock.rooms.has(lobbyRoom)) continue;
-        const marked = result.isMarkedMap.get(sock.userId);
-        if (marked !== undefined) { sock.emit('markStatusUpdate', { isMarked: marked }); markCount++; }
-      }
-      console.log(`[Socket] summarizeRound → markStatusUpdate per-socket to ${markCount} players`);
-    }
     io.to(lobbyRoom).emit('roundSummary', result.summary);
     console.log(`[Socket] summarizeRound → roundSummary to ${lobbyRoom}`);
   }

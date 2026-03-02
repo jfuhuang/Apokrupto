@@ -13,8 +13,7 @@ import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
-
-const MOVEMENT_LABELS = { A: 'DEDUCTION', B: 'TASKS', C: 'VOTING' };
+import { MOVEMENT_NAMES } from '../../constants/movementNames';
 
 export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, onLobbyGone }) {
   const [players, setPlayers] = useState([]);
@@ -203,7 +202,7 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
               <Text style={styles.stateLabel}>MOVEMENT</Text>
               <Text style={styles.stateValue}>
                 {gameState?.movement
-                  ? `${gameState.movement} — ${MOVEMENT_LABELS[gameState.movement]}`
+                  ? `${gameState.movement} — ${MOVEMENT_NAMES[gameState.movement]}`
                   : '—'}
               </Text>
             </View>

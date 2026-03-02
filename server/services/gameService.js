@@ -330,16 +330,19 @@ async function startGame(gameId, options = {}) {
 // ---------------------------------------------------------------------------
 // advanceMovement — 9-step GM-gated state machine
 //
+// Round order: A (Impostor Stage) → C (Voting Stage) → B (Challenges Stage)
+// Voting is now second so Sus marks are applied before Challenges begin.
+//
 // Steps (in order within a round):
-//   activateA     → A pending → active (GM starts Movement A)
+//   activateA     → A pending → active (GM starts Impostor Stage)
 //   completeA     → A active → completed (deliberation timer or GM force)
-//   activateB     → A done, create B active (GM starts Movement B)
+//   activateC     → A done, create C active + voting timer (GM starts Voting Stage)
+//   completeC     → C active → completed + _resolveVoting (voting timer or GM force)
+//   activateB     → C done, create B active (GM starts Challenges Stage)
 //   completeB     → B active → completed (B timer or GM force)
-//   activateC     → B done, create C active + voting timer (GM starts voting)
-//   completeC     → C active → completed (voting timer or GM force)
-//   summarizeRound→ All done, resolve votes (GM triggers summary)
+//   summarizeRound→ All done, read stored voting summary (GM triggers summary)
 //   nextRound     → round summarizing, more rounds (GM starts next round)
-//   gameOver      → round summarizing, last round OR supermajority
+//   gameOver      → round summarizing, last round OR supermajority (detected at completeC)
 // ---------------------------------------------------------------------------
 async function advanceMovement(gameId) {
   const client = await pool.connect();
@@ -426,7 +429,8 @@ async function advanceMovement(gameId) {
     }
 
     // ── completeA: A active (turns or deliberation) → GM or timer completes ──
-    if (movA && movA.status === 'active' && !movB) {
+    // Round order is now A → C (Voting) → B (Challenges), so we check !movC instead of !movB.
+    if (movA && movA.status === 'active' && !movC) {
       await client.query(
         "UPDATE movements SET status = 'completed', completed_at = now() WHERE id = $1",
         [movA.id]
@@ -435,34 +439,9 @@ async function advanceMovement(gameId) {
       return { step: 'completeA', lobbyId: String(lobbyId), gameId: String(gameId) };
     }
 
-    // ── activateB: A completed, no B yet → GM creates B ──────────────────
-    if (movA && movA.status === 'completed' && !movB) {
-      await client.query(
-        "INSERT INTO movements (round_id, movement_type, status, started_at) VALUES ($1, 'B', 'active', now())",
-        [roundId]
-      );
-      await client.query('COMMIT');
-      return { step: 'activateB', roundNumber, lobbyId: String(lobbyId), gameId: String(gameId) };
-    }
-
-    // ── completeB: B active → GM or timer completes ───────────────────────
-    if (movB && movB.status === 'active' && !movC) {
-      await client.query(
-        "UPDATE movements SET status = 'completed', completed_at = now() WHERE id = $1",
-        [movB.id]
-      );
-      // Award Skotia passive bonus at the end of Movement B
-      await client.query(
-        "UPDATE game_teams SET points = points + $1 WHERE game_id = $2 AND team = 'skotia'",
-        [POINTS.SKOTIA_PASSIVE, gameId]
-      );
-      console.log(`[Game] completeB game=${gameId}: Skotia passive bonus +${POINTS.SKOTIA_PASSIVE}`);
-      await client.query('COMMIT');
-      return { step: 'completeB', lobbyId: String(lobbyId), gameId: String(gameId) };
-    }
-
-    // ── activateC: B completed, no C yet → GM creates C + voting timer ───
-    if (movB && movB.status === 'completed' && !movC) {
+    // ── activateC: A completed, no C yet → GM creates Voting Stage (C) ──────
+    // Voting Stage is now second (was third) so Marking status is known before Challenges.
+    if (movA && movA.status === 'completed' && !movC) {
       const votingEndsAt = Date.now() + VOTING_DURATION_MS;
       await client.query(
         "INSERT INTO movements (round_id, movement_type, status, started_at) VALUES ($1, 'C', 'active', now())",
@@ -478,32 +457,35 @@ async function advanceMovement(gameId) {
       };
     }
 
-    // ── completeC: C active → voting timer or GM force ────────────────────
+    // ── completeC + resolveVoting: C active → voting timer or GM force ────────
+    // Votes are now resolved HERE (was at summarizeRound) so marks are set before Challenges start.
     if (movC && movC.status === 'active') {
       await client.query(
         "UPDATE movements SET status = 'completed', completed_at = now() WHERE id = $1",
         [movC.id]
       );
-      await client.query('COMMIT');
-      return { step: 'completeC', lobbyId: String(lobbyId), gameId: String(gameId) };
-    }
 
-    // ── summarizeRound: all 3 done, round still 'active' → GM resolves ───
-    if (movC && movC.status === 'completed' && roundStatus === 'active') {
       const votingResult = await _resolveVoting(client, gameId, roundNumber);
-      console.log(`[Game] Voting resolved game=${gameId} round=${roundNumber}: marks=${votingResult.marksApplied} unmarks=${votingResult.unmarksApplied} phos=+${votingResult.phosPointsEarned} skotia=+${votingResult.skotiaPointsEarned}`);
+      console.log(`[Game] Voting resolved at completeC game=${gameId} round=${roundNumber}: marks=${votingResult.marksApplied} unmarks=${votingResult.unmarksApplied} phos=+${votingResult.phosPointsEarned} skotia=+${votingResult.skotiaPointsEarned}`);
+
       // Supermajority is only an instant-win condition on the final round.
-      // Mid-game it would prematurely end rounds that the players haven't finished.
       const isFinalRound = roundNumber >= totalRounds;
       const supermajority = isFinalRound && await _checkSupermajority(client, gameId);
       if (supermajority) console.log(`[Game] SUPERMAJORITY detected game=${gameId} — Phos wins!`);
 
-      // Build per-player mark status map after voting resolves
+      // Build per-player mark status map for per-socket emissions
       const marksRes = await client.query(
         'SELECT user_id::text, is_marked FROM game_players WHERE game_id = $1',
         [gameId]
       );
       const isMarkedMap = new Map(marksRes.rows.map((r) => [r.user_id, r.is_marked]));
+
+      // Persist voting summary so summarizeRound can emit it after Challenges finish
+      const votingSummary = _buildSummary(votingResult, roundNumber);
+      await client.query(
+        'UPDATE rounds SET voting_summary = $1 WHERE id = $2',
+        [JSON.stringify(votingSummary), roundId]
+      );
 
       if (supermajority) {
         await client.query("UPDATE rounds SET status = 'completed' WHERE id = $1", [roundId]);
@@ -511,7 +493,7 @@ async function advanceMovement(gameId) {
         await client.query('COMMIT');
         return {
           step:         'gameOver',
-          summary:      _buildSummary(votingResult, roundNumber),
+          summary:      votingSummary,
           groupResults: votingResult.groupResults,
           gameOverData,
           isMarkedMap,
@@ -520,16 +502,60 @@ async function advanceMovement(gameId) {
         };
       }
 
+      await client.query('COMMIT');
+      return {
+        step:         'completeC',
+        groupResults: votingResult.groupResults,
+        isMarkedMap,
+        lobbyId: String(lobbyId),
+        gameId:  String(gameId),
+      };
+    }
+
+    // ── activateB: C completed, no B yet → GM creates Challenges Stage (B) ──
+    // Challenges Stage is now third (was second). Sus marks are already applied.
+    if (movC && movC.status === 'completed' && !movB) {
+      await client.query(
+        "INSERT INTO movements (round_id, movement_type, status, started_at) VALUES ($1, 'B', 'active', now())",
+        [roundId]
+      );
+      await client.query('COMMIT');
+      return { step: 'activateB', roundNumber, lobbyId: String(lobbyId), gameId: String(gameId) };
+    }
+
+    // ── completeB: B active → GM or timer completes ───────────────────────────
+    if (movB && movB.status === 'active') {
+      await client.query(
+        "UPDATE movements SET status = 'completed', completed_at = now() WHERE id = $1",
+        [movB.id]
+      );
+      // Award Skotia passive bonus at the end of Challenges Stage
+      await client.query(
+        "UPDATE game_teams SET points = points + $1 WHERE game_id = $2 AND team = 'skotia'",
+        [POINTS.SKOTIA_PASSIVE, gameId]
+      );
+      console.log(`[Game] completeB game=${gameId}: Skotia passive bonus +${POINTS.SKOTIA_PASSIVE}`);
+      await client.query('COMMIT');
+      return { step: 'completeB', lobbyId: String(lobbyId), gameId: String(gameId) };
+    }
+
+    // ── summarizeRound: all 3 done, round still 'active' → GM triggers summary ──
+    // Votes were already resolved at completeC; just read the stored summary.
+    if (movB && movB.status === 'completed' && roundStatus === 'active') {
+      const summaryRes = await client.query(
+        'SELECT voting_summary FROM rounds WHERE id = $1',
+        [roundId]
+      );
+      const summary = summaryRes.rows[0]?.voting_summary || null;
+
       await client.query("UPDATE rounds SET status = 'summarizing' WHERE id = $1", [roundId]);
       await client.query('COMMIT');
       return {
-        step:         'summarizeRound',
+        step:        'summarizeRound',
         roundNumber,
         lobbyId: String(lobbyId),
         gameId:  String(gameId),
-        summary:      _buildSummary(votingResult, roundNumber),
-        groupResults: votingResult.groupResults,
-        isMarkedMap,
+        summary,
       };
     }
 
@@ -947,6 +973,7 @@ module.exports = {
   scheduleRevealTimeout:     turnService.scheduleRevealTimeout,
   clearAllGroupTimersForGame: turnService.clearAllGroupTimersForGame,
   startTurns:                turnService.startTurns,
+  initTurnState:             turnService.initTurnState,
   scheduleBotSubmitIfNeeded: turnService.scheduleBotSubmitIfNeeded,
   notifyGroupDeliberationReady: turnService.notifyGroupDeliberationReady,
   clearDeliberationTimer:    turnService.clearDeliberationTimer,

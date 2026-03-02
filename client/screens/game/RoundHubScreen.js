@@ -9,9 +9,10 @@ import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
+import { MOVEMENT_NAMES, MOVEMENT_LABELS_SHORT } from '../../constants/movementNames';
 
-const MOVEMENT_LABELS = { A: 'DEDUCTION', B: 'TASKS', C: 'VOTING' };
-const MOVEMENT_SEQUENCE = ['A', 'B', 'C'];
+// Display order matches the new A → C → B round sequence
+const MOVEMENT_SEQUENCE = ['A', 'C', 'B'];
 
 export default function RoundHubScreen({
   token,
@@ -82,7 +83,7 @@ export default function RoundHubScreen({
 
       socket.on('movementStart', ({ movement, groupId, groupMembers, groupNumber: gn, movementBEndsAt }) => {
         setActiveMovement(movement);
-        setStatusMessage(`Movement ${movement} — ${MOVEMENT_LABELS[movement]} beginning...`);
+        setStatusMessage(`${MOVEMENT_NAMES[movement]} beginning...`);
         if (groupMembers) setLiveGroupMembers(groupMembers);
         if (onMovementReady) onMovementReady(movement, groupId, groupMembers, gn ?? null, { movementBEndsAt });
       });
@@ -90,7 +91,7 @@ export default function RoundHubScreen({
       socket.on('movementComplete', ({ movement }) => {
         setCompletedMovements((prev) => new Set([...prev, movement]));
         setActiveMovement(null);
-        setStatusMessage(`Movement ${movement} complete. Waiting for Game Master...`);
+        setStatusMessage(`${MOVEMENT_NAMES[movement]} complete. Waiting for Game Master...`);
       });
 
       socket.on('roundSummary', (summary) => {
@@ -196,7 +197,7 @@ export default function RoundHubScreen({
                     isDone   && { color: colors.accent.neonGreen },
                     isActive && { color: colors.primary.electricBlue },
                   ]}>
-                    {m}
+                    {MOVEMENT_LABELS_SHORT[m]}
                   </Text>
                 </View>
               );
@@ -326,9 +327,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   movementPip: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 75,
+    height: 50,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.border.default,
     backgroundColor: colors.background.panel,

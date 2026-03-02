@@ -12,6 +12,7 @@ import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
+import { MOVEMENT_NAMES } from '../../constants/movementNames';
 import { TASKS, TASK_CATEGORY } from '../../data/tasks';
 import { submitMovementBTask } from '../../utils/api';
 import TaskScreen from '../tasks/TaskScreen';
@@ -126,9 +127,8 @@ export default function MovementBScreen({
         if (movement === 'B' && movementBEndsAt) {
           startCountdown(movementBEndsAt);
         }
-        if (movement === 'C') {
-          if (onMovementComplete) onMovementComplete();
-        }
+        // NOTE: in the A→C→B order, Movement C (Voting) runs before B (Challenges).
+        // There is no movementStart{C} after B, so no exit-to-C logic is needed here.
       });
 
       socket.on('movementBInfo', ({ movementBEndsAt }) => {
@@ -210,8 +210,7 @@ export default function MovementBScreen({
         {/* ── Header ── */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.headerLabel}>MOVEMENT B</Text>
-            <Text style={styles.headerSub}>TASKS</Text>
+            <Text style={styles.headerLabel}>{MOVEMENT_NAMES.B.toUpperCase()}</Text>
           </View>
           <View style={styles.headerCenter}>
             <View style={styles.timerBarTrack}>

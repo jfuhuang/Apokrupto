@@ -719,8 +719,8 @@
       <span class="indicator-label">Movement</span>
       <div class="pip-row">
         <div class="mov-pip" id="mov-pip-A">A</div>
-        <div class="mov-pip" id="mov-pip-B">B</div>
         <div class="mov-pip" id="mov-pip-C">C</div>
+        <div class="mov-pip" id="mov-pip-B">B</div>
       </div>
     </div>
   </div>
@@ -851,8 +851,8 @@
       }
       pipRow.innerHTML = html;
 
-      // Movement pips — A / B / C
-      for (const m of ['A', 'B', 'C']) {
+      // Movement pips — A / C / B
+      for (const m of ['A', 'C', 'B']) {
         const pip = document.getElementById(`mov-pip-${m}`);
         if (!pip) continue;
         pip.className = 'mov-pip';
@@ -1076,11 +1076,11 @@
 
       // Refresh state on any movement event
       socket.on('movementStart', ({ movement, roundNumber, totalRounds, movementBEndsAt }) => {
-        const movLabel = { A: 'MOV A — DEDUCTION', B: 'MOV B — TASKS', C: 'MOV C — VOTING' };
+        const movLabel = { A: 'MOV A — IMPOSTOR', B: 'MOV B — CHALLENGES', C: 'MOV C — VOTING' };
         if (movement) setText('movement-badge', movLabel[movement] || '—');
         if (roundNumber) setText('round-badge', `ROUND ${roundNumber} / ${totalRounds || '?'}`);
         if (movement === 'B' && movementBEndsAt) { clearMovATurnRow(); startTimer(movementBEndsAt); }
-        else if (movement === 'C') { clearMovATurnRow(); stopTimer(); }
+        else if (movement === 'C') { clearMovATurnRow(); stopTimer(); } // stopTimer; votingReady drives C timer
         else if (movement === 'A') stopTimer(); // timer for A is driven by movementATurnUpdate
         // Update bubble state
         if (movement) _activeMovement = movement;
@@ -1168,7 +1168,7 @@
       const round = gameState.round;
       const total = gameState.totalRounds;
       setText('round-badge',    round ? `ROUND ${round} / ${total}` : '— / —');
-      const movLabel = { A: 'MOV A — DEDUCTION', B: 'MOV B — TASKS', C: 'MOV C — VOTING' };
+      const movLabel = { A: 'MOV A — IMPOSTOR', B: 'MOV B — CHALLENGES', C: 'MOV C — VOTING' };
       setText('movement-badge', movLabel[gameState.movement] || '—');
 
       // Seed bubble state from REST data (handles page refresh / reconnect)

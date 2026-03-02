@@ -15,6 +15,7 @@ import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
+import { MOVEMENT_NAMES } from '../../constants/movementNames';
 import SketchCanvas from '../../components/SketchCanvas';
 import SketchThumbnail from '../../components/SketchThumbnail';
 
@@ -77,12 +78,15 @@ export default function MovementAScreen({
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) {
+          let errBody = null;
+          try { errBody = await res.json(); } catch (_) {}
+          const errMsg = errBody?.error ?? '(no body)';
           if (n <= retries) {
-            console.warn(`[MovementA] Prompt fetch attempt ${n} failed (${res.status}), retrying...`);
+            console.warn(`[MovementA] Prompt fetch attempt ${n} failed — HTTP ${res.status}: ${errMsg}. Retrying in 1.5s...`);
             await new Promise((r) => setTimeout(r, 1500));
             return attempt(n + 1);
           }
-          console.warn(`[MovementA] Prompt fetch failed after ${n} attempts`);
+          console.warn(`[MovementA] Prompt fetch failed after ${n} attempt(s) — HTTP ${res.status}: ${errMsg}`);
           return;
         }
         const data = await res.json();
@@ -658,7 +662,7 @@ export default function MovementAScreen({
       <View style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.header}>
-            <Text style={styles.headerLabel}>MOVEMENT A — DEDUCTION</Text>
+            <Text style={styles.headerLabel}>{MOVEMENT_NAMES.A.toUpperCase()}</Text>
             <Text style={styles.headerRound}>ROUND {roundNumber}</Text>
           </View>
 
@@ -706,7 +710,7 @@ export default function MovementAScreen({
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <Text style={styles.headerLabel}>MOVEMENT A — DEDUCTION</Text>
+          <Text style={styles.headerLabel}>{MOVEMENT_NAMES.A.toUpperCase()}</Text>
           <Text style={styles.headerRound}>ROUND {roundNumber}</Text>
         </View>
 

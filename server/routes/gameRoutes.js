@@ -25,6 +25,8 @@ const {
   getMovementATurnInfo,
   getMovementBEndsAt,
   getVotingEndsAt,
+  initTurnState,
+  startTurns,
 } = require('../services/gameService');
 const { emitAdvanceEvents } = require('../websocket/lobbySocket');
 const { getIO } = require('../websocket/io');
@@ -295,6 +297,7 @@ router.get('/:gameId/movement-a/prompt', auth, async (req, res) => {
       [gameId, userId]
     );
     if (playerRes.rows.length === 0) {
+      console.warn(`[GET movement-a/prompt] 404 — user ${userId} not in game ${gameId} (no row in game_players)`);
       return res.status(404).json({ error: 'Player not found in this game' });
     }
     const { team } = playerRes.rows[0];
@@ -309,14 +312,58 @@ router.get('/:gameId/movement-a/prompt', auth, async (req, res) => {
       [gameId, userId]
     );
     if (groupRes.rows.length === 0) {
+      // Dig out what current_round actually is so we can tell if group assignment is missing
+      const roundRes = await db.query('SELECT current_round FROM games WHERE id = $1', [gameId]);
+      const currentRound = roundRes.rows[0]?.current_round ?? 'unknown';
+      console.warn(`[GET movement-a/prompt] 404 — no group for user ${userId} in game ${gameId} round ${currentRound} (game_group_members missing or round mismatch)`);
       return res.status(404).json({ error: 'Group not found for current round' });
     }
     const groupId = String(groupRes.rows[0].group_id);
 
-    // Get turn state and prompt
-    const turnState = getGroupTurnState(groupId);
+    // Get turn state — attempt recovery if missing (e.g. server restart while Movement A active,
+    // or initTurnState failed on a previous advanceMovement call but the DB COMMIT already ran).
+    let turnState = getGroupTurnState(groupId);
     if (!turnState) {
-      return res.status(404).json({ error: 'Turn state not initialised for this group' });
+      console.warn(`[GET movement-a/prompt] turn state missing for group ${groupId} (game ${gameId}, user ${userId}) — attempting recovery`);
+      try {
+        const gameInfoRes = await db.query(
+          'SELECT lobby_id, current_round FROM games WHERE id = $1',
+          [gameId]
+        );
+        if (gameInfoRes.rows.length > 0) {
+          const { lobby_id: recoveryLobbyId, current_round: roundNumber } = gameInfoRes.rows[0];
+          // Build groups array the same shape initTurnState expects
+          const allGroupsRes = await db.query(
+            `SELECT gg.id AS group_id, gg.group_index,
+                    array_agg(ggm.user_id::text ORDER BY ggm.user_id) AS member_ids
+             FROM game_groups gg
+             JOIN game_group_members ggm ON ggm.group_id = gg.id
+             WHERE gg.game_id = $1 AND gg.round_number = $2
+             GROUP BY gg.id, gg.group_index
+             ORDER BY gg.group_index`,
+            [gameId, roundNumber]
+          );
+          const allGroups = allGroupsRes.rows.map((r) => ({
+            groupId:    r.group_id,
+            groupIndex: r.group_index,
+            memberIds:  r.member_ids,
+            members:    r.member_ids.map((id) => ({ id, username: id, isMarked: false })),
+          }));
+          const missingGroups = allGroups.filter((g) => !getGroupTurnState(String(g.groupId)));
+          if (missingGroups.length > 0) {
+            await initTurnState(missingGroups, gameId, recoveryLobbyId);
+            startTurns(missingGroups);
+            console.log(`[GET movement-a/prompt] recovery: re-initialised ${missingGroups.length} / ${allGroups.length} group(s) for game ${gameId}`);
+          }
+        }
+      } catch (recoveryErr) {
+        console.error(`[GET movement-a/prompt] recovery failed for game ${gameId}:`, recoveryErr.message);
+      }
+      turnState = getGroupTurnState(groupId);
+      if (!turnState) {
+        console.warn(`[GET movement-a/prompt] 404 — turn state still null after recovery for group ${groupId} (game ${gameId}, user ${userId})`);
+        return res.status(404).json({ error: 'Turn state not initialised for this group' });
+      }
     }
 
     const promptRes = await db.query(
@@ -324,6 +371,7 @@ router.get('/:gameId/movement-a/prompt', auth, async (req, res) => {
       [turnState.promptId]
     );
     if (promptRes.rows.length === 0) {
+      console.warn(`[GET movement-a/prompt] 404 — promptId ${turnState.promptId} not found in prompts table (group ${groupId}, game ${gameId})`);
       return res.status(404).json({ error: 'Prompt not found' });
     }
 
