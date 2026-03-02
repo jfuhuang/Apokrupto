@@ -408,7 +408,8 @@ export default function App() {
             roundNumber={currentRound}
             movementBEndsAt={movementBEndsAt}
             isSus={isSus}
-            onMovementComplete={() => setCurrentScreen('roundHub')}={() => setCurrentScreen('taskRush')}
+            onMovementComplete={() => setCurrentScreen('roundHub')}
+            onEnterRush={() => setCurrentScreen('taskRush')}
           />
         );
 
