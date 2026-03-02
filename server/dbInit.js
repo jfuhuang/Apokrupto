@@ -174,50 +174,6 @@ async function init() {
     CREATE INDEX IF NOT EXISTS ix_sus_events    ON sus_events (game_id, round_number);
   `);
 
-  // Migrate existing rounds table — add voting_summary column if absent (safe on fresh DBs too)
-  await pool.query(`
-    ALTER TABLE rounds ADD COLUMN IF NOT EXISTS voting_summary JSONB;
-  `);
-
-  // Migrate mark_events → sus_events (rename table and update action constraint)
-  await pool.query(`
-    DO $$
-    BEGIN
-      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'mark_events') THEN
-        -- sus_events may have been created empty by the CREATE TABLE IF NOT EXISTS above;
-        -- drop it so we can rename mark_events (which holds any existing data) instead.
-        DROP TABLE IF EXISTS sus_events;
-        ALTER TABLE mark_events RENAME TO sus_events;
-      END IF;
-    END$$;
-  `);
-
-  // Migrate sus_events action values: 'mark' → 'sus', 'unmark' → 'clear', and enforce new constraint.
-  // Runs every startup but is safe/idempotent — UPDATE affects 0 rows once already migrated.
-  await pool.query(`
-    DO $$
-    BEGIN
-      -- Rewrite old action values before touching the constraint
-      UPDATE sus_events SET action = 'sus'   WHERE action = 'mark';
-      UPDATE sus_events SET action = 'clear' WHERE action = 'unmark';
-      -- Swap out old constraint for new one (both names handled)
-      ALTER TABLE sus_events DROP CONSTRAINT IF EXISTS mark_events_action_check;
-      ALTER TABLE sus_events DROP CONSTRAINT IF EXISTS sus_events_action_check;
-      ALTER TABLE sus_events ADD CONSTRAINT sus_events_action_check
-        CHECK (action IN ('sus', 'clear'));
-    END$$;
-  `);
-
-  // Migrate existing prompts table — add prompt_mode column if absent.
-  // Without this, initTurnState's WHERE prompt_mode = $1 query would throw on old DBs,
-  // leaving groupTurnState unpopulated even though Movement A was committed as active.
-  await pool.query(`
-    ALTER TABLE prompts ADD COLUMN IF NOT EXISTS prompt_mode VARCHAR DEFAULT 'word';
-  `);
-  await pool.query(`
-    UPDATE prompts SET prompt_mode = 'word' WHERE prompt_mode IS NULL;
-  `);
-
   // Seed word prompt pairs (only if table is empty)
   await pool.query(`
     INSERT INTO prompts (phos_prompt, skotia_prompt, theme_label, prompt_mode)
