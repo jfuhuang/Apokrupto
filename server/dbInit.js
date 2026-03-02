@@ -1,6 +1,25 @@
 const pool = require('./db');
 
 async function init() {
+  // If a previous migration renamed mark_events → sus_events, rename it back before
+  // the main schema block runs CREATE TABLE IF NOT EXISTS mark_events.
+  // This makes startup idempotent regardless of which DB state was left behind.
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'sus_events'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'mark_events'
+      ) THEN
+        ALTER TABLE sus_events RENAME TO mark_events;
+      END IF;
+    END;
+    $$;
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id            SERIAL PRIMARY KEY,
