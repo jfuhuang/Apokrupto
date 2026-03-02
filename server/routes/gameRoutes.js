@@ -4,6 +4,7 @@ const auth    = require('../middleware/auth');
 const { GM_USERNAMES } = require('../utils/config');
 const db      = require('../db');
 const {
+  POINTS,
   createGame,
   startGame,
   advanceMovement,
@@ -730,19 +731,23 @@ router.post('/:gameId/movement-b/complete', auth, async (req, res) => {
       return res.status(409).json({ error: 'Movement B is not active' });
     }
 
-    // 2. Get player's team
+    // 2. Get player's team and mark status
     const playerRes = await client.query(
-      'SELECT team FROM game_players WHERE game_id = $1 AND user_id = $2',
+      'SELECT team, is_marked FROM game_players WHERE game_id = $1 AND user_id = $2',
       [gameId, userId]
     );
     if (playerRes.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Player not in this game' });
     }
-    const { team } = playerRes.rows[0];
+    const { team, is_marked } = playerRes.rows[0];
 
-    // 3. Determine points (base + streak bonus)
-    const pointsEarned = basePoints + cappedBonus;
+    // 3. Determine points (base + streak bonus), apply Sus penalty if marked
+    const rawPoints = basePoints + cappedBonus;
+    const isSusPenaltyApplied = !!is_marked;
+    const pointsEarned = isSusPenaltyApplied
+      ? Math.floor(rawPoints * POINTS.MARKED_CHALLENGE_MULTIPLIER)
+      : rawPoints;
 
     // 4. Award to team
     await client.query(
@@ -760,7 +765,7 @@ router.post('/:gameId/movement-b/complete', auth, async (req, res) => {
 
     await client.query('COMMIT');
 
-    res.json({ ok: true, pointsEarned, teamPoints, taskId });
+    res.json({ ok: true, pointsEarned, isSusPenaltyApplied, teamPoints, taskId });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('[movement-b/complete] error:', err.message);

@@ -173,7 +173,7 @@ is called after C resolves (which is now mid-round), and the player should **not
 
 ---
 
-## TASK 2 — Sus Penalty During Challenges Stage
+## ✅ TASK 2 — Sus Penalty During Challenges Stage *(COMPLETE)*
 
 > Depends on: **Task 1B complete** (voting must now precede challenges so marks are active)
 
@@ -208,10 +208,10 @@ When the task completion response includes `isSusPenaltyApplied: true`, display 
 inline UI note: "⚠️ Sus penalty: 50% points" in `colors.primary.neonRed`.
 
 **Acceptance criteria:**
-- [ ] Sus players earn 50% of task points compared to clear players
-- [ ] `isSusPenaltyApplied` is present in the task completion API response
-- [ ] Client shows a visual indicator when the penalty was applied
-- [ ] Non-Sus players are unaffected
+- [x] Sus players earn 50% of task points compared to clear players
+- [x] `isSusPenaltyApplied` is present in the task completion API response
+- [x] Client shows a visual indicator when the penalty was applied
+- [x] Non-Sus players are unaffected
 
 ---
 

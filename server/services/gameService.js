@@ -11,6 +11,7 @@ const POINTS = {
   CORRECT_UNMARK: 150, // Unmark Phos (vindication) → Phos earns
   FALSE_UNMARK:   200, // Unmark Skotia (re-hides)  → Skotia earns
   SKOTIA_PASSIVE:  50, // Skotia flat bonus per Movement B
+  MARKED_CHALLENGE_MULTIPLIER: 0.5, // Sus players earn 50% of task points
 };
 
 // Local copy of voting duration used in activateC step (avoids re-require)

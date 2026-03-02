@@ -407,6 +407,7 @@ export default function App() {
             currentTeam={currentTeam}
             roundNumber={currentRound}
             movementBEndsAt={movementBEndsAt}
+            isMarked={isMarked}
             onMovementComplete={() => setCurrentScreen('roundHub')}
             onEnterRush={() => setCurrentScreen('taskRush')}
           />
@@ -421,6 +422,7 @@ export default function App() {
             currentTeam={currentTeam}
             roundNumber={currentRound}
             movementBEndsAt={movementBEndsAt}
+            isMarked={isMarked}
             onExitRush={() => setCurrentScreen('movementB')}
             onMovementComplete={() => setCurrentScreen('roundHub')}
           />
