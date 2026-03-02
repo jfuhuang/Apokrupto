@@ -11,7 +11,7 @@ import Svg, { Path, Circle, Rect, Ellipse, Line, G } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
-const { width: W, height: H } = Dimensions.get('window');
+const { width: W } = Dimensions.get('window');
 
 // ── SVG tap button components ─────────────────────────────────────────────
 
@@ -173,38 +173,39 @@ function WaveBackground({ taps, targetTaps }) {
   const waveAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.loop(
-      Animated.timing(waveAnim, { toValue: 1, duration: 1200, useNativeDriver: false })
+      Animated.timing(waveAnim, { toValue: 1, duration: 1200, useNativeDriver: true })
     ).start();
   }, []);
 
-  // Amplitude decreases as taps increase
-  const progress    = Math.min(taps / targetTaps, 1);
-  const translateX  = waveAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -30] });
+  const progress   = Math.min(taps / targetTaps, 1);
+  const translateX = waveAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -30] });
   const waveOpacity = waveAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.8, 1, 0.8] });
 
-  const amps = ['20', String(Math.max(5, 20 - progress * 15)), '14'];
+  // Amplitudes in viewBox units (0–100); shrink as player progresses
+  const amp0 = Math.max(1, 5 - progress * 4);
+  const amp1 = Math.max(0.5, 4 - progress * 3);
 
   return (
     <Animated.View
       style={[StyleSheet.absoluteFill, { transform: [{ translateX }], opacity: waveOpacity }]}
       pointerEvents="none"
     >
-      <Svg style={StyleSheet.absoluteFill} viewBox={`0 0 ${W} ${H}`}>
-        {/* Large front wave */}
+      <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+        {/* Front wave */}
         <Path
-          d={`M0 ${H*0.3} Q${W*0.25} ${H*0.3 - amps[0]} ${W*0.5} ${H*0.3} Q${W*0.75} ${H*0.3 + amps[0]} ${W} ${H*0.3} L${W} ${H} L0 ${H}Z`}
+          d={`M0 30 Q25 ${30 - amp0} 50 30 Q75 ${30 + amp0} 100 30 L100 100 L0 100Z`}
           fill="#003060"
           opacity="0.5"
         />
         {/* Mid wave */}
         <Path
-          d={`M-30 ${H*0.4} Q${W*0.25} ${H*0.4 - amps[1]} ${W*0.5} ${H*0.4} Q${W*0.75} ${H*0.4 + amps[1]} ${W+30} ${H*0.4} L${W+30} ${H} L-30 ${H}Z`}
+          d={`M-5 40 Q25 ${40 - amp1} 50 40 Q75 ${40 + amp1} 105 40 L105 100 L-5 100Z`}
           fill="#004080"
           opacity="0.4"
         />
         {/* Back wave */}
         <Path
-          d={`M-60 ${H*0.22} Q${W*0.25} ${H*0.22 - amps[2]} ${W*0.5} ${H*0.22} Q${W*0.75} ${H*0.22 + amps[2]} ${W+60} ${H*0.22} L${W+60} ${H} L-60 ${H}Z`}
+          d="M-10 22 Q25 19 50 22 Q75 25 110 22 L110 100 L-10 100Z"
           fill="#002050"
           opacity="0.35"
         />

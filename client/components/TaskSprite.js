@@ -244,15 +244,18 @@ const SPRITES = {
 
   manna_wilderness: (c) => (
     <G>
-      <Circle cx="10" cy="8" r="4" fill={c} />
-      <Circle cx="16" cy="6" r="5" fill={c} />
-      <Circle cx="22" cy="8" r="4" fill={c} />
-      <Rect x="6" y="8" width="20" height="4" fill={c} />
-      <Polygon points="8,18 10,16 12,18 10,20"  fill={c} opacity="0.9" />
-      <Polygon points="15,22 17,20 19,22 17,24" fill={c} opacity="0.8" />
-      <Polygon points="21,16 23,14 25,16 23,18" fill={c} opacity="0.7" />
-      <Polygon points="5,25 7,23 9,25 7,27"     fill={c} opacity="0.6" />
-      <Polygon points="22,25 24,23 26,25 24,27" fill={c} opacity="0.6" />
+      {/* Cloud */}
+      <Circle cx="10" cy="8" r="4" fill={c} opacity="0.6" />
+      <Circle cx="16" cy="6" r="5" fill={c} opacity="0.7" />
+      <Circle cx="22" cy="8" r="4" fill={c} opacity="0.6" />
+      <Rect x="6" y="8" width="20" height="3" fill={c} opacity="0.6" />
+      {/* Falling manna wafers */}
+      <Circle cx="9"  cy="18" r="3.5" fill="#DEB887" />
+      <Circle cx="9"  cy="18" r="2.5" fill="#F5DEB3" />
+      <Circle cx="17" cy="22" r="3.5" fill="#DEB887" />
+      <Circle cx="17" cy="22" r="2.5" fill="#F5DEB3" />
+      <Circle cx="24" cy="17" r="3.5" fill="#DEB887" />
+      <Circle cx="24" cy="17" r="2.5" fill="#F5DEB3" />
     </G>
   ),
 
@@ -390,6 +393,57 @@ const SPRITES = {
       <Ellipse cx="8"  cy="16" rx="4" ry="3" fill={c} opacity="0.9" />
       <Ellipse cx="16" cy="16" rx="4" ry="3" fill={c} opacity="0.9" />
       <Ellipse cx="24" cy="16" rx="4" ry="3" fill={c} opacity="0.9" />
+    </G>
+  ),
+
+  // ── PATIENCE (don't tap) ─────────────────────────────────────────────
+
+  still_waters: (c) => (
+    <G>
+      {/* Rock */}
+      <Path d="M6 28 Q4 20 6 14 Q9 8 16 7 Q23 6 25 12 Q27 18 27 28Z" fill="#8B9CB0" />
+      <Path d="M16 7 L15 14 L17 19" stroke={BG} strokeWidth="1.5" fill="none" />
+      {/* Water drops - don't strike! */}
+      <Path d="M12 20 Q8 23 7 27" stroke="#87CEEB" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+      <Path d="M20 19 Q24 22 25 27" stroke="#87CEEB" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+      {/* X mark (don't tap) */}
+      <Line x1="3" y1="3" x2="8" y2="8" stroke={c} strokeWidth="2" strokeLinecap="round" />
+      <Line x1="8" y1="3" x2="3" y2="8" stroke={c} strokeWidth="2" strokeLinecap="round" />
+    </G>
+  ),
+
+  be_still: (c) => (
+    <G>
+      {/* Calm water */}
+      <Path d="M2 18 Q8 14 16 18 Q24 22 30 18" stroke={c} strokeWidth="2" fill="none" />
+      <Path d="M2 24 Q8 20 16 24 Q24 28 30 24" stroke={c} strokeWidth="1.5" fill="none" opacity="0.5" />
+      {/* Serene clouds */}
+      <Circle cx="10" cy="8" r="4" fill={c} opacity="0.3" />
+      <Circle cx="16" cy="6" r="5" fill={c} opacity="0.4" />
+      <Circle cx="22" cy="8" r="4" fill={c} opacity="0.3" />
+      {/* Peace symbol - small cross */}
+      <Rect x="14.5" y="10" width="3" height="6" rx="0.5" fill={c} opacity="0.6" />
+      <Rect x="12" y="12" width="8" height="3" rx="0.5" fill={c} opacity="0.6" />
+    </G>
+  ),
+
+  wait_on_the_lord: (c) => (
+    <G>
+      {/* Eagle wings spread */}
+      <Path d="M16 16 Q10 12 4 8 Q6 14 10 18Z" fill={c} />
+      <Path d="M16 16 Q22 12 28 8 Q26 14 22 18Z" fill={c} />
+      {/* Body */}
+      <Ellipse cx="16" cy="18" rx="3" ry="5" fill={c} />
+      {/* Head */}
+      <Circle cx="16" cy="12" r="3" fill={c} />
+      {/* Beak */}
+      <Polygon points="16,13 14,15 18,15" fill={FIRE} />
+      {/* Sun rays */}
+      <Line x1="16" y1="2" x2="16" y2="5" stroke={FIRE} strokeWidth="1.5" opacity="0.5" />
+      <Line x1="8"  y1="4" x2="10" y2="7" stroke={FIRE} strokeWidth="1" opacity="0.4" />
+      <Line x1="24" y1="4" x2="22" y2="7" stroke={FIRE} strokeWidth="1" opacity="0.4" />
+      {/* Hourglass below */}
+      <Path d="M12 26 L16 22 L20 26 L16 30Z" stroke={c} strokeWidth="1.5" fill="none" />
     </G>
   ),
 

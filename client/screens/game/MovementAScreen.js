@@ -58,9 +58,14 @@ export default function MovementAScreen({
   const prevTurnPlayerIdRef = useRef(null);
   const wordInputRef = useRef(''); // mirrors wordInput state to avoid stale closure in timer
   const submittedRef = useRef(false); // true after this player submits; prevents double auto-submit
+  const sketchCanvasRef = useRef(null); // ref to SketchCanvas for getSketchData() on auto-submit
+  const promptModeRef = useRef(promptMode); // mirror for stale closure in timer
+  const sketchDataRef = useRef(null); // mirror of sketchData for stale closure fallback
 
-  // Keep ref in sync with state so the interval callback always has the latest value
+  // Keep refs in sync with state so interval/timer callbacks always have the latest value
   useEffect(() => { wordInputRef.current = wordInput; }, [wordInput]);
+  useEffect(() => { promptModeRef.current = promptMode; }, [promptMode]);
+  useEffect(() => { sketchDataRef.current = sketchData; }, [sketchData]);
 
   // Fetch prompt (server returns team-specific prompt via JWT).
   // Used on mount (with retries) and on pull-to-refresh (single attempt).
@@ -176,7 +181,11 @@ export default function MovementAScreen({
             clearInterval(turnTimerRef.current);
             // Auto-submit only if it's still our turn and we haven't submitted yet
             if (String(currentPlayerId) === String(currentUserId) && !submittedRef.current) {
-              handleSubmit(wordInputRef.current.trim() || '—'); // word mode fallback; sketch mode ignores this arg
+              if (promptModeRef.current === 'sketch') {
+                handleSubmit(); // sketch data retrieved from canvas ref inside handleSubmit
+              } else {
+                handleSubmit(wordInputRef.current.trim() || '—');
+              }
             }
           }
         }, 1000);
@@ -268,15 +277,18 @@ export default function MovementAScreen({
   const handleSubmit = async (word) => {
     if (submitting) return;
 
-    const isSketch = promptMode === 'sketch';
+    const isSketch = promptModeRef.current === 'sketch';
 
     let finalWord = null;
     if (!isSketch) {
       finalWord = (word ?? wordInput).trim();
     }
 
-    // In sketch mode, use current drawing or an empty sketch if time ran out
-    const finalSketchData = isSketch ? (sketchData ?? { strokes: [] }) : null;
+    // In sketch mode, get data from canvas ref (includes in-progress stroke)
+    // or fall back to state/ref, or an empty sketch if nothing drawn
+    const finalSketchData = isSketch
+      ? (sketchCanvasRef.current?.getSketchData?.() ?? sketchDataRef.current ?? { strokes: [] })
+      : null;
 
     setSubmitting(true);
     submittedRef.current = true; // prevent auto-submit from triggering again
@@ -485,22 +497,8 @@ export default function MovementAScreen({
       );
 
       if (promptMode === 'sketch') {
-        const hasStrokes = sketchData?.strokes?.length > 0;
-        return (
-          <View style={styles.phaseContainer}>
-            {myTurnHeader}
-            {promptDisplay}
-            <SketchCanvas onSketchChange={setSketchData} />
-            <TouchableOpacity
-              style={[styles.submitBtn, !hasStrokes && styles.submitBtnDisabled]}
-              onPress={() => handleSubmit()}
-              disabled={!hasStrokes || submitting}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.submitBtnText}>SUBMIT SKETCH</Text>
-            </TouchableOpacity>
-          </View>
-        );
+        // Sketch my_turn is rendered in a separate flex layout (see main return below)
+        return null;
       }
 
       return (
@@ -652,6 +650,58 @@ export default function MovementAScreen({
     return null;
   };
 
+  // ── Sketch drawing mode — fixed flex layout, no ScrollView ────────────────
+  // Prevents scroll/draw conflict by keeping the canvas outside a ScrollView.
+  if (phase === 'my_turn' && promptMode === 'sketch') {
+    const hasStrokes = sketchData?.strokes?.length > 0;
+    return (
+      <View style={styles.container}>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.header}>
+            <Text style={styles.headerLabel}>MOVEMENT A — DEDUCTION</Text>
+            <Text style={styles.headerRound}>ROUND {roundNumber}</Text>
+          </View>
+
+          <View style={styles.sketchTurnLayout}>
+            {/* Compact header: YOUR TURN + timer */}
+            <View style={styles.myTurnHeader}>
+              <Text style={styles.yourTurnLabel}>YOUR TURN</Text>
+              <View style={[styles.timerCircle, turnSecondsLeft <= 10 && styles.timerCircleUrgent]}>
+                <Text style={[styles.timerValue, turnSecondsLeft <= 10 && styles.timerValueUrgent]}>
+                  {turnSecondsLeft}
+                </Text>
+              </View>
+            </View>
+
+            {/* Compact prompt */}
+            <View style={styles.sketchPromptRow}>
+              <Text style={styles.promptLabel}>DRAW</Text>
+              <Text style={styles.sketchPromptText} numberOfLines={2}>{prompt || '...'}</Text>
+            </View>
+
+            {/* Canvas fills remaining space */}
+            <SketchCanvas
+              ref={sketchCanvasRef}
+              onSketchChange={setSketchData}
+              style={{ flex: 1 }}
+            />
+
+            {/* Submit button */}
+            <TouchableOpacity
+              style={[styles.submitBtn, !hasStrokes && styles.submitBtnDisabled]}
+              onPress={() => handleSubmit()}
+              disabled={!hasStrokes || submitting}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.submitBtnText}>SUBMIT SKETCH</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  // ── Normal scrollable layout (all other phases) ─────────────────────────────
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -788,6 +838,33 @@ const styles = StyleSheet.create({
   phaseContainer: {
     padding: 20,
     gap: 20,
+  },
+
+  // ── Sketch turn (non-scrollable flex layout) ────────────────────────────
+  sketchTurnLayout: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    gap: 10,
+  },
+  sketchPromptRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(0, 212, 255, 0.05)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.primary.electricBlue,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  sketchPromptText: {
+    flex: 1,
+    fontFamily: fonts.accent.bold,
+    fontSize: 16,
+    color: colors.text.primary,
+    letterSpacing: 1,
   },
 
   // Prompt section (shared between waiting_turn and my_turn)

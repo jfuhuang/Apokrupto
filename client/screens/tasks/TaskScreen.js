@@ -18,6 +18,8 @@ import QuizTask from './mechanics/QuizTask';
 import MatchPairTask from './mechanics/MatchPairTask';
 import HoldTask from './mechanics/HoldTask';
 import TraceTask from './mechanics/TraceTask';
+import PatienceTask from './mechanics/PatienceTask';
+import BuildTask from './mechanics/BuildTask';
 
 const RESULT_DISPLAY_MS = 1500;
 
@@ -99,6 +101,10 @@ export default function TaskScreen({ task, role, isAlive, token, lobbyId, onComp
         return <HoldTask {...props} />;
       case MECHANIC.TRACE:
         return <TraceTask {...props} />;
+      case MECHANIC.PATIENCE:
+        return <PatienceTask {...props} />;
+      case MECHANIC.BUILD:
+        return <BuildTask {...props} />;
       default:
         return null;
     }

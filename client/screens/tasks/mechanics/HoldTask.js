@@ -59,7 +59,7 @@ function WaterCenter({ fillAnim }) {
   const waveAnim = useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
     Animated.loop(
-      Animated.timing(waveAnim, { toValue: 1, duration: 1400, useNativeDriver: false })
+      Animated.timing(waveAnim, { toValue: 1, duration: 1400, useNativeDriver: true })
     ).start();
   }, []);
 

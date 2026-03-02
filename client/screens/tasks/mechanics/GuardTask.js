@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,22 +19,21 @@ import Svg, {
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
-const { width: W, height: H } = Dimensions.get('window');
+const { width: W } = Dimensions.get('window');
 const ENEMY_SIZE    = 56;
 const SPAWN_INTERVAL = 2200;
 const ENEMY_DURATION = 5000;
 const CENTER_X = W / 2 - ENEMY_SIZE / 2;
-const CENTER_Y = H * 0.45;
 
 let _id = 0;
 
-function makeEnemy() {
+function makeEnemy(centerY, areaH) {
   const side = Math.floor(Math.random() * 4);
   let sx, sy;
   if (side === 0) { sx = Math.random() * W; sy = -ENEMY_SIZE; }
-  else if (side === 1) { sx = W + ENEMY_SIZE; sy = Math.random() * CENTER_Y; }
-  else if (side === 2) { sx = Math.random() * W; sy = H; }
-  else { sx = -ENEMY_SIZE; sy = Math.random() * CENTER_Y; }
+  else if (side === 1) { sx = W + ENEMY_SIZE; sy = Math.random() * centerY; }
+  else if (side === 2) { sx = Math.random() * W; sy = areaH; }
+  else { sx = -ENEMY_SIZE; sy = Math.random() * centerY; }
   return { id: ++_id, sx, sy, pan: new Animated.ValueXY({ x: sx, y: sy }), anim: null };
 }
 
@@ -104,9 +103,9 @@ function SoldierSvg() {
 
 // ── Sheep pen SVG (static background) ────────────────────────────────────
 
-function SheepPenBg({ taskId }) {
-  const penTop    = H * 0.38;
-  const penBottom = H * 0.58;
+function SheepPenBg({ areaH }) {
+  const penTop    = areaH * 0.32;
+  const penBottom = areaH * 0.52;
   const postCount = Math.ceil(W / 35);
 
   return (
@@ -148,22 +147,47 @@ function PillarOfFireBg({ pulseAnim }) {
       style={[StyleSheet.absoluteFill, { transform: [{ scale: pulseAnim }] }]}
       pointerEvents="none"
     >
-      <Svg style={StyleSheet.absoluteFill} viewBox={`0 0 ${W} ${H}`}>
+      <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
         {/* Desert ground */}
-        <Rect x="0" y={H * 0.72} width={W} height={H * 0.28} fill="#5C3A1A" />
+        <Rect x="0" y="72" width="100" height="28" fill="#5C3A1A" />
         {/* Fire column outer glow */}
-        <Ellipse cx={W / 2} cy={H * 0.4} rx="38" ry={H * 0.34} fill="#FFA63D" opacity="0.3" />
+        <Ellipse cx="50" cy="40" rx="12" ry="34" fill="#FFA63D" opacity="0.3" />
         {/* Fire column bright core */}
-        <Ellipse cx={W / 2} cy={H * 0.4} rx="20" ry={H * 0.25} fill="#FFE082" opacity="0.45" />
+        <Ellipse cx="50" cy="40" rx="6" ry="25" fill="#FFE082" opacity="0.45" />
         {/* Base ground glow */}
-        <Ellipse cx={W / 2} cy={H * 0.72} rx="60" ry="14" fill="#FFA63D" opacity="0.3" />
+        <Ellipse cx="50" cy="72" rx="18" ry="4" fill="#FFA63D" opacity="0.3" />
       </Svg>
     </Animated.View>
   );
 }
 
-export default function GuardTask({ config, onSuccess, onFail, taskId }) {
+// ── Main wrapper (measures layout) ──────────────────────────────────────
+
+export default function GuardTask(props) {
+  const [areaSize, setAreaSize] = useState(null);
+
+  const handleLayout = useCallback((e) => {
+    if (!areaSize) {
+      setAreaSize({
+        w: e.nativeEvent.layout.width,
+        h: e.nativeEvent.layout.height,
+      });
+    }
+  }, [areaSize]);
+
+  return (
+    <View style={styles.container} onLayout={handleLayout}>
+      {areaSize && <GuardTaskInner {...props} areaW={areaSize.w} areaH={areaSize.h} />}
+    </View>
+  );
+}
+
+// ── Inner component (has measured dimensions) ───────────────────────────
+
+function GuardTaskInner({ config, onSuccess, onFail, taskId, areaW, areaH }) {
   const { waveDuration, maxMisses } = config;
+  const centerY = areaH * 0.35;
+
   const [enemies, setEnemies] = useState([]);
   const [misses,  setMisses]  = useState(0);
   const [done,    setDone]    = useState(false);
@@ -186,10 +210,10 @@ export default function GuardTask({ config, onSuccess, onFail, taskId }) {
   useEffect(() => {
     const spawnInterval = setInterval(() => {
       if (doneRef.current) return;
-      const e = makeEnemy();
+      const e = makeEnemy(centerY, areaH);
       setEnemies((prev) => [...prev, e]);
       e.anim = Animated.timing(e.pan, {
-        toValue:  { x: CENTER_X, y: CENTER_Y },
+        toValue:  { x: CENTER_X, y: centerY },
         duration: ENEMY_DURATION,
         useNativeDriver: false,
       });
@@ -241,10 +265,10 @@ export default function GuardTask({ config, onSuccess, onFail, taskId }) {
     : 'Tap enemies before they reach the flock!';
 
   return (
-    <View style={styles.container}>
+    <>
       {/* Backgrounds */}
       {isPillar && <PillarOfFireBg pulseAnim={pulseAnim} />}
-      {isSheep  && <SheepPenBg taskId={taskId} />}
+      {isSheep  && <SheepPenBg areaH={areaH} />}
 
       <Text style={styles.hint}>{hint}</Text>
       <View style={styles.missRow}>
@@ -256,7 +280,7 @@ export default function GuardTask({ config, onSuccess, onFail, taskId }) {
       </View>
 
       {/* Center: sheep emoji for sheep tasks, fire glyph for pillar */}
-      <View style={[styles.center, { left: CENTER_X, top: CENTER_Y }]}>
+      <View style={[styles.center, { left: CENTER_X, top: centerY }]}>
         <Text style={styles.centerIcon}>{isPillar ? '🔥' : '🐑'}</Text>
       </View>
 
@@ -274,7 +298,7 @@ export default function GuardTask({ config, onSuccess, onFail, taskId }) {
           </TouchableOpacity>
         </Animated.View>
       ))}
-    </View>
+    </>
   );
 }
 

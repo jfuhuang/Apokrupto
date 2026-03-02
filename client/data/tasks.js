@@ -9,6 +9,8 @@ export const MECHANIC = {
   MATCH_PAIR: 'MATCH_PAIR',
   HOLD: 'HOLD',
   TRACE: 'TRACE',
+  PATIENCE: 'PATIENCE',
+  BUILD: 'BUILD',
 };
 
 export const TASK_TYPE = {
@@ -50,7 +52,7 @@ export const TASK_SPRITE = {
   lamp_on_lampstand: '💡',
   protect_the_sheep: '🐑',
   feeding_five_thousand: '🍞',
-  manna_wilderness:  '⭐',
+  manna_wilderness:  '🍯',
   walls_of_jericho:  '🏰',
   ark_of_covenant:   '🌈',
   gideons_torch:     '🕯️',
@@ -68,6 +70,15 @@ export const TASK_SPRITE = {
   shout_of_victory:  '📯',
   loaves_and_fish:   '🐟',
   circle_of_prayer:  '🙏',
+
+  // Build (drag & drop)
+  nehemiah_wall:     '🧱',
+  building_the_altar:'🪨',
+
+  // Patience (don't tap)
+  still_waters:      '🪨',
+  be_still:          '🌊',
+  wait_on_the_lord:  '🦅',
 };
 
 export const TASKS = [
@@ -747,6 +758,85 @@ export const TASKS = [
     timeLimit: 18,
     config: {
       items: ['Stone', 'Stone', 'Stone', 'Stone', 'Stone', 'Stone', 'Stone', 'Stone', 'Stone', 'Stone', 'Stone', 'Stone'],
+    },
+  },
+  {
+    id: 'still_waters',
+    title: 'Still Waters',
+    synopsis: "God told Moses to speak to the rock, not strike it. DON'T tap — be still and let the water flow.",
+    reference: 'Numbers 20:8–12',
+    mechanic: MECHANIC.PATIENCE,
+    taskType: TASK_TYPE.FREE_ROAM,
+    category: TASK_CATEGORY.CHALLENGES,
+    points: { alive: 70, dead: 42 },
+    difficulty: 'medium',
+    timeLimit: 0,
+    config: {
+      duration: 5,
+    },
+  },
+  {
+    id: 'be_still',
+    title: 'Be Still',
+    synopsis: '"Be still and know that I am God." Resist the urge to act — just wait in silence.',
+    reference: 'Psalm 46:10',
+    mechanic: MECHANIC.PATIENCE,
+    taskType: TASK_TYPE.FREE_ROAM,
+    category: TASK_CATEGORY.CHALLENGES,
+    points: { alive: 80, dead: 48 },
+    difficulty: 'medium',
+    timeLimit: 0,
+    config: {
+      duration: 6,
+    },
+  },
+  {
+    id: 'wait_on_the_lord',
+    title: 'Wait on the Lord',
+    synopsis: "Those who wait on the LORD will soar like eagles. Don't rush ahead — patience wins.",
+    reference: 'Isaiah 40:31',
+    mechanic: MECHANIC.PATIENCE,
+    taskType: TASK_TYPE.FREE_ROAM,
+    category: TASK_CATEGORY.CHALLENGES,
+    points: { alive: 90, dead: 54 },
+    difficulty: 'hard',
+    timeLimit: 0,
+    config: {
+      duration: 7,
+    },
+  },
+
+  // ── BUILD (drag & drop) ──────────────────────────────────────────────
+  {
+    id: 'nehemiah_wall',
+    title: "Nehemiah's Wall",
+    synopsis: "Nehemiah rebuilt Jerusalem's wall in 52 days. Drag each brick into place to complete the wall!",
+    reference: 'Nehemiah 4:17',
+    mechanic: MECHANIC.BUILD,
+    taskType: TASK_TYPE.FREE_ROAM,
+    category: TASK_CATEGORY.CHALLENGES,
+    points: { alive: 130, dead: 78 },
+    difficulty: 'medium',
+    timeLimit: 60,
+    config: {
+      brickCount: 6,
+      snapTolerance: 55,
+    },
+  },
+  {
+    id: 'building_the_altar',
+    title: 'Building the Altar',
+    synopsis: "Elijah rebuilt the LORD's altar with 12 stones, one for each tribe. Lay every stone!",
+    reference: '1 Kings 18:30-32',
+    mechanic: MECHANIC.BUILD,
+    taskType: TASK_TYPE.FREE_ROAM,
+    category: TASK_CATEGORY.CHALLENGES,
+    points: { alive: 150, dead: 90 },
+    difficulty: 'hard',
+    timeLimit: 75,
+    config: {
+      brickCount: 8,
+      snapTolerance: 45,
     },
   },
 

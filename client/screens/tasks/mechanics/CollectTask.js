@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,19 +7,17 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import Svg, { Circle, Rect, Polygon, Line, Path, Ellipse } from 'react-native-svg';
+import Svg, { Circle, Rect, Line, Path, Ellipse } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
-const { width: W, height: H } = Dimensions.get('window');
+const { width: W } = Dimensions.get('window');
 const MARGIN = 20;
 
 // Decoy items for Paul's Belongings "Where's Waldo" mode
 const PAULS_DECOYS = ['👡', '🪔', '🍞', '🫙', '🪙', '🐟', '🍇', '🌾', '🏺', '🧵', '🔑', '🪵'];
-// Real items Paul needs (indexes 0=Cloak,1=Parchments,2=Books)
 const PAULS_REAL_ICONS = ['🧥', '📜', '📚'];
 
-// Per-task visual configuration
 const ITEM_VISUALS = {
   pauls_belongings: {
     color:   '#FFA63D',
@@ -27,11 +25,9 @@ const ITEM_VISUALS = {
     shape:   'card',
   },
   manna_wilderness: {
-    icons:   ['✦', '✦', '✦'],
-    color:   '#00D4FF',
-    hint:    'Collect the manna!',
-    shape:   'diamond',
-    rain:    true,
+    color:   '#F5DEB3',
+    hint:    'Catch the falling manna!',
+    shape:   'manna',
   },
   jordan_river: {
     icons:   null,
@@ -59,102 +55,217 @@ function shuffle(arr) {
 function getIcon(taskId, index) {
   if (taskId === 'loaves_and_fish') return index % 2 === 0 ? '🍞' : '🐟';
   if (taskId === 'jordan_river') return null;
+  if (taskId === 'manna_wilderness') return null;
   const v = ITEM_VISUALS[taskId];
   if (v && v.icons) return v.icons[index % v.icons.length];
   return '✦';
 }
 
-function randomPos(shape, maxH) {
-  const itemW = shape === 'card' ? 64 : shape === 'stone' ? 65 : 70;
-  const itemH = shape === 'card' ? 72 : shape === 'stone' ? 45 : 70;
-  const usableH = maxH || H * 0.5;
-  return {
-    x: MARGIN + Math.random() * (W - itemW - MARGIN * 2),
-    y: MARGIN + 60 + Math.random() * (usableH - itemH - MARGIN * 2 - 60),
-  };
+// ── Item dimensions per shape ───────────────────────────────────────────────
+
+function getItemDimensions(shape) {
+  switch (shape) {
+    case 'card':  return { w: 64, h: 72 };
+    case 'stone': return { w: 65, h: 45 };
+    case 'manna': return { w: 56, h: 56 };
+    default:      return { w: 70, h: 70 };
+  }
 }
 
-export default function CollectTask({ config, onSuccess, onFail, taskId }) {
+// ── Collision-aware position generation ─────────────────────────────────────
+
+function generatePositions(count, shape, areaW, areaH) {
+  const { w: itemW, h: itemH } = getItemDimensions(shape);
+  const minSpacing = Math.max(itemW, itemH) * 1.15;
+  const startY = 60;
+  const positions = [];
+
+  for (let i = 0; i < count; i++) {
+    let placed = false;
+    let spacing = minSpacing;
+
+    for (let attempt = 0; attempt < 60 && !placed; attempt++) {
+      const x = MARGIN + Math.random() * (areaW - itemW - MARGIN * 2);
+      const y = startY + Math.random() * Math.max(0, areaH - itemH - startY - MARGIN);
+
+      const overlaps = positions.some((p) => {
+        const dx = Math.abs(p.x - x);
+        const dy = Math.abs(p.y - y);
+        return dx < spacing && dy < spacing;
+      });
+
+      if (!overlaps) {
+        positions.push({ x, y });
+        placed = true;
+      }
+
+      // Relax spacing after many failed attempts
+      if (attempt > 35) spacing = minSpacing * 0.6;
+    }
+
+    if (!placed) {
+      const cols = Math.max(1, Math.floor((areaW - MARGIN * 2) / (itemW + MARGIN)));
+      const row  = Math.floor(i / cols);
+      const col  = i % cols;
+      positions.push({
+        x: MARGIN + col * (itemW + MARGIN),
+        y: startY + row * (itemH + MARGIN),
+      });
+    }
+  }
+
+  return positions;
+}
+
+// ── Manna SVG sprite ────────────────────────────────────────────────────────
+
+function MannaSprite({ collected }) {
+  return (
+    <Svg width={44} height={44} viewBox="0 0 44 44">
+      <Circle cx="22" cy="22" r="18" fill={collected ? '#00FF9F' : '#F5DEB3'} />
+      <Circle cx="22" cy="22" r="15" fill={collected ? 'rgba(0,255,159,0.7)' : '#DEB887'} />
+      {!collected && (
+        <>
+          <Line x1="9" y1="22" x2="35" y2="22" stroke="#C8A060" strokeWidth="1" opacity="0.5" />
+          <Line x1="22" y1="9" x2="22" y2="35" stroke="#C8A060" strokeWidth="1" opacity="0.5" />
+          <Line x1="12" y1="12" x2="32" y2="32" stroke="#C8A060" strokeWidth="0.8" opacity="0.3" />
+          <Line x1="32" y1="12" x2="12" y2="32" stroke="#C8A060" strokeWidth="0.8" opacity="0.3" />
+          <Circle cx="17" cy="17" r="4" fill="#FFE4B5" opacity="0.5" />
+        </>
+      )}
+      {collected && (
+        <Path d="M14 22 L20 28 L30 16" stroke="#0B0C10" strokeWidth="3" fill="none" strokeLinecap="round" />
+      )}
+    </Svg>
+  );
+}
+
+// ── Main component (measures layout before rendering items) ─────────────────
+
+export default function CollectTask(props) {
+  const [areaSize, setAreaSize] = useState(null);
+
+  const handleLayout = useCallback((e) => {
+    if (!areaSize) {
+      setAreaSize({
+        w: e.nativeEvent.layout.width,
+        h: e.nativeEvent.layout.height,
+      });
+    }
+  }, [areaSize]);
+
+  return (
+    <View style={styles.container} onLayout={handleLayout}>
+      {areaSize && <CollectTaskInner {...props} areaW={areaSize.w} areaH={areaSize.h} />}
+    </View>
+  );
+}
+
+// ── Inner component (has measured dimensions) ───────────────────────────────
+
+function CollectTaskInner({ config, onSuccess, onFail, taskId, areaW, areaH }) {
   const { items } = config;
   const visual  = ITEM_VISUALS[taskId] || {};
   const shape   = visual.shape || 'circle';
   const color   = visual.color || colors.primary.electricBlue;
-  const isRain  = !!visual.rain;
+  const isManna = taskId === 'manna_wilderness';
   const isWaldo = taskId === 'pauls_belongings';
+  const hint    = visual.hint || 'Tap all items before time runs out!';
 
-  const hint = isWaldo
-    ? visual.hint
-    : visual.hint || 'Tap all items before time runs out!';
+  // ── Collected tracking ──────────────────────────────────────────────────
 
-  // ── Paul's Belongings: mixed real + decoy item list ──────────────────────
+  const [collected, setCollected] = useState(new Set());
+  const collectedRef = useRef(new Set());
+  const doneRef      = useRef(false);
+
+  // ── Paul's Belongings waldo mode ────────────────────────────────────────
+
   const [waldoItems] = useState(() => {
     if (!isWaldo) return null;
     const realItems = items.map((label, i) => ({
-      key:     `real-${i}`,
-      icon:    PAULS_REAL_ICONS[i] || '📦',
-      label,
-      decoy:   false,
-      realIdx: i,
-      pos:     randomPos('card', H * 0.82),
+      key: `real-${i}`, icon: PAULS_REAL_ICONS[i] || '📦',
+      label, decoy: false, realIdx: i,
     }));
     const decoyItems = shuffle(PAULS_DECOYS).slice(0, 12).map((icon, i) => ({
-      key:     `decoy-${i}`,
-      icon,
-      label:   '',
-      decoy:   true,
-      realIdx: null,
-      pos:     randomPos('card', H * 0.82),
+      key: `decoy-${i}`, icon, label: '', decoy: true, realIdx: null,
     }));
     return shuffle([...realItems, ...decoyItems]);
   });
 
-  // Flash anims for wrong-tap feedback (keyed by item key)
+  const [waldoPositions] = useState(() => {
+    if (!isWaldo || !waldoItems) return null;
+    return generatePositions(waldoItems.length, 'card', areaW, areaH);
+  });
+
   const flashAnims = useRef(
     isWaldo
-      ? Object.fromEntries((waldoItems || []).map(it => [it.key, new Animated.Value(0)]))
+      ? Object.fromEntries((waldoItems || []).map((it) => [it.key, new Animated.Value(0)]))
       : {}
   ).current;
 
-  // ── Standard item positions (non-waldo tasks) ────────────────────────────
-  const [positions] = useState(() => {
-    if (isWaldo) return null;
-    return items.map(() => randomPos(shape));
-  });
-  const [collected, setCollected] = useState(new Set());
+  // ── Standard item positions (non-waldo, non-manna) ─────────────────────
 
-  // Rain animation for manna
-  const rainAnims = useRef(
-    isRain ? items.map(() => new Animated.Value(-80)) : null
+  const [positions] = useState(() => {
+    if (isWaldo || isManna) return null;
+    return generatePositions(items.length, shape, areaW, areaH);
+  });
+
+  // ── Manna continuous falling ────────────────────────────────────────────
+
+  const mannaAnims = useRef(
+    isManna
+      ? items.map((_, i) => ({
+          x: new Animated.Value(MARGIN + Math.random() * (areaW - 56 - MARGIN * 2)),
+          y: new Animated.Value(-80 - i * 120),
+        }))
+      : null
   ).current;
 
   useEffect(() => {
-    if (!isRain || !rainAnims) return;
-    Animated.stagger(
-      300,
-      rainAnims.map((a, i) =>
-        Animated.timing(a, {
-          toValue:  positions[i].y,
-          duration: 900,
-          useNativeDriver: false,
-        })
-      )
-    ).start();
+    if (!isManna || !mannaAnims) return;
+
+    const startFall = (i) => {
+      if (collectedRef.current.has(i) || doneRef.current) return;
+      const m = mannaAnims[i];
+      m.x.setValue(MARGIN + Math.random() * (areaW - 56 - MARGIN * 2));
+      m.y.setValue(-80);
+      Animated.timing(m.y, {
+        toValue:  areaH + 80,
+        duration: 2500,
+        useNativeDriver: false,
+      }).start(({ finished }) => {
+        if (finished && !collectedRef.current.has(i) && !doneRef.current) {
+          startFall(i);
+        }
+      });
+    };
+
+    mannaAnims.forEach((_, i) => {
+      setTimeout(() => startFall(i), i * 600);
+    });
+
+    return () => { doneRef.current = true; };
   }, []);
 
-  // ── Collect handlers ─────────────────────────────────────────────────────
+  // ── Collect handlers ──────────────────────────────────────────────────
 
   const handleCollect = (idx) => {
-    if (collected.has(idx)) return;
+    if (collected.has(idx) || doneRef.current) return;
     const next = new Set([...collected, idx]);
+    collectedRef.current = next;
     setCollected(next);
+    if (isManna && mannaAnims && mannaAnims[idx]) {
+      mannaAnims[idx].y.stopAnimation();
+    }
     if (next.size === items.length) {
+      doneRef.current = true;
       onSuccess();
     }
   };
 
   const handleWaldoTap = (item) => {
+    if (doneRef.current) return;
     if (item.decoy) {
-      // Flash red feedback
       const anim = flashAnims[item.key];
       if (anim) {
         Animated.sequence([
@@ -166,13 +277,15 @@ export default function CollectTask({ config, onSuccess, onFail, taskId }) {
     }
     if (collected.has(item.realIdx)) return;
     const next = new Set([...collected, item.realIdx]);
+    collectedRef.current = next;
     setCollected(next);
     if (next.size === items.length) {
+      doneRef.current = true;
       onSuccess();
     }
   };
 
-  // ── Render helpers ───────────────────────────────────────────────────────
+  // ── Render helpers ────────────────────────────────────────────────────
 
   const renderItemContent = (idx, done) => {
     const icon = getIcon(taskId, idx);
@@ -218,11 +331,11 @@ export default function CollectTask({ config, onSuccess, onFail, taskId }) {
           done && { borderColor: colors.accent.neonGreen },
           !done && { borderColor: color },
         ];
-      case 'diamond':
+      case 'manna':
         return [
-          styles.itemDiamond,
+          styles.itemManna,
           done && { borderColor: colors.accent.neonGreen, backgroundColor: 'rgba(0,255,159,0.12)' },
-          !done && { borderColor: color, backgroundColor: color + '18' },
+          !done && { borderColor: '#DEB887', backgroundColor: 'rgba(245,222,179,0.15)' },
         ];
       default:
         return [
@@ -233,11 +346,11 @@ export default function CollectTask({ config, onSuccess, onFail, taskId }) {
     }
   };
 
-  // ── Paul's Waldo render ──────────────────────────────────────────────────
+  // ── Paul's Waldo render ─────────────────────────────────────────────────
 
-  if (isWaldo && waldoItems) {
+  if (isWaldo && waldoItems && waldoPositions) {
     return (
-      <View style={styles.container}>
+      <>
         <Text style={styles.hint}>{hint}</Text>
         <Text style={[styles.progress, { color }]}>
           Found: {collected.size} / {items.length}
@@ -246,8 +359,9 @@ export default function CollectTask({ config, onSuccess, onFail, taskId }) {
           Looking for: {'🧥 📜 📚'}
         </Text>
 
-        {waldoItems.map((item) => {
-          const done     = !item.decoy && collected.has(item.realIdx);
+        {waldoItems.map((item, idx) => {
+          const pos  = waldoPositions[idx];
+          const done = !item.decoy && collected.has(item.realIdx);
           const flashAnim = flashAnims[item.key];
           const borderColorAnim = flashAnim
             ? flashAnim.interpolate({ inputRange: [0, 1], outputRange: [color + '60', '#FF3366'] })
@@ -261,7 +375,7 @@ export default function CollectTask({ config, onSuccess, onFail, taskId }) {
               key={item.key}
               style={[
                 styles.waldoCard,
-                { position: 'absolute', left: item.pos.x, top: item.pos.y },
+                { position: 'absolute', left: pos.x, top: pos.y },
                 done && styles.waldoCardDone,
                 !done && { borderColor: borderColorAnim, backgroundColor: bgColorAnim },
               ]}
@@ -278,38 +392,77 @@ export default function CollectTask({ config, onSuccess, onFail, taskId }) {
             </Animated.View>
           );
         })}
-      </View>
+      </>
     );
   }
 
-  // ── Standard collect render ──────────────────────────────────────────────
+  // ── Manna render ────────────────────────────────────────────────────────
 
-  return (
-    <View style={styles.container}>
-      {/* Cloud decoration for manna */}
-      {isRain && (
+  if (isManna && mannaAnims) {
+    return (
+      <>
+        {/* Cloud decoration */}
         <Svg
           style={{ position: 'absolute', top: 0, left: 0, right: 0 }}
           height={70}
-          width={W}
+          width={areaW}
           pointerEvents="none"
         >
-          <Circle cx={W * 0.3} cy={30} r={22} fill="#C0E0FF" opacity="0.8" />
-          <Circle cx={W * 0.5} cy={20} r={28} fill="#D0EAFF" opacity="0.9" />
-          <Circle cx={W * 0.7} cy={30} r={22} fill="#C0E0FF" opacity="0.8" />
-          <Rect x={W * 0.3 - 22} y={28} width={W * 0.4 + 44} height={22} fill="#D0EAFF" opacity="0.9" />
+          <Circle cx={areaW * 0.3} cy={30} r={22} fill="#C0E0FF" opacity="0.8" />
+          <Circle cx={areaW * 0.5} cy={20} r={28} fill="#D0EAFF" opacity="0.9" />
+          <Circle cx={areaW * 0.7} cy={30} r={22} fill="#C0E0FF" opacity="0.8" />
+          <Rect
+            x={areaW * 0.3 - 22} y={28}
+            width={areaW * 0.4 + 44} height={22}
+            fill="#D0EAFF" opacity="0.9"
+          />
         </Svg>
-      )}
 
+        <Text style={styles.hint}>{hint}</Text>
+        <Text style={[styles.progress, { color }]}>
+          {collected.size} / {items.length} collected
+        </Text>
+
+        {items.map((_, idx) => {
+          const done = collected.has(idx);
+          if (done) return null;
+
+          return (
+            <Animated.View
+              key={idx}
+              style={{
+                position: 'absolute',
+                left: mannaAnims[idx].x,
+                top:  mannaAnims[idx].y,
+              }}
+              pointerEvents="box-none"
+            >
+              <TouchableOpacity
+                style={getItemStyle(false)}
+                onPress={() => handleCollect(idx)}
+                activeOpacity={0.7}
+              >
+                <MannaSprite collected={false} />
+              </TouchableOpacity>
+            </Animated.View>
+          );
+        })}
+      </>
+    );
+  }
+
+  // ── Standard collect render ─────────────────────────────────────────────
+
+  return (
+    <>
       {/* River background for jordan */}
       {taskId === 'jordan_river' && (
         <View
           style={{
             position: 'absolute',
-            left: 0,
-            right: 0,
-            top: H * 0.3,
-            height: H * 0.2,
+            left: 0, right: 0,
+            top: areaH * 0.3,
+            height: areaH * 0.2,
             backgroundColor: 'rgba(0,100,200,0.2)',
           }}
           pointerEvents="none"
@@ -321,28 +474,9 @@ export default function CollectTask({ config, onSuccess, onFail, taskId }) {
         {collected.size} / {items.length} collected
       </Text>
 
-      {items.map((item, idx) => {
+      {positions && items.map((item, idx) => {
         const pos  = positions[idx];
         const done = collected.has(idx);
-
-        if (isRain && rainAnims) {
-          return (
-            <Animated.View
-              key={idx}
-              style={[{ position: 'absolute', left: pos.x }, { top: rainAnims[idx] }]}
-              pointerEvents="box-none"
-            >
-              <TouchableOpacity
-                style={getItemStyle(done)}
-                onPress={() => handleCollect(idx)}
-                activeOpacity={0.7}
-                disabled={done}
-              >
-                {renderItemContent(idx, done)}
-              </TouchableOpacity>
-            </Animated.View>
-          );
-        }
 
         return (
           <TouchableOpacity
@@ -356,7 +490,7 @@ export default function CollectTask({ config, onSuccess, onFail, taskId }) {
           </TouchableOpacity>
         );
       })}
-    </View>
+    </>
   );
 }
 
@@ -386,7 +520,6 @@ const styles = StyleSheet.create({
     marginTop:  2,
     letterSpacing: 2,
   },
-  // Waldo-mode compact card
   waldoCard: {
     width:        64,
     height:       72,
@@ -400,8 +533,8 @@ const styles = StyleSheet.create({
     elevation:     4,
   },
   waldoCardDone: {
-    borderColor:       colors.accent.neonGreen,
-    backgroundColor:  'rgba(0,255,159,0.12)',
+    borderColor:      colors.accent.neonGreen,
+    backgroundColor: 'rgba(0,255,159,0.12)',
   },
   waldoCardInner: {
     flex:           1,
@@ -411,7 +544,6 @@ const styles = StyleSheet.create({
   waldoIcon: {
     fontSize: 28,
   },
-  // Default circle
   item: {
     width:        70,
     height:       70,
@@ -431,7 +563,6 @@ const styles = StyleSheet.create({
     borderColor:     colors.accent.neonGreen,
     shadowColor:     colors.accent.neonGreen,
   },
-  // Rectangular card (pauls_belongings fallback)
   itemCard: {
     width:        80,
     height:       90,
@@ -446,7 +577,6 @@ const styles = StyleSheet.create({
     shadowRadius:  8,
     elevation:     5,
   },
-  // Stone oval (jordan_river)
   itemStone: {
     width:        65,
     height:       45,
@@ -460,24 +590,22 @@ const styles = StyleSheet.create({
     elevation:     4,
     backgroundColor: 'rgba(139,156,176,0.1)',
   },
-  // Diamond shape (manna_wilderness)
-  itemDiamond: {
+  itemManna: {
     width:        56,
     height:       56,
-    borderRadius: 8,
+    borderRadius: 28,
     borderWidth:  2,
     justifyContent: 'center',
     alignItems:   'center',
-    transform:    [{ rotate: '45deg' }],
+    shadowColor:  '#DEB887',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation:    5,
+    shadowRadius:  8,
+    elevation:     5,
   },
   itemIcon: {
     fontSize: 18,
     color:    colors.primary.electricBlue,
-    transform: [{ rotate: '0deg' }],
   },
   itemLabel: {
     fontFamily: fonts.ui.semiBold,

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, TouchableOpacity, PanResponder, StyleSheet } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { colors } from '../theme/colors';
@@ -15,34 +15,69 @@ const ERASE_RADIUS = 0.05; // 5% of canvas — comfortable finger-width
  * Props:
  *   onSketchChange(sketchData) — called on every stroke completion (finger lift)
  *                                sketchData = { strokes: [[{x, y}, ...], ...] }
+ *   style — optional style for the wrapper View (e.g. { flex: 1 })
+ *
+ * Ref methods:
+ *   getSketchData() — returns { strokes: [...] } including any in-progress stroke
  */
-export default function SketchCanvas({ onSketchChange }) {
+const SketchCanvas = forwardRef(function SketchCanvas({ onSketchChange, style }, ref) {
   const [strokes, setStrokes] = useState([]); // completed strokes
   const [currentStroke, setCurrentStroke] = useState([]); // in-progress stroke
   const [mode, setMode] = useState('draw'); // 'draw' | 'erase'
 
   const canvasSizeRef = useRef({ width: 1, height: 1 });
+  const canvasPositionRef = useRef({ x: 0, y: 0 }); // absolute window position
+  const canvasViewRef = useRef(null);
   const currentStrokeRef = useRef([]); // mirror of currentStroke to avoid stale closure
+  const strokesRef = useRef([]); // mirror of strokes state for ref access
   const modeRef = useRef('draw'); // mirror of mode to avoid stale closure in PanResponder
-  const strokesAfterReleaseRef = useRef([]); // holds computed next-strokes value across the updater/notify boundary
+  const onSketchChangeRef = useRef(onSketchChange);
+  onSketchChangeRef.current = onSketchChange;
+
+  // Expose getSketchData for parent (e.g. auto-submit on timeout)
+  useImperativeHandle(ref, () => ({
+    getSketchData: () => {
+      const completed = strokesRef.current;
+      const inProgress = currentStrokeRef.current;
+      const all = inProgress.length > 0 ? [...completed, inProgress] : completed;
+      return { strokes: all };
+    },
+  }));
+
+  // Compute normalized + clamped point from a touch event using pageX/pageY.
+  // canvasPositionRef is re-computed on every grant using the reliable
+  // locationX/locationY from the initial touch (avoids async measureInWindow).
+  const getPointFromEvent = useRef((evt) => {
+    const { pageX, pageY } = evt.nativeEvent;
+    const { width, height } = canvasSizeRef.current;
+    const { x: cx, y: cy } = canvasPositionRef.current;
+    return {
+      x: Math.max(0, Math.min(1, (pageX - cx) / width)),
+      y: Math.max(0, Math.min(1, (pageY - cy) / height)),
+    };
+  }).current;
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      // Prevent ScrollView or other gesture handlers from stealing the touch
+      onPanResponderTerminationRequest: () => false,
 
       onPanResponderGrant: (evt) => {
-        const { locationX, locationY } = evt.nativeEvent;
-        const { width, height } = canvasSizeRef.current;
-        const point = { x: locationX / width, y: locationY / height };
+        // Derive the canvas origin from the initial touch: locationX/locationY
+        // is reliable on grant (target hasn't changed yet). This avoids
+        // depending on the async measureInWindow result.
+        const { pageX, pageY, locationX, locationY } = evt.nativeEvent;
+        canvasPositionRef.current = { x: pageX - locationX, y: pageY - locationY };
+
+        const point = getPointFromEvent(evt);
         currentStrokeRef.current = [point];
         setCurrentStroke([point]);
       },
 
       onPanResponderMove: (evt) => {
-        const { locationX, locationY } = evt.nativeEvent;
-        const { width, height } = canvasSizeRef.current;
-        const point = { x: locationX / width, y: locationY / height };
+        const point = getPointFromEvent(evt);
         currentStrokeRef.current = [...currentStrokeRef.current, point];
         setCurrentStroke([...currentStrokeRef.current]);
       },
@@ -51,11 +86,6 @@ export default function SketchCanvas({ onSketchChange }) {
         const stroke = currentStrokeRef.current;
         if (stroke.length === 0) return;
 
-        // Compute the new strokes value first, then call setStrokes and
-        // onSketchChange separately.  Calling onSketchChange (which calls
-        // setSketchData in the parent) from *inside* a setState functional
-        // updater triggers React's "update a component while rendering
-        // another component" error because updaters run during reconciliation.
         if (modeRef.current === 'erase') {
           setStrokes((prev) => {
             const next = prev.filter(
@@ -63,25 +93,24 @@ export default function SketchCanvas({ onSketchChange }) {
                 stroke.some((ep) => Math.hypot(sp.x - ep.x, sp.y - ep.y) < ERASE_RADIUS)
               )
             );
-            // Store result so we can notify the parent after the state update.
-            strokesAfterReleaseRef.current = next;
+            strokesRef.current = next;
             return next;
           });
         } else {
           setStrokes((prev) => {
             const next = [...prev, stroke];
-            strokesAfterReleaseRef.current = next;
+            strokesRef.current = next;
             return next;
           });
         }
+
         // Notify parent outside the updater so it doesn't trigger a
         // cross-component setState during reconciliation.
-        if (onSketchChange) {
-          // Use a microtask so the strokes state has been committed first.
-          Promise.resolve().then(() => {
-            if (onSketchChange) onSketchChange({ strokes: strokesAfterReleaseRef.current });
-          });
-        }
+        Promise.resolve().then(() => {
+          if (onSketchChangeRef.current) {
+            onSketchChangeRef.current({ strokes: strokesRef.current });
+          }
+        });
 
         currentStrokeRef.current = [];
         setCurrentStroke([]);
@@ -97,9 +126,21 @@ export default function SketchCanvas({ onSketchChange }) {
 
   const handleClear = () => {
     setStrokes([]);
+    strokesRef.current = [];
     setCurrentStroke([]);
     currentStrokeRef.current = [];
-    if (onSketchChange) onSketchChange({ strokes: [] });
+    if (onSketchChangeRef.current) onSketchChangeRef.current({ strokes: [] });
+  };
+
+  const handleLayout = (e) => {
+    const { width, height } = e.nativeEvent.layout;
+    canvasSizeRef.current = { width, height };
+    // Measure absolute window position for pageX/pageY calculations
+    if (canvasViewRef.current?.measureInWindow) {
+      canvasViewRef.current.measureInWindow((x, y) => {
+        canvasPositionRef.current = { x, y };
+      });
+    }
   };
 
   const strokeToPath = (points, w, h) => {
@@ -115,13 +156,11 @@ export default function SketchCanvas({ onSketchChange }) {
   const isErasing = mode === 'erase';
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, style]}>
       <View
+        ref={canvasViewRef}
         style={[styles.canvas, isErasing && styles.canvasEraseMode]}
-        onLayout={(e) => {
-          const { width, height } = e.nativeEvent.layout;
-          canvasSizeRef.current = { width, height };
-        }}
+        onLayout={handleLayout}
         {...panResponder.panHandlers}
       >
         <Svg style={StyleSheet.absoluteFill}>
@@ -166,15 +205,17 @@ export default function SketchCanvas({ onSketchChange }) {
       </View>
     </View>
   );
-}
+});
+
+export default SketchCanvas;
 
 const styles = StyleSheet.create({
   wrapper: {
-    gap: 12,
+    gap: 10,
   },
   canvas: {
-    width: '100%',
-    aspectRatio: 1,
+    flex: 1,
+    minHeight: 180,
     backgroundColor: colors.background.void,
     borderRadius: 12,
     borderWidth: 1,

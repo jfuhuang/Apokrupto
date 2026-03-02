@@ -41,6 +41,15 @@ const TASKS = [
   { id: 'prophets_quiz',      points: { alive: 90,  dead: 54 } },
   { id: 'parables_quiz',      points: { alive: 75,  dead: 45 } },
   { id: 'acts_quiz',          points: { alive: 85,  dead: 51 } },
+
+  // Patience (don't tap)
+  { id: 'still_waters',       points: { alive: 70,  dead: 42 } },
+  { id: 'be_still',           points: { alive: 80,  dead: 48 } },
+  { id: 'wait_on_the_lord',   points: { alive: 90,  dead: 54 } },
+
+  // Build (drag & drop)
+  { id: 'nehemiah_wall',      points: { alive: 130, dead: 78 } },
+  { id: 'building_the_altar', points: { alive: 150, dead: 90 } },
 ];
 
 const taskMap = new Map(TASKS.map((t) => [t.id, t]));
