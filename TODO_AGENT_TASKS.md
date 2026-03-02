@@ -272,7 +272,7 @@ Replace with "Sus" and append `<SusIcon />` next to the text.
 
 ---
 
-## TASK 4 — Skotia Balance Improvements
+## ✅ TASK 4 — Skotia Balance Improvements *(COMPLETE)*
 
 > Can be implemented after Task 1B (which establishes the new round order).
 
@@ -347,14 +347,14 @@ If `summary.survivalBonus > 0`, show a line: "🌑 Skotia survival bonus: +{surv
 ({summary.survivingSkotia} members undetected)"
 
 **Acceptance criteria:**
-- [ ] Surviving Skotia members earn `+100` pts per round they go undetected
-- [ ] `FALSE_MARK` point award is `100` (not `150`)
-- [ ] Supermajority threshold is `0.75`
-- [ ] Round summary screen shows survival bonus when applicable
+- [x] Surviving Skotia members earn `+100` pts per round they go undetected
+- [x] `FALSE_MARK` point award is `100` (not `150`)
+- [x] Supermajority threshold is `0.75`
+- [x] Round summary screen shows survival bonus when applicable
 
 ---
 
-## TASK 5 — Stress Test Client
+## ✅ TASK 5 — Stress Test Client *(COMPLETE)*
 
 > This is a standalone test utility. No production code changes required.
 
@@ -453,10 +453,10 @@ TEST_PLAYER_COUNT=50
 ```
 
 **Acceptance criteria:**
-- [ ] Script creates 50 bots, has them go through a 2-round game without errors
-- [ ] Metrics are printed after completion
-- [ ] All socket connections clean up on game over (no orphaned connections)
-- [ ] Script exits with code `0` on success, `1` if any fatal errors occurred
+- [x] Script creates 50 bots, has them go through a 2-round game without errors
+- [x] Metrics are printed after completion
+- [x] All socket connections clean up on game over (no orphaned connections)
+- [x] Script exits with code `0` on success, `1` if any fatal errors occurred
 
 ---
 

@@ -7,11 +7,12 @@ const votingService = require('./votingService');
 // ---------------------------------------------------------------------------
 const POINTS = {
   CORRECT_SUS:   200, // Phos sus's Skotia → Phos earns
-  FALSE_SUS:     150, // Phos sus's Phos   → Skotia earns
+  FALSE_SUS:     100, // Phos sus's Phos   → Skotia earns (was 150 — lowered to reduce random-marking incentive)
   CORRECT_CLEAR: 150, // Clear Phos (vindication) → Phos earns
   FALSE_CLEAR:   200, // Clear Skotia (re-hides)  → Skotia earns
   SKOTIA_PASSIVE:  50, // Skotia flat bonus per Movement B
   SUS_CHALLENGE_MULTIPLIER: 0.5, // Sus players earn 50% of task points
+  SKOTIA_SURVIVAL_PER_PLAYER: 100, // Per undetected Skotia per voting round
 };
 
 // Local copy of voting duration used in activateC step (avoids re-require)
@@ -771,7 +772,23 @@ async function _resolveVoting(client, gameId, roundNumber) {
     );
   }
 
-  return { susApplied, clearedApplied, phosPointsEarned, skotiaPointsEarned, groupResults };
+  // Skotia survival bonus: +100 per undetected Skotia
+  const survivalRes = await client.query(
+    `SELECT COUNT(*) AS count FROM game_players
+     WHERE game_id = $1 AND team = 'skotia' AND is_marked = false`,
+    [gameId]
+  );
+  const survivingSkotia = parseInt(survivalRes.rows[0].count, 10);
+  const survivalBonus = survivingSkotia * POINTS.SKOTIA_SURVIVAL_PER_PLAYER;
+  if (survivalBonus > 0) {
+    await client.query(
+      "UPDATE game_teams SET points = points + $1 WHERE game_id = $2 AND team = 'skotia'",
+      [survivalBonus, gameId]
+    );
+    skotiaPointsEarned += survivalBonus;
+  }
+
+  return { susApplied, clearedApplied, phosPointsEarned, skotiaPointsEarned, groupResults, survivalBonus, survivingSkotia };
 }
 
 // ---------------------------------------------------------------------------
@@ -788,7 +805,7 @@ async function _checkSupermajority(client, gameId) {
   );
   const { total_skotia, marked_skotia } = res.rows[0];
   if (parseInt(total_skotia, 10) === 0) return false;
-  return parseInt(marked_skotia, 10) / parseInt(total_skotia, 10) >= 0.80;
+  return parseInt(marked_skotia, 10) / parseInt(total_skotia, 10) >= 0.75;
 }
 
 // ---------------------------------------------------------------------------
@@ -851,10 +868,12 @@ async function _endGame(client, gameId, winner, condition) {
 function _buildSummary(votingResult, roundNumber) {
   return {
     roundNumber,
-    susApplied:     votingResult.susApplied,
-    clearedApplied: votingResult.clearedApplied,
-    phosPoints:     votingResult.phosPointsEarned,
-    skotiaPoints:   votingResult.skotiaPointsEarned,
+    susApplied:      votingResult.susApplied,
+    clearedApplied:  votingResult.clearedApplied,
+    phosPoints:      votingResult.phosPointsEarned,
+    skotiaPoints:    votingResult.skotiaPointsEarned,
+    survivalBonus:   votingResult.survivalBonus || 0,
+    survivingSkotia: votingResult.survivingSkotia || 0,
   };
 }
 

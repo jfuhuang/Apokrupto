@@ -59,6 +59,8 @@ export default function RoundSummaryScreen({
   const clearedApplied = summary?.clearedApplied ?? 0;
   const phosPoints = summary?.phosPoints ?? 0;
   const skotiaPoints = summary?.skotiaPoints ?? 0;
+  const survivalBonus = summary?.survivalBonus ?? 0;
+  const survivingSkotia = summary?.survivingSkotia ?? 0;
 
   return (
     <View style={styles.container}>
@@ -100,6 +102,20 @@ export default function RoundSummaryScreen({
               </View>
             )}
           </View>
+
+          {/* Skotia survival bonus */}
+          {survivalBonus > 0 && (
+            <View style={[styles.card, styles.survivalCard]}>
+              <Text style={styles.cardLabel}>SKOTIA SURVIVAL BONUS</Text>
+              <View style={styles.statRow}>
+                <Text style={[styles.statValue, { color: colors.primary.neonRed }]}>+{survivalBonus}</Text>
+                <Text style={styles.statDesc}>pts</Text>
+              </View>
+              <Text style={styles.survivalDetail}>
+                {survivingSkotia} Skotia member{survivingSkotia !== 1 ? 's' : ''} undetected
+              </Text>
+            </View>
+          )}
 
           {/* Points summary */}
           <View style={styles.pointsRow}>
@@ -194,6 +210,15 @@ const styles = StyleSheet.create({
   statDesc: {
     ...typography.body,
     color: colors.text.secondary,
+  },
+  survivalCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary.neonRed,
+  },
+  survivalDetail: {
+    ...typography.small,
+    color: colors.text.tertiary,
+    textAlign: 'center',
   },
   pointsRow: {
     width: '100%',
