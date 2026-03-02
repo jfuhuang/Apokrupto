@@ -13,6 +13,7 @@ import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
 import { MOVEMENT_NAMES } from '../../constants/movementNames';
+import SusIcon from '../../components/SusIcon';
 import { TASKS, TASK_CATEGORY } from '../../data/tasks';
 import { submitMovementBTask } from '../../utils/api';
 import TaskScreen from '../tasks/TaskScreen';
@@ -250,6 +251,7 @@ export default function MovementBScreen({
         {/* ── Sus penalty banner ── */}
         {isSus && (
           <View style={styles.susBanner}>
+            <SusIcon size={14} />
             <Text style={styles.susBannerText}>
               SUS PENALTY ACTIVE — Tasks earn 50% points
             </Text>
@@ -510,6 +512,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
     paddingVertical: 6,
     paddingHorizontal: 14,
     backgroundColor: colors.primary.neonRed + '20',

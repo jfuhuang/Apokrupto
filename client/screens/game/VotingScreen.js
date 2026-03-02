@@ -12,6 +12,7 @@ import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
 import { MOVEMENT_NAMES } from '../../constants/movementNames';
+import SusIcon from '../../components/SusIcon';
 
 export default function VotingScreen({
   token,
@@ -180,6 +181,7 @@ export default function VotingScreen({
           </Text>
           {member.isSus && (
             <View style={styles.currentSusBadge}>
+              <SusIcon size={12} />
               <Text style={styles.currentSusText}>SUS</Text>
             </View>
           )}
@@ -208,12 +210,15 @@ export default function VotingScreen({
           {susResults.map((r) => (
             <View key={r.userId} style={styles.previewRow}>
               <Text style={styles.previewName}>{r.username}</Text>
-              <Text style={[
-                styles.previewAction,
-                r.action === 'sus' ? { color: colors.primary.neonRed } : { color: colors.accent.neonGreen },
-              ]}>
-                {r.action === 'sus' ? 'SUS' : 'CLEARED'}
-              </Text>
+              <View style={styles.previewActionRow}>
+                {r.action === 'sus' && <SusIcon size={12} />}
+                <Text style={[
+                  styles.previewAction,
+                  r.action === 'sus' ? { color: colors.primary.neonRed } : { color: colors.accent.neonGreen },
+                ]}>
+                  {r.action === 'sus' ? 'SUS' : 'CLEARED'}
+                </Text>
+              </View>
             </View>
           ))}
         </View>
@@ -364,6 +369,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   currentSusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
     backgroundColor: 'rgba(255, 51, 102, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.35)',
@@ -475,6 +483,11 @@ const styles = StyleSheet.create({
   previewName: {
     ...typography.body,
     color: colors.text.primary,
+  },
+  previewActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   previewAction: {
     fontFamily: fonts.display.bold,

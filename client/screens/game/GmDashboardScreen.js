@@ -14,6 +14,7 @@ import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
 import { MOVEMENT_NAMES } from '../../constants/movementNames';
+import SusIcon from '../../components/SusIcon';
 
 export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, onLobbyGone }) {
   const [players, setPlayers] = useState([]);
@@ -308,7 +309,7 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
                         >
                           {m.username}
                         </Text>
-                        {m.isSus && <View style={styles.susDot} />}
+                        {m.isSus && <SusIcon size={12} />}
                       </View>
                     ))}
                   </View>
@@ -323,7 +324,7 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
             {skotiaPlayers.map((p) => (
               <View key={p.id} style={[styles.playerRow, styles.skotiaRow]}>
                 <Text style={[styles.playerName, { color: colors.primary.neonRed }]}>{p.username}</Text>
-                {p.isSus && <View style={styles.susDot} />}
+                {p.isSus && <SusIcon size={12} />}
               </View>
             ))}
           </View>
@@ -334,7 +335,7 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
             {phosPlayers.map((p) => (
               <View key={p.id} style={styles.playerRow}>
                 <Text style={[styles.playerName, { color: colors.primary.electricBlue }]}>{p.username}</Text>
-                {p.isSus && <View style={[styles.susDot, { backgroundColor: colors.primary.neonRed }]} />}}
+                {p.isSus && <SusIcon size={12} />}
               </View>
             ))}
           </View>
@@ -540,12 +541,6 @@ const styles = StyleSheet.create({
   },
   playerName: {
     ...typography.body,
-  },
-  susDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary.neonRed,
   },
   groupCard: {
     backgroundColor: colors.background.void,

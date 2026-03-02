@@ -5,6 +5,7 @@ import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
+import SusIcon from '../../components/SusIcon';
 
 export default function RoundSummaryScreen({
   roundNumber,
@@ -76,9 +77,12 @@ export default function RoundSummaryScreen({
           {isSus !== undefined && isSus !== null && (
             <View style={[styles.statusCard, isSus && styles.statusCardSus]}>
               <Text style={styles.statusLabel}>YOUR STATUS</Text>
-              <Text style={[styles.statusValue, { color: isSus ? colors.primary.neonRed : colors.accent.neonGreen }]}>
-                {isSus ? 'SUS ●' : 'CLEAR ●'}
-              </Text>
+              <View style={styles.statusRow}>
+                {isSus && <SusIcon size={16} />}
+                <Text style={[styles.statusValue, { color: isSus ? colors.primary.neonRed : colors.accent.neonGreen }]}>
+                  {isSus ? 'SUS' : 'CLEAR'}
+                </Text>
+              </View>
             </View>
           )}
 
@@ -242,6 +246,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 3,
     color: colors.text.tertiary,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   statusValue: {
     fontFamily: fonts.accent.bold,

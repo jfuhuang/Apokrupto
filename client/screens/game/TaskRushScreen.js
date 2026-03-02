@@ -14,6 +14,7 @@ import { fonts } from '../../theme/typography';
 import { TASKS, TASK_CATEGORY, MECHANIC } from '../../data/tasks';
 import { submitMovementBTask } from '../../utils/api';
 import RushResultOverlay from '../tasks/components/RushResultOverlay';
+import SusIcon from '../../components/SusIcon';
 
 // Mechanic components (same imports as TaskScreen)
 import SlingTask from '../tasks/mechanics/SlingTask';
@@ -306,6 +307,7 @@ export default function TaskRushScreen({
         {/* ── Sus penalty banner ── */}
         {isSus && (
           <View style={styles.susBanner}>
+            <SusIcon size={12} />
             <Text style={styles.susBannerText}>SUS PENALTY — 50% PTS</Text>
           </View>
         )}
@@ -450,7 +452,10 @@ const styles = StyleSheet.create({
 
   // ── Sus penalty banner ─────────────────────────────────────────────────
   susBanner: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     paddingVertical: 4,
     backgroundColor: colors.primary.neonRed + '20',
     borderBottomWidth: 1,

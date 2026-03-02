@@ -15,7 +15,7 @@ const SHARED_STYLE = {
 const ROLE_CONFIG = {
   phos: {
     label: 'ΦΩΣ',
-    description: 'You are the light. Work with your group to find and mark the Skotia among you.',
+    description: 'You are the light. Work with your group to find and sus the Skotia among you.',
     ...SHARED_STYLE,
   },
   skotia: {

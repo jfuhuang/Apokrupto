@@ -10,6 +10,7 @@ import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
 import { MOVEMENT_NAMES, MOVEMENT_LABELS_SHORT } from '../../constants/movementNames';
+import SusIcon from '../../components/SusIcon';
 
 // Display order matches the new A → C → B round sequence
 const MOVEMENT_SEQUENCE = ['A', 'C', 'B'];
@@ -240,6 +241,7 @@ export default function RoundHubScreen({
             <Text style={styles.groupLabel}>{groupLabel}</Text>
             {isSus && (
               <View style={styles.selfSusBadge}>
+                <SusIcon size={14} />
                 <Text style={styles.selfSusText}>YOU ARE SUS</Text>
               </View>
             )}
@@ -271,6 +273,7 @@ export default function RoundHubScreen({
                     {member.isYou && <Text style={styles.youTag}>you</Text>}
                     {member.isSus && (
                       <View style={styles.susBadge}>
+                        <SusIcon size={12} />
                         <Text style={styles.susBadgeText}>SUS</Text>
                       </View>
                     )}
@@ -439,6 +442,9 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
   },
   selfSusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: 'rgba(255, 51, 102, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.4)',
@@ -495,6 +501,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   susBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
     backgroundColor: 'rgba(255, 51, 102, 0.15)',
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.4)',
