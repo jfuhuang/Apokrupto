@@ -180,7 +180,7 @@ export default function VotingScreen({
           </Text>
           {member.isMarked && (
             <View style={styles.currentMarkBadge}>
-              <Text style={styles.currentMarkText}>MARKED</Text>
+              <Text style={styles.currentMarkText}>SUS</Text>
             </View>
           )}
           {!isVoted && (
@@ -212,7 +212,7 @@ export default function VotingScreen({
                 styles.previewAction,
                 r.action === 'mark' ? { color: colors.primary.neonRed } : { color: colors.accent.neonGreen },
               ]}>
-                {r.action === 'mark' ? 'MARKED' : 'UNMARKED'}
+                {r.action === 'mark' ? 'SUS' : 'CLEARED'}
               </Text>
             </View>
           ))}

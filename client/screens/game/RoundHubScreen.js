@@ -240,7 +240,7 @@ export default function RoundHubScreen({
             <Text style={styles.groupLabel}>{groupLabel}</Text>
             {isMarked && (
               <View style={styles.selfMarkedBadge}>
-                <Text style={styles.selfMarkedText}>YOU ARE MARKED</Text>
+                <Text style={styles.selfMarkedText}>YOU ARE SUS</Text>
               </View>
             )}
           </View>
@@ -271,7 +271,7 @@ export default function RoundHubScreen({
                     {member.isYou && <Text style={styles.youTag}>you</Text>}
                     {member.isMarked && (
                       <View style={styles.markBadge}>
-                        <Text style={styles.markBadgeText}>MARKED</Text>
+                        <Text style={styles.markBadgeText}>SUS</Text>
                       </View>
                     )}
                   </View>

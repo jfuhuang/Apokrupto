@@ -1221,7 +1221,7 @@
           ${g.members.map(m => `
             <div class="group-member">
               <span class="group-member-name${m.isMarked ? ' marked' : ''}">${escHtml(m.username)}</span>
-              ${m.isMarked ? '<span class="group-member-mark">MARKED</span>' : ''}
+              ${m.isMarked ? '<span class="group-member-mark">SUS</span>' : ''}
             </div>
           `).join('')}
         </div>
