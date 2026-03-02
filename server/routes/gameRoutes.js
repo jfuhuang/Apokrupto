@@ -252,7 +252,7 @@ router.get('/:gameId/gm-state', auth, async (req, res) => {
         id:       String(row.user_id),
         username: row.username,
         team:     row.team,
-        isMarked: row.is_marked,
+        isSus: row.is_marked,
       });
     });
     const groups = Array.from(groupMap.values()).sort((a, b) => a.groupIndex - b.groupIndex);
@@ -262,7 +262,7 @@ router.get('/:gameId/gm-state', auth, async (req, res) => {
         id:       String(p.id),
         username: p.username,
         team:     p.team,
-        isMarked: p.is_marked,
+        isSus:    p.is_marked,
       })),
       groups,
       gameState: {
@@ -348,7 +348,7 @@ router.get('/:gameId/movement-a/prompt', auth, async (req, res) => {
             groupId:    r.group_id,
             groupIndex: r.group_index,
             memberIds:  r.member_ids,
-            members:    r.member_ids.map((id) => ({ id, username: id, isMarked: false })),
+            members:    r.member_ids.map((id) => ({ id, username: id, isSus: false })),
           }));
           const missingGroups = allGroups.filter((g) => !getGroupTurnState(String(g.groupId)));
           if (missingGroups.length > 0) {
@@ -746,7 +746,7 @@ router.post('/:gameId/movement-b/complete', auth, async (req, res) => {
     const rawPoints = basePoints + cappedBonus;
     const isSusPenaltyApplied = !!is_marked;
     const pointsEarned = isSusPenaltyApplied
-      ? Math.floor(rawPoints * POINTS.MARKED_CHALLENGE_MULTIPLIER)
+      ? Math.floor(rawPoints * POINTS.SUS_CHALLENGE_MULTIPLIER)
       : rawPoints;
 
     // 4. Award to team

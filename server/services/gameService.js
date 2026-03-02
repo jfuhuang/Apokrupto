@@ -6,12 +6,12 @@ const votingService = require('./votingService');
 // Point constants
 // ---------------------------------------------------------------------------
 const POINTS = {
-  CORRECT_MARK:   200, // Phos marks Skotia → Phos earns
-  FALSE_MARK:     150, // Phos marks Phos   → Skotia earns
-  CORRECT_UNMARK: 150, // Unmark Phos (vindication) → Phos earns
-  FALSE_UNMARK:   200, // Unmark Skotia (re-hides)  → Skotia earns
+  CORRECT_SUS:   200, // Phos sus's Skotia → Phos earns
+  FALSE_SUS:     150, // Phos sus's Phos   → Skotia earns
+  CORRECT_CLEAR: 150, // Clear Phos (vindication) → Phos earns
+  FALSE_CLEAR:   200, // Clear Skotia (re-hides)  → Skotia earns
   SKOTIA_PASSIVE:  50, // Skotia flat bonus per Movement B
-  MARKED_CHALLENGE_MULTIPLIER: 0.5, // Sus players earn 50% of task points
+  SUS_CHALLENGE_MULTIPLIER: 0.5, // Sus players earn 50% of task points
 };
 
 // Local copy of voting duration used in activateC step (avoids re-require)
@@ -48,7 +48,7 @@ async function _getGroupsWithMembers(client, gameId, roundNumber) {
   );
   const userMap = {};
   userRes.rows.forEach((r) => {
-    userMap[String(r.id)] = { username: r.username, isMarked: r.is_marked };
+    userMap[String(r.id)] = { username: r.username, isSus: r.is_marked };
   });
 
   const groups = [];
@@ -62,7 +62,7 @@ async function _getGroupsWithMembers(client, gameId, roundNumber) {
     const members = memberIds.map((id) => ({
       id,
       username: userMap[id]?.username ?? id,
-      isMarked: userMap[id]?.isMarked ?? false,
+      isSus: userMap[id]?.isSus ?? false,
     }));
     const group = { groupId: groupRow.group_id, groupIndex: groupRow.group_index, memberIds, members };
     groups.push(group);
@@ -303,7 +303,7 @@ async function startGame(gameId, options = {}) {
       const memberInfos = group.memberIds.map((id) => ({
         id,
         username: userIdToUsername[id],
-        isMarked: false,
+        isSus: false,
       }));
       for (const memberId of group.memberIds) {
         playerGroups.set(memberId, {
@@ -467,7 +467,7 @@ async function advanceMovement(gameId) {
       );
 
       const votingResult = await _resolveVoting(client, gameId, roundNumber);
-      console.log(`[Game] Voting resolved at completeC game=${gameId} round=${roundNumber}: marks=${votingResult.marksApplied} unmarks=${votingResult.unmarksApplied} phos=+${votingResult.phosPointsEarned} skotia=+${votingResult.skotiaPointsEarned}`);
+      console.log(`[Game] Voting resolved at completeC game=${gameId} round=${roundNumber}: sus'd=${votingResult.susApplied} cleared=${votingResult.clearedApplied} phos=+${votingResult.phosPointsEarned} skotia=+${votingResult.skotiaPointsEarned}`);
 
       // Supermajority is only an instant-win condition on the final round.
       const isFinalRound = roundNumber >= totalRounds;
@@ -479,7 +479,7 @@ async function advanceMovement(gameId) {
         'SELECT user_id::text, is_marked FROM game_players WHERE game_id = $1',
         [gameId]
       );
-      const isMarkedMap = new Map(marksRes.rows.map((r) => [r.user_id, r.is_marked]));
+      const isSusMap = new Map(marksRes.rows.map((r) => [r.user_id, r.is_marked]));
 
       // Persist voting summary so summarizeRound can emit it after Challenges finish
       const votingSummary = _buildSummary(votingResult, roundNumber);
@@ -497,7 +497,7 @@ async function advanceMovement(gameId) {
           summary:      votingSummary,
           groupResults: votingResult.groupResults,
           gameOverData,
-          isMarkedMap,
+          isSusMap,
           lobbyId: String(lobbyId),
           gameId:  String(gameId),
         };
@@ -507,7 +507,7 @@ async function advanceMovement(gameId) {
       return {
         step:         'completeC',
         groupResults: votingResult.groupResults,
-        isMarkedMap,
+        isSusMap,
         lobbyId: String(lobbyId),
         gameId:  String(gameId),
       };
@@ -613,14 +613,14 @@ async function advanceMovement(gameId) {
         [gameId]
       );
       const userMap = {};
-      userRes.rows.forEach((r) => { userMap[String(r.id)] = { username: r.username, isMarked: r.is_marked }; });
+      userRes.rows.forEach((r) => { userMap[String(r.id)] = { username: r.username, isSus: r.is_marked }; });
 
       const enrichedGroups = newGroups.map((g) => ({
         ...g,
         members: g.memberIds.map((id) => ({
           id,
           username: userMap[id]?.username ?? id,
-          isMarked: userMap[id]?.isMarked ?? false,
+          isSus: userMap[id]?.isSus ?? false,
         })),
       }));
 
@@ -678,8 +678,8 @@ async function _resolveVoting(client, gameId, roundNumber) {
     [gameId, roundNumber]
   );
 
-  let marksApplied     = 0;
-  let unmarksApplied   = 0;
+  let susApplied       = 0;
+  let clearedApplied   = 0;
   let phosPointsEarned   = 0;
   let skotiaPointsEarned = 0;
   const groupResults = new Map();
@@ -703,7 +703,7 @@ async function _resolveVoting(client, gameId, roundNumber) {
 
     for (const member of membersRes.rows) {
       const targetId   = String(member.user_id);
-      const isMarked   = member.is_marked;
+      const isSus      = member.is_marked;
       const isSkotia   = member.team === 'skotia';
 
       const votesForTarget = votesRes.rows.filter(
@@ -718,33 +718,33 @@ async function _resolveVoting(client, gameId, roundNumber) {
       let action     = null;
       let wasCorrect = false;
 
-      if (!isMarked && majority === 'skotia') {
-        action     = 'mark';
+      if (!isSus && majority === 'skotia') {
+        action     = 'sus';
         wasCorrect = isSkotia;
         await client.query(
           'UPDATE game_players SET is_marked = true WHERE game_id = $1 AND user_id = $2',
           [gameId, targetId]
         );
-        marksApplied++;
-        if (wasCorrect) phosPointsEarned   += POINTS.CORRECT_MARK;
-        else            skotiaPointsEarned += POINTS.FALSE_MARK;
+        susApplied++;
+        if (wasCorrect) phosPointsEarned   += POINTS.CORRECT_SUS;
+        else            skotiaPointsEarned += POINTS.FALSE_SUS;
 
-      } else if (isMarked && majority === 'phos') {
-        action     = 'unmark';
+      } else if (isSus && majority === 'phos') {
+        action     = 'clear';
         wasCorrect = !isSkotia;
         await client.query(
           'UPDATE game_players SET is_marked = false WHERE game_id = $1 AND user_id = $2',
           [gameId, targetId]
         );
-        unmarksApplied++;
-        if (wasCorrect) phosPointsEarned   += POINTS.CORRECT_UNMARK;
-        else            skotiaPointsEarned += POINTS.FALSE_UNMARK;
+        clearedApplied++;
+        if (wasCorrect) phosPointsEarned   += POINTS.CORRECT_CLEAR;
+        else            skotiaPointsEarned += POINTS.FALSE_CLEAR;
       }
 
       if (action) {
-        // Insert mark_event (need the game_player row id)
+        // Insert sus_event (need the game_player row id)
         await client.query(
-          `INSERT INTO mark_events (game_id, game_player_id, round_number, action, was_correct)
+          `INSERT INTO sus_events (game_id, game_player_id, round_number, action, was_correct)
            SELECT $1, gp.id, $2, $3, $4
            FROM game_players gp
            WHERE gp.game_id = $1 AND gp.user_id = $5`,
@@ -771,7 +771,7 @@ async function _resolveVoting(client, gameId, roundNumber) {
     );
   }
 
-  return { marksApplied, unmarksApplied, phosPointsEarned, skotiaPointsEarned, groupResults };
+  return { susApplied, clearedApplied, phosPointsEarned, skotiaPointsEarned, groupResults };
 }
 
 // ---------------------------------------------------------------------------
@@ -807,7 +807,7 @@ async function cleanupGameData(gameId) {
   // Delete DB rows (rounds cascades → movements → movement_a_submissions + movement_c_votes)
   await pool.query('DELETE FROM rounds WHERE game_id = $1', [key]);
   await pool.query('DELETE FROM game_groups WHERE game_id = $1', [key]);
-  await pool.query('DELETE FROM mark_events WHERE game_id = $1', [key]);
+  await pool.query('DELETE FROM sus_events WHERE game_id = $1', [key]);
 }
 
 // ---------------------------------------------------------------------------
@@ -851,8 +851,8 @@ async function _endGame(client, gameId, winner, condition) {
 function _buildSummary(votingResult, roundNumber) {
   return {
     roundNumber,
-    marksApplied:   votingResult.marksApplied,
-    unmarksApplied: votingResult.unmarksApplied,
+    susApplied:     votingResult.susApplied,
+    clearedApplied: votingResult.clearedApplied,
     phosPoints:     votingResult.phosPointsEarned,
     skotiaPoints:   votingResult.skotiaPointsEarned,
   };
@@ -896,7 +896,7 @@ async function getPlayerState(gameId, userId) {
     groupMembers = membersRes.rows.map((m) => ({
       id:       String(m.user_id),
       username: m.username,
-      isMarked: m.is_marked,
+      isSus: m.is_marked,
       isYou:    String(m.user_id) === String(userId),
     }));
   }
@@ -938,7 +938,7 @@ async function getPlayerState(gameId, userId) {
 
   return {
     team,
-    isMarked:           is_marked,
+    isSus:              is_marked,
     groupId:            groupId ? String(groupId) : null,
     groupIndex,
     groupMembers,

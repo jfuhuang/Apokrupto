@@ -65,7 +65,7 @@ export default function MovementBScreen({
   currentTeam,
   roundNumber,
   movementBEndsAt: initialEndsAt,
-  isMarked,
+  isSus,
   onMovementComplete,
   onEnterRush,
 }) {
@@ -248,7 +248,7 @@ export default function MovementBScreen({
         </View>
 
         {/* ── Sus penalty banner ── */}
-        {isMarked && (
+        {isSus && (
           <View style={styles.susBanner}>
             <Text style={styles.susBannerText}>
               SUS PENALTY ACTIVE — Tasks earn 50% points

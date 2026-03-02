@@ -60,14 +60,14 @@ export default function App() {
   // All game state + handlers in one hook
   const { state, handlers, resetGameState, setters } = useGameState({ setCurrentScreen });
   const {
-    gameId, currentTeam, skotiaTeammates, isMarked, isGm,
+    gameId, currentTeam, skotiaTeammates, isSus, isGm,
     currentGroupId, currentGroupNumber, currentGroupMembers,
     teamPoints, currentRound, totalRounds, currentMovement,
     movementBEndsAt, roundSummary, gameOverResult,
   } = state;
   const {
     handleTeamAssigned, handleGameStarted, handleMovementReady,
-    handleMovementAComplete, handleMovementCComplete, handleMarkStatusUpdate,
+    handleMovementAComplete, handleMovementCComplete, handleSusStatusUpdate,
     handleRoundSummary, handleGameStateUpdate, handleRoundSetup,
     handleGameOver,
   } = handlers;
@@ -153,7 +153,7 @@ export default function App() {
         if (!stateOk) return;
 
         if (stateData.team)                  setters.setCurrentTeam(stateData.team);
-        if (stateData.isMarked !== undefined) setters.setIsMarked(stateData.isMarked);
+        if (stateData.isSus !== undefined) setters.setIsSus(stateData.isSus);
         if (stateData.teamPoints)            setters.setTeamPoints(stateData.teamPoints);
         if (stateData.currentRound)          setters.setCurrentRound(stateData.currentRound);
         if (stateData.totalRounds)           setters.setTotalRounds(stateData.totalRounds);
@@ -369,13 +369,13 @@ export default function App() {
             currentRound={currentRound}
             totalRounds={totalRounds}
             currentTeam={currentTeam}
-            isMarked={isMarked}
+            isSus={isSus}
             currentGroupMembers={currentGroupMembers}
             groupNumber={currentGroupNumber}
             teamPoints={teamPoints}
             onMovementReady={handleMovementReady}
             onGameStateUpdate={handleGameStateUpdate}
-            onMarkStatusUpdate={handleMarkStatusUpdate}
+            onSusStatusUpdate={handleSusStatusUpdate}
             onRoundSummary={handleRoundSummary}
             onRoundSetup={handleRoundSetup}
             onGameOver={handleGameOver}
@@ -407,9 +407,8 @@ export default function App() {
             currentTeam={currentTeam}
             roundNumber={currentRound}
             movementBEndsAt={movementBEndsAt}
-            isMarked={isMarked}
-            onMovementComplete={() => setCurrentScreen('roundHub')}
-            onEnterRush={() => setCurrentScreen('taskRush')}
+            isSus={isSus}
+            onMovementComplete={() => setCurrentScreen('roundHub')}={() => setCurrentScreen('taskRush')}
           />
         );
 
@@ -422,7 +421,7 @@ export default function App() {
             currentTeam={currentTeam}
             roundNumber={currentRound}
             movementBEndsAt={movementBEndsAt}
-            isMarked={isMarked}
+            isSus={isSus}
             onExitRush={() => setCurrentScreen('movementB')}
             onMovementComplete={() => setCurrentScreen('roundHub')}
           />
@@ -453,7 +452,7 @@ export default function App() {
             totalRounds={totalRounds}
             summary={roundSummary}
             isLastRound={currentRound >= totalRounds}
-            isMarked={isMarked}
+            isSus={isSus}
             token={token}
             lobbyId={currentLobbyId}
             onRoundSetup={handleRoundSetup}

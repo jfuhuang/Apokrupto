@@ -11,7 +11,7 @@ export default function RoundSummaryScreen({
   totalRounds,
   summary,
   isLastRound,
-  isMarked,
+  isSus,
   token,
   lobbyId,
   onRoundSetup,
@@ -54,8 +54,8 @@ export default function RoundSummaryScreen({
     };
   }, [token, lobbyId]);
 
-  const marksApplied = summary?.marksApplied ?? 0;
-  const unmarksApplied = summary?.unmarksApplied ?? 0;
+  const susApplied = summary?.susApplied ?? 0;
+  const clearedApplied = summary?.clearedApplied ?? 0;
   const phosPoints = summary?.phosPoints ?? 0;
   const skotiaPoints = summary?.skotiaPoints ?? 0;
 
@@ -73,11 +73,11 @@ export default function RoundSummaryScreen({
           <View style={styles.divider} />
 
           {/* Personal mark status */}
-          {isMarked !== undefined && isMarked !== null && (
-            <View style={[styles.statusCard, isMarked && styles.statusCardMarked]}>
+          {isSus !== undefined && isSus !== null && (
+            <View style={[styles.statusCard, isSus && styles.statusCardSus]}>
               <Text style={styles.statusLabel}>YOUR STATUS</Text>
-              <Text style={[styles.statusValue, { color: isMarked ? colors.primary.neonRed : colors.accent.neonGreen }]}>
-                {isMarked ? 'SUS ●' : 'CLEAR ●'}
+              <Text style={[styles.statusValue, { color: isSus ? colors.primary.neonRed : colors.accent.neonGreen }]}>
+                {isSus ? 'SUS ●' : 'CLEAR ●'}
               </Text>
             </View>
           )}
@@ -86,13 +86,13 @@ export default function RoundSummaryScreen({
           <View style={styles.card}>
             <Text style={styles.cardLabel}>VOTING RESULTS</Text>
             <View style={styles.statRow}>
-              <Text style={styles.statValue}>{marksApplied}</Text>
-              <Text style={styles.statDesc}>player{marksApplied !== 1 ? 's' : ''} sus'd</Text>
+              <Text style={styles.statValue}>{susApplied}</Text>
+              <Text style={styles.statDesc}>player{susApplied !== 1 ? 's' : ''} sus'd</Text>
             </View>
-            {unmarksApplied > 0 && (
+            {clearedApplied > 0 && (
               <View style={styles.statRow}>
-                <Text style={styles.statValue}>{unmarksApplied}</Text>
-                <Text style={styles.statDesc}>player{unmarksApplied !== 1 ? 's' : ''} cleared</Text>
+                <Text style={styles.statValue}>{clearedApplied}</Text>
+                <Text style={styles.statDesc}>player{clearedApplied !== 1 ? 's' : ''} cleared</Text>
               </View>
             )}
           </View>
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  statusCardMarked: {
+  statusCardSus: {
     borderLeftColor: colors.primary.neonRed,
   },
   statusLabel: {

@@ -495,7 +495,7 @@ async function _emitGameStateUpdate(io, gameId, lobbyRoom) {
         id:       String(p.id),
         username: p.username,
         team:     p.team,
-        isMarked: p.is_marked,
+        isSus: p.is_marked,
       })),
       gameState: {
         round:       game.current_round,
@@ -563,19 +563,19 @@ function _emitAdvanceEvents(io, result) {
   else if (result.step === 'completeC') {
     if (result.groupResults) {
       for (const [gId, actions] of result.groupResults) {
-        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
+        io.to(`lobby:${gId}`).emit('votingComplete', { susResults: actions });
       }
       console.log(`[Socket] completeC → votingComplete to ${result.groupResults.size || 0} groups`);
     }
-    // Push per-player mark status so clients show Sus indicator before Challenges start
-    if (result.isMarkedMap) {
-      let markCount = 0;
+    // Push per-player sus status so clients show Sus indicator before Challenges start
+    if (result.isSusMap) {
+      let susCount = 0;
       for (const [, sock] of io.sockets.sockets) {
         if (!sock.rooms.has(lobbyRoom)) continue;
-        const marked = result.isMarkedMap.get(sock.userId);
-        if (marked !== undefined) { sock.emit('markStatusUpdate', { isMarked: marked }); markCount++; }
+        const isSus = result.isSusMap.get(sock.userId);
+        if (isSus !== undefined) { sock.emit('susStatusUpdate', { isSus }); susCount++; }
       }
-      console.log(`[Socket] completeC → markStatusUpdate per-socket to ${markCount} players`);
+      console.log(`[Socket] completeC → susStatusUpdate per-socket to ${susCount} players`);
     }
     io.to(lobbyRoom).emit('movementComplete', { movement: 'C' });
     console.log(`[Socket] completeC → movementComplete {C} to ${lobbyRoom}`);
@@ -637,19 +637,19 @@ function _emitAdvanceEvents(io, result) {
   else if (result.step === 'gameOver') {
     if (result.groupResults) {
       for (const [gId, actions] of result.groupResults) {
-        io.to(`lobby:${gId}`).emit('votingComplete', { markResults: actions });
+        io.to(`lobby:${gId}`).emit('votingComplete', { susResults: actions });
       }
       console.log(`[Socket] gameOver → votingComplete to ${result.groupResults.size || 0} groups`);
     }
-    // Emit personal mark status to each connected lobby member before roundSummary/gameOver
-    if (result.isMarkedMap) {
-      let markCount = 0;
+    // Emit personal sus status to each connected lobby member before roundSummary/gameOver
+    if (result.isSusMap) {
+      let susCount = 0;
       for (const [, sock] of io.sockets.sockets) {
         if (!sock.rooms.has(lobbyRoom)) continue;
-        const marked = result.isMarkedMap.get(sock.userId);
-        if (marked !== undefined) { sock.emit('markStatusUpdate', { isMarked: marked }); markCount++; }
+        const isSus = result.isSusMap.get(sock.userId);
+        if (isSus !== undefined) { sock.emit('susStatusUpdate', { isSus }); susCount++; }
       }
-      console.log(`[Socket] gameOver → markStatusUpdate per-socket to ${markCount} players`);
+      console.log(`[Socket] gameOver → susStatusUpdate per-socket to ${susCount} players`);
     }
     if (result.summary) {
       io.to(lobbyRoom).emit('roundSummary', result.summary);

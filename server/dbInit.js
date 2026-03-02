@@ -153,12 +153,12 @@ async function init() {
       UNIQUE (movement_id, voter_id, target_id)
     );
 
-    CREATE TABLE IF NOT EXISTS mark_events (
+    CREATE TABLE IF NOT EXISTS sus_events (
       id             SERIAL PRIMARY KEY,
       game_id        INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
       game_player_id INT NOT NULL REFERENCES game_players(id) ON DELETE CASCADE,
       round_number   INT NOT NULL,
-      action         VARCHAR(10) NOT NULL CHECK (action IN ('mark', 'unmark')),
+      action         VARCHAR(10) NOT NULL CHECK (action IN ('sus', 'clear')),
       was_correct    BOOLEAN NOT NULL,
       created_at     TIMESTAMPTZ DEFAULT now()
     );
@@ -171,12 +171,25 @@ async function init() {
     CREATE INDEX IF NOT EXISTS ix_movements     ON movements (round_id);
     CREATE INDEX IF NOT EXISTS ix_mv_a_sub      ON movement_a_submissions (movement_id, group_id);
     CREATE INDEX IF NOT EXISTS ix_mv_c_votes    ON movement_c_votes (movement_id, group_id);
-    CREATE INDEX IF NOT EXISTS ix_mark_events   ON mark_events (game_id, round_number);
+    CREATE INDEX IF NOT EXISTS ix_sus_events    ON sus_events (game_id, round_number);
   `);
 
   // Migrate existing rounds table — add voting_summary column if absent (safe on fresh DBs too)
   await pool.query(`
     ALTER TABLE rounds ADD COLUMN IF NOT EXISTS voting_summary JSONB;
+  `);
+
+  // Migrate mark_events → sus_events (rename table and update action constraint)
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'mark_events') THEN
+        ALTER TABLE mark_events RENAME TO sus_events;
+        ALTER TABLE sus_events DROP CONSTRAINT IF EXISTS mark_events_action_check;
+        ALTER TABLE sus_events ADD CONSTRAINT sus_events_action_check
+          CHECK (action IN ('sus', 'clear'));
+      END IF;
+    END$$;
   `);
 
   // Migrate existing prompts table — add prompt_mode column if absent.

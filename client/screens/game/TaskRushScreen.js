@@ -48,7 +48,7 @@ export default function TaskRushScreen({
   currentTeam,
   roundNumber,
   movementBEndsAt,
-  isMarked,
+  isSus,
   onExitRush,
   onMovementComplete,
 }) {
@@ -304,7 +304,7 @@ export default function TaskRushScreen({
         </TouchableOpacity>
 
         {/* ── Sus penalty banner ── */}
-        {isMarked && (
+        {isSus && (
           <View style={styles.susBanner}>
             <Text style={styles.susBannerText}>SUS PENALTY — 50% PTS</Text>
           </View>
