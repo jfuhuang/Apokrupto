@@ -184,11 +184,27 @@ async function init() {
     DO $$
     BEGIN
       IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'mark_events') THEN
+        -- sus_events may have been created empty by the CREATE TABLE IF NOT EXISTS above;
+        -- drop it so we can rename mark_events (which holds any existing data) instead.
+        DROP TABLE IF EXISTS sus_events;
         ALTER TABLE mark_events RENAME TO sus_events;
-        ALTER TABLE sus_events DROP CONSTRAINT IF EXISTS mark_events_action_check;
-        ALTER TABLE sus_events ADD CONSTRAINT sus_events_action_check
-          CHECK (action IN ('sus', 'clear'));
       END IF;
+    END$$;
+  `);
+
+  // Migrate sus_events action values: 'mark' → 'sus', 'unmark' → 'clear', and enforce new constraint.
+  // Runs every startup but is safe/idempotent — UPDATE affects 0 rows once already migrated.
+  await pool.query(`
+    DO $$
+    BEGIN
+      -- Rewrite old action values before touching the constraint
+      UPDATE sus_events SET action = 'sus'   WHERE action = 'mark';
+      UPDATE sus_events SET action = 'clear' WHERE action = 'unmark';
+      -- Swap out old constraint for new one (both names handled)
+      ALTER TABLE sus_events DROP CONSTRAINT IF EXISTS mark_events_action_check;
+      ALTER TABLE sus_events DROP CONSTRAINT IF EXISTS sus_events_action_check;
+      ALTER TABLE sus_events ADD CONSTRAINT sus_events_action_check
+        CHECK (action IN ('sus', 'clear'));
     END$$;
   `);
 
