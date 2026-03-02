@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "7e414a3e-708e-40cc-a7ef-434b56cc2186"
+      }
+    },
+    "android": {
+      "package": "com.jfuhuang.apokrupto"
+    },
+    "ios": {
+      "bundleIdentifier": "com.jfuhuang.apokrupto",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}

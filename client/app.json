@@ -23,6 +23,11 @@
       "expo-secure-store",
       "expo-font",
       "expo-screen-orientation"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "7e414a3e-708e-40cc-a7ef-434b56cc2186"
+      }
+    }
   }
 }
