@@ -106,11 +106,11 @@ export async function fetchPlayerGameState(token, gameId) {
   });
 }
 
-export async function submitMovementBTask(token, gameId, taskId) {
+export async function submitMovementBTask(token, gameId, taskId, bonusPoints = 0) {
   return request(`/api/games/${gameId}/movement-b/complete`, {
     method: 'POST',
     headers: { ...jsonHeaders, ...authHeader(token) },
-    body: JSON.stringify({ taskId }),
+    body: JSON.stringify({ taskId, bonusPoints }),
   });
 }
 

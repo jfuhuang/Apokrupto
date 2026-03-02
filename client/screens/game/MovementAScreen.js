@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
@@ -49,6 +50,7 @@ export default function MovementAScreen({
   const [submitting, setSubmitting] = useState(false);
   const [submittedIds, setSubmittedIds] = useState(new Set());
   const [turnOrder, setTurnOrder] = useState(null); // [userId, ...] from server
+  const [refreshing, setRefreshing] = useState(false);
 
   const socketRef = useRef(null);
   const turnTimerRef = useRef(null);
@@ -60,42 +62,50 @@ export default function MovementAScreen({
   // Keep ref in sync with state so the interval callback always has the latest value
   useEffect(() => { wordInputRef.current = wordInput; }, [wordInput]);
 
-  // Fetch prompt on mount (server returns team-specific prompt via JWT).
-  // Retries up to 3 times with a short delay — turn state may not be
-  // initialised yet if the client navigated before the server finished setup.
-  useEffect(() => {
-    let cancelled = false;
-    const fetchPrompt = async (attempt = 1) => {
+  // Fetch prompt (server returns team-specific prompt via JWT).
+  // Used on mount (with retries) and on pull-to-refresh (single attempt).
+  const fetchPrompt = async ({ retries = 0 } = {}) => {
+    const attempt = async (n = 1) => {
       try {
         const baseUrl = await getApiUrl();
         const res = await fetch(`${baseUrl}/api/games/${gameId}/movement-a/prompt`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) {
-          if (attempt < 3 && !cancelled) {
-            console.warn(`[MovementA] Prompt fetch attempt ${attempt} failed (${res.status}), retrying...`);
-            setTimeout(() => fetchPrompt(attempt + 1), 1500);
-            return;
+          if (n <= retries) {
+            console.warn(`[MovementA] Prompt fetch attempt ${n} failed (${res.status}), retrying...`);
+            await new Promise((r) => setTimeout(r, 1500));
+            return attempt(n + 1);
           }
-          console.warn(`[MovementA] Prompt fetch failed after ${attempt} attempts`);
+          console.warn(`[MovementA] Prompt fetch failed after ${n} attempts`);
           return;
         }
         const data = await res.json();
-        if (!cancelled && data.prompt) {
+        if (data.prompt) {
           setPrompt(data.prompt);
           if (data.promptMode) setPromptMode(data.promptMode);
         }
       } catch (err) {
-        if (attempt < 3 && !cancelled) {
-          setTimeout(() => fetchPrompt(attempt + 1), 1500);
-          return;
+        if (n <= retries) {
+          await new Promise((r) => setTimeout(r, 1500));
+          return attempt(n + 1);
         }
         console.warn('[MovementA] Could not fetch prompt:', err.message);
       }
     };
-    if (gameId) fetchPrompt();
-    return () => { cancelled = true; };
+    await attempt();
+  };
+
+  // Fetch on mount with retries — turn state may not be initialised yet
+  useEffect(() => {
+    if (gameId) fetchPrompt({ retries: 2 });
   }, [gameId, token]);
+
+  const handleRefreshPrompt = async () => {
+    setRefreshing(true);
+    await fetchPrompt();
+    setRefreshing(false);
+  };
 
   // Socket connection
   useEffect(() => {
@@ -654,6 +664,14 @@ export default function MovementAScreen({
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefreshPrompt}
+              tintColor={colors.primary.electricBlue}
+              colors={[colors.primary.electricBlue]}
+            />
+          }
         >
           {renderGroupRoster()}
           <View style={styles.divider} />

@@ -652,12 +652,18 @@ router.post('/:gameId/movement-c/vote', auth, async (req, res) => {
 router.post('/:gameId/movement-b/complete', auth, async (req, res) => {
   const { gameId } = req.params;
   const userId     = req.user.sub;
-  const { taskId } = req.body;
+  const { taskId, bonusPoints: rawBonus } = req.body;
 
   if (!taskId) return res.status(400).json({ error: 'taskId is required' });
 
   const taskDef = getTask(taskId);
   if (!taskDef) return res.status(400).json({ error: 'Unknown task' });
+
+  // Streak bonus — client-sent, capped at 1x base (max 2x total)
+  const basePoints = taskDef.points.alive;
+  const cappedBonus = Number.isFinite(rawBonus) && rawBonus > 0
+    ? Math.min(Math.floor(rawBonus), basePoints)
+    : 0;
 
   const client = await db.connect();
   try {
@@ -687,8 +693,8 @@ router.post('/:gameId/movement-b/complete', auth, async (req, res) => {
     }
     const { team } = playerRes.rows[0];
 
-    // 3. Determine points (use alive points — no elimination in this game)
-    const pointsEarned = taskDef.points.alive;
+    // 3. Determine points (base + streak bonus)
+    const pointsEarned = basePoints + cappedBonus;
 
     // 4. Award to team
     await client.query(

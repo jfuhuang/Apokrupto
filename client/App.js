@@ -29,6 +29,7 @@ import RoleRevealScreen from './screens/game/RoleRevealScreen';
 import RoundHubScreen from './screens/game/RoundHubScreen';
 import MovementAScreen from './screens/game/MovementAScreen';
 import MovementBScreen from './screens/game/MovementBScreen';
+import TaskRushScreen from './screens/game/TaskRushScreen';
 import VotingScreen from './screens/game/VotingScreen';
 import RoundSummaryScreen from './screens/game/RoundSummaryScreen';
 import GmWaitingScreen from './screens/game/GmWaitingScreen';
@@ -94,6 +95,7 @@ export default function App() {
   const SYNC_SKIP_SCREENS = [
     'loading', 'welcome', 'login', 'register', 'lobbyList',
     'countdown', 'roleReveal', 'roundSummary', 'gameOver', 'devMenu',
+    'taskRush',
   ];
 
   const syncCallbackRef = useRef(null);
@@ -415,6 +417,21 @@ export default function App() {
             currentTeam={currentTeam}
             roundNumber={currentRound}
             movementBEndsAt={movementBEndsAt}
+            onMovementComplete={() => setCurrentScreen('roundHub')}
+            onEnterRush={() => setCurrentScreen('taskRush')}
+          />
+        );
+
+      case 'taskRush':
+        return (
+          <TaskRushScreen
+            token={token}
+            gameId={gameId}
+            lobbyId={currentLobbyId}
+            currentTeam={currentTeam}
+            roundNumber={currentRound}
+            movementBEndsAt={movementBEndsAt}
+            onExitRush={() => setCurrentScreen('movementB')}
             onMovementComplete={() => setCurrentScreen('roundHub')}
           />
         );

@@ -17,6 +17,8 @@ import { submitMovementBTask } from '../../utils/api';
 import TaskScreen from '../tasks/TaskScreen';
 import TaskSprite from '../../components/TaskSprite';
 
+const CHALLENGE_COUNT = TASKS.filter((t) => t.category === TASK_CATEGORY.CHALLENGES).length;
+
 const DIFFICULTY_COLOR = {
   easy:   colors.accent.neonGreen,
   medium: colors.accent.amber,
@@ -63,6 +65,7 @@ export default function MovementBScreen({
   roundNumber,
   movementBEndsAt: initialEndsAt,
   onMovementComplete,
+  onEnterRush,
 }) {
   const [activeTask, setActiveTask] = useState(null);
   const [completedTasks, setCompletedTasks] = useState(new Set());
@@ -302,73 +305,104 @@ export default function MovementBScreen({
           </View>
         )}
 
-        {/* ── Task grid ── */}
+        {/* ── Task grid / Rush CTA ── */}
         <ScrollView
           style={styles.taskList}
           contentContainerStyle={styles.taskListContent}
           showsVerticalScrollIndicator={false}
         >
-          {visibleTasks.length === 0 && (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No tasks in this category.</Text>
+          {/* Rush mode CTA for Challenges */}
+          {selectedCategory === TASK_CATEGORY.CHALLENGES ? (
+            <View style={styles.rushCtaContainer}>
+              <View style={styles.rushCtaCard}>
+                <Text style={styles.rushCtaIcon}>⚡</Text>
+                <Text style={styles.rushCtaTitle}>CHALLENGE RUSH</Text>
+                <Text style={styles.rushCtaDesc}>
+                  {CHALLENGE_COUNT} rapid-fire skill challenges
+                </Text>
+                <Text style={styles.rushCtaBonus}>
+                  Streak bonuses up to 2x!
+                </Text>
+                <TouchableOpacity
+                  style={styles.rushCtaBtn}
+                  onPress={onEnterRush}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.rushCtaBtnText}>ENTER RUSH MODE</Text>
+                </TouchableOpacity>
+              </View>
+
+              {sessionPoints > 0 && (
+                <Text style={styles.rushSessionNote}>
+                  This round: +{sessionPoints} pts from Rush
+                </Text>
+              )}
             </View>
-          )}
-
-          {visibleTasks.map((task) => {
-            const done = completedTasks.has(task.id);
-            const diffColor = DIFFICULTY_COLOR[task.difficulty] || colors.text.tertiary;
-            const catDef = CATEGORIES.find((c) => c.key === task.category);
-            const accentColor = catDef ? catDef.color : colors.primary.electricBlue;
-            const isCoopStub = task.category === TASK_CATEGORY.COOPERATIVE;
-
-            return (
-              <TouchableOpacity
-                key={task.id}
-                style={[
-                  styles.taskCard,
-                  done && styles.taskCardDone,
-                  isCoopStub && styles.taskCardCoop,
-                  { borderLeftColor: done ? colors.accent.neonGreen : accentColor },
-                ]}
-                onPress={() => !done && !isCoopStub && setActiveTask(task)}
-                activeOpacity={done || isCoopStub ? 1 : 0.75}
-                disabled={done || isCoopStub}
-              >
-                {/* Sprite column */}
-                <View style={[styles.spriteCol, { backgroundColor: accentColor + '22' }]}>
-                  <TaskSprite taskId={task.id} size={28} color={accentColor} />
-                  {done && <Text style={styles.spriteDone}>✓</Text>}
+          ) : (
+            <>
+              {visibleTasks.length === 0 && (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateText}>No tasks in this category.</Text>
                 </View>
+              )}
 
-                {/* Info column */}
-                <View style={styles.infoCol}>
-                  <View style={styles.infoTop}>
-                    <Text
-                      style={[styles.taskTitle, done && styles.taskTitleDone]}
-                      numberOfLines={1}
-                    >
-                      {task.title}
-                    </Text>
-                    <View style={styles.taskMeta}>
-                      <Text style={[styles.taskDiff, { color: diffColor }]}>
-                        {task.difficulty.toUpperCase()}
-                      </Text>
-                      <Text style={[styles.taskPts, done && { color: colors.accent.neonGreen }]}>
-                        {done ? 'DONE' : `+${task.points.alive}`}
-                      </Text>
+              {visibleTasks.map((task) => {
+                const done = completedTasks.has(task.id);
+                const diffColor = DIFFICULTY_COLOR[task.difficulty] || colors.text.tertiary;
+                const catDef = CATEGORIES.find((c) => c.key === task.category);
+                const accentColor = catDef ? catDef.color : colors.primary.electricBlue;
+                const isCoopStub = task.category === TASK_CATEGORY.COOPERATIVE;
+
+                return (
+                  <TouchableOpacity
+                    key={task.id}
+                    style={[
+                      styles.taskCard,
+                      done && styles.taskCardDone,
+                      isCoopStub && styles.taskCardCoop,
+                      { borderLeftColor: done ? colors.accent.neonGreen : accentColor },
+                    ]}
+                    onPress={() => !done && !isCoopStub && setActiveTask(task)}
+                    activeOpacity={done || isCoopStub ? 1 : 0.75}
+                    disabled={done || isCoopStub}
+                  >
+                    {/* Sprite column */}
+                    <View style={[styles.spriteCol, { backgroundColor: accentColor + '22' }]}>
+                      <TaskSprite taskId={task.id} size={28} color={accentColor} />
+                      {done && <Text style={styles.spriteDone}>✓</Text>}
                     </View>
-                  </View>
-                  <Text style={[styles.taskSynopsis, done && styles.taskSynopsisDone]}
-                    numberOfLines={2}>
-                    {isCoopStub
-                      ? task.synopsis + ' (Requires your full group)'
-                      : task.synopsis}
-                  </Text>
-                  <Text style={styles.taskRef}>{task.reference}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+
+                    {/* Info column */}
+                    <View style={styles.infoCol}>
+                      <View style={styles.infoTop}>
+                        <Text
+                          style={[styles.taskTitle, done && styles.taskTitleDone]}
+                          numberOfLines={1}
+                        >
+                          {task.title}
+                        </Text>
+                        <View style={styles.taskMeta}>
+                          <Text style={[styles.taskDiff, { color: diffColor }]}>
+                            {task.difficulty.toUpperCase()}
+                          </Text>
+                          <Text style={[styles.taskPts, done && { color: colors.accent.neonGreen }]}>
+                            {done ? 'DONE' : `+${task.points.alive}`}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.taskSynopsis, done && styles.taskSynopsisDone]}
+                        numberOfLines={2}>
+                        {isCoopStub
+                          ? task.synopsis + ' (Requires your full group)'
+                          : task.synopsis}
+                      </Text>
+                      <Text style={styles.taskRef}>{task.reference}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </>
+          )}
 
           <View style={{ height: 32 }} />
         </ScrollView>
@@ -655,6 +689,77 @@ const styles = StyleSheet.create({
     fontFamily: fonts.accent.semiBold,
     fontSize: 9,
     color: colors.accent.amber,
+    letterSpacing: 0.5,
+  },
+
+  // ── Rush CTA ──────────────────────────────────────────────────────────
+  rushCtaContainer: {
+    paddingTop: 20,
+    alignItems: 'center',
+  },
+  rushCtaCard: {
+    width: '100%',
+    backgroundColor: colors.background.void,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.primary.electricBlue,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: colors.shadow.electricBlue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  rushCtaIcon: {
+    fontSize: 36,
+    marginBottom: 4,
+  },
+  rushCtaTitle: {
+    fontFamily: fonts.display.bold,
+    fontSize: 20,
+    letterSpacing: 4,
+    color: colors.primary.electricBlue,
+    textShadowColor: colors.shadow.electricBlue,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
+  },
+  rushCtaDesc: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 14,
+    color: colors.text.secondary,
+  },
+  rushCtaBonus: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 13,
+    color: colors.accent.amber,
+    letterSpacing: 0.5,
+  },
+  rushCtaBtn: {
+    marginTop: 12,
+    backgroundColor: colors.primary.electricBlue,
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    shadowColor: colors.shadow.electricBlue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  rushCtaBtnText: {
+    fontFamily: fonts.display.bold,
+    fontSize: 14,
+    letterSpacing: 3,
+    color: colors.background.space,
+  },
+  rushSessionNote: {
+    fontFamily: fonts.accent.semiBold,
+    fontSize: 12,
+    color: colors.accent.neonGreen,
+    marginTop: 16,
     letterSpacing: 0.5,
   },
 

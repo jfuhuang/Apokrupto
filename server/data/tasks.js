@@ -21,6 +21,26 @@ const TASKS = [
   { id: 'water_from_rock',    points: { alive: 45,  dead: 27 } },
   { id: 'the_lost_sheep',     points: { alive: 140, dead: 84 } },
   { id: 'rebuilding_wall',    points: { alive: 70,  dead: 42 } },
+
+  // Challenges — previously missing
+  { id: 'jonah_storm',        points: { alive: 60,  dead: 36 } },
+  { id: 'walking_on_water',   points: { alive: 85,  dead: 51 } },
+  { id: 'pillar_of_fire',     points: { alive: 130, dead: 78 } },
+  { id: 'jordan_river',       points: { alive: 100, dead: 60 } },
+
+  // Scripture
+  { id: 'john_3_16',          points: { alive: 70,  dead: 42 } },
+  { id: 'psalm_23',           points: { alive: 90,  dead: 54 } },
+  { id: 'romans_8_28',        points: { alive: 60,  dead: 36 } },
+  { id: 'philippians_4_13',   points: { alive: 50,  dead: 30 } },
+  { id: 'isaiah_40_31',       points: { alive: 80,  dead: 48 } },
+  { id: 'hebrews_11_1',       points: { alive: 55,  dead: 33 } },
+
+  // Trivia
+  { id: 'jesus_miracles',     points: { alive: 80,  dead: 48 } },
+  { id: 'prophets_quiz',      points: { alive: 90,  dead: 54 } },
+  { id: 'parables_quiz',      points: { alive: 75,  dead: 45 } },
+  { id: 'acts_quiz',          points: { alive: 85,  dead: 51 } },
 ];
 
 const taskMap = new Map(TASKS.map((t) => [t.id, t]));
