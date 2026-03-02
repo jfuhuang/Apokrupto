@@ -29,7 +29,7 @@ export default function VotingScreen({
 }) {
   const [phase, setPhase] = useState('voting'); // 'voting' | 'waiting' | 'preview'
   const [myVotes, setMyVotes] = useState({});        // { [playerId]: 'phos' | 'skotia' }
-  const [markResults, setMarkResults] = useState([]); // [{ playerId, username, action }]
+  const [susResults, setSusResults] = useState([]); // [{ playerId, username, action }]
   const [submitting, setSubmitting] = useState(false);
   const [votingSecondsLeft, setVotingSecondsLeft] = useState(null);
 
@@ -67,9 +67,9 @@ export default function VotingScreen({
         votingTimerRef.current = setInterval(tick, 1000);
       });
 
-      // Per-group mark results — show preview; Challenges Stage (B) follows next
-      socket.on('votingComplete', ({ markResults: results }) => {
-        setMarkResults(results || []);
+      // Per-group sus results — show preview; Challenges Stage (B) follows next
+      socket.on('votingComplete', ({ susResults: results }) => {
+        setSusResults(results || []);
         setPhase('preview');
         clearInterval(votingTimerRef.current);
         // Navigation to Challenges Stage is driven by movementStart{B} below.
@@ -178,9 +178,9 @@ export default function VotingScreen({
           >
             {member.username}
           </Text>
-          {member.isMarked && (
-            <View style={styles.currentMarkBadge}>
-              <Text style={styles.currentMarkText}>MARKED</Text>
+          {member.isSus && (
+            <View style={styles.currentSusBadge}>
+              <Text style={styles.currentSusText}>SUS</Text>
             </View>
           )}
           {!isVoted && (
@@ -201,18 +201,18 @@ export default function VotingScreen({
       ) : (
         <Text style={styles.previewHint}>This round in your group:</Text>
       )}
-      {markResults.length === 0 ? (
+      {susResults.length === 0 ? (
         <Text style={styles.previewNoChange}>No changes this round.</Text>
       ) : (
         <View style={styles.previewList}>
-          {markResults.map((r) => (
+          {susResults.map((r) => (
             <View key={r.userId} style={styles.previewRow}>
               <Text style={styles.previewName}>{r.username}</Text>
               <Text style={[
                 styles.previewAction,
-                r.action === 'mark' ? { color: colors.primary.neonRed } : { color: colors.accent.neonGreen },
+                r.action === 'sus' ? { color: colors.primary.neonRed } : { color: colors.accent.neonGreen },
               ]}>
-                {r.action === 'mark' ? 'MARKED' : 'UNMARKED'}
+                {r.action === 'sus' ? 'SUS' : 'CLEARED'}
               </Text>
             </View>
           ))}
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     textAlign: 'center',
   },
-  currentMarkBadge: {
+  currentSusBadge: {
     backgroundColor: 'rgba(255, 51, 102, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.35)',
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  currentMarkText: {
+  currentSusText: {
     fontFamily: fonts.display.bold,
     fontSize: 7,
     letterSpacing: 2,

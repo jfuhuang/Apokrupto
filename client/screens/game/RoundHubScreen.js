@@ -21,13 +21,13 @@ export default function RoundHubScreen({
   currentRound,
   totalRounds,
   currentTeam,
-  isMarked,
+  isSus,
   currentGroupMembers,
   groupNumber,
   teamPoints,
   onMovementReady,
   onGameStateUpdate,
-  onMarkStatusUpdate,
+  onSusStatusUpdate,
   onRoundSummary,
   onRoundSetup,
   onGameOver,
@@ -77,8 +77,8 @@ export default function RoundHubScreen({
         if (onGameStateUpdate) onGameStateUpdate(state);
       });
 
-      socket.on('markStatusUpdate', ({ isMarked: marked }) => {
-        if (onMarkStatusUpdate) onMarkStatusUpdate(marked);
+      socket.on('susStatusUpdate', ({ isSus: sus }) => {
+        if (onSusStatusUpdate) onSusStatusUpdate(sus);
       });
 
       socket.on('movementStart', ({ movement, groupId, groupMembers, groupNumber: gn, movementBEndsAt }) => {
@@ -238,9 +238,9 @@ export default function RoundHubScreen({
         <View style={styles.groupSection}>
           <View style={styles.groupHeader}>
             <Text style={styles.groupLabel}>{groupLabel}</Text>
-            {isMarked && (
-              <View style={styles.selfMarkedBadge}>
-                <Text style={styles.selfMarkedText}>YOU ARE MARKED</Text>
+            {isSus && (
+              <View style={styles.selfSusBadge}>
+                <Text style={styles.selfSusText}>YOU ARE SUS</Text>
               </View>
             )}
           </View>
@@ -256,22 +256,22 @@ export default function RoundHubScreen({
                   <View
                     style={[
                       styles.memberCard,
-                      member.isMarked && styles.memberCardMarked,
+                      member.isSus && styles.memberCardSus,
                     ]}
                   >
                     <Text
                       style={[
                         styles.memberName,
-                        member.isMarked && { color: colors.primary.neonRed },
+                        member.isSus && { color: colors.primary.neonRed },
                       ]}
                       numberOfLines={1}
                     >
                       {member.username}
                     </Text>
                     {member.isYou && <Text style={styles.youTag}>you</Text>}
-                    {member.isMarked && (
-                      <View style={styles.markBadge}>
-                        <Text style={styles.markBadgeText}>MARKED</Text>
+                    {member.isSus && (
+                      <View style={styles.susBadge}>
+                        <Text style={styles.susBadgeText}>SUS</Text>
                       </View>
                     )}
                   </View>
@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     color: colors.text.tertiary,
   },
-  selfMarkedBadge: {
+  selfSusBadge: {
     backgroundColor: 'rgba(255, 51, 102, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.4)',
@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  selfMarkedText: {
+  selfSusText: {
     fontFamily: fonts.display.bold,
     fontSize: 8,
     letterSpacing: 2,
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
     minHeight: 60,
     gap: 3,
   },
-  memberCardMarked: {
+  memberCardSus: {
     backgroundColor: 'rgba(220, 20, 60, 0.12)',
     borderColor: 'rgba(255, 51, 102, 0.45)',
   },
@@ -494,7 +494,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  markBadge: {
+  susBadge: {
     backgroundColor: 'rgba(255, 51, 102, 0.15)',
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.4)',
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 2,
   },
-  markBadgeText: {
+  susBadgeText: {
     fontFamily: fonts.display.bold,
     fontSize: 7,
     letterSpacing: 1,

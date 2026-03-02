@@ -124,7 +124,7 @@ All tables are auto-created on startup. Key tables:
 | `prompts` | Biblical prompt pairs (phos_prompt, skotia_prompt, theme_label) — 10 seeded on first startup |
 | `movement_a_submissions` | Word submissions — UNIQUE(movement_id, user_id) |
 | `movement_c_votes` | Voting records — UNIQUE(movement_id, voter_id, target_id) |
-| `mark_events` | Mark/unmark history with was_correct flag |
+| `sus_events` | Sus/clear history with was_correct flag |
 
 ## API Endpoints
 
@@ -183,8 +183,8 @@ All endpoints require `Authorization: Bearer <token>` unless noted.
 | `turnStart` | Group room | `{ currentPlayerId, turnIndex, completedCount, timeLimit: 30 }` |
 | `wordSubmitted` | Group room | `{ userId, username, word, nextTurnInSeconds }` |
 | `deliberationStart` | Group room | `{ words: [{ userId, username, word }] }` |
-| `votingComplete` | Group room | `{ markResults, roundSummary }` |
-| `roundSummary` | Lobby room | `{ marksApplied, unmarksApplied, phosPointsEarned, skotiaPointsEarned }` |
+| `votingComplete` | Group room | `{ susResults, roundSummary }` |
+| `roundSummary` | Lobby room | `{ susApplied, clearedApplied, phosPointsEarned, skotiaPointsEarned }` |
 | `announcement` | Lobby room | `{ message, from: 'GM', at: timestamp }` |
 | `gameOver` | Lobby room | `{ winner, condition, phosPoints, skotiaPoints, skotiaPlayers }` |
 | `playerKicked` | Lobby room | `{ userId }` |

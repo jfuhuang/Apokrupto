@@ -14,7 +14,7 @@ export function useGameState({ setCurrentScreen }) {
   const [currentMovement,      setCurrentMovement]      = useState(null);
   const [currentTeam,          setCurrentTeam]          = useState(null);
   const [skotiaTeammates,      setSkotiaTeammates]      = useState([]);
-  const [isMarked,             setIsMarked]             = useState(false);
+  const [isSus,                setIsSus]                = useState(false);
   const [isGm,                 setIsGm]                 = useState(false);
   const [currentGroupId,       setCurrentGroupId]       = useState(null);
   const [currentGroupNumber,   setCurrentGroupNumber]   = useState(null);
@@ -31,7 +31,7 @@ export function useGameState({ setCurrentScreen }) {
     setCurrentMovement(null);
     setCurrentTeam(null);
     setSkotiaTeammates([]);
-    setIsMarked(false);
+    setIsSus(false);
     setIsGm(false);
     setCurrentGroupId(null);
     setCurrentGroupNumber(null);
@@ -73,7 +73,7 @@ export function useGameState({ setCurrentScreen }) {
 
   const handleMovementCComplete = () => setCurrentScreen('roundHub');
 
-  const handleMarkStatusUpdate = (marked) => setIsMarked(marked);
+  const handleSusStatusUpdate = (sus) => setIsSus(sus);
 
   const handleRoundSummary = (summary) => {
     setRoundSummary(summary || null);
@@ -82,13 +82,13 @@ export function useGameState({ setCurrentScreen }) {
 
   const handleGameStateUpdate = ({
     gameId: gId, totalRounds: tr, currentRound: cr,
-    teamPoints: tp, isMarked: im, isGm: gm,
+    teamPoints: tp, isSus: sus, isGm: gm,
   } = {}) => {
     if (gId !== undefined) setGameId(gId);
     if (tr  !== undefined) setTotalRounds(tr);
     if (cr  !== undefined) setCurrentRound(cr);
     if (tp  !== undefined) setTeamPoints(tp);
-    if (im  !== undefined) setIsMarked(im);
+    if (sus !== undefined) setIsSus(sus);
     if (gm  !== undefined) setIsGm(gm);
   };
 
@@ -117,7 +117,7 @@ export function useGameState({ setCurrentScreen }) {
   };
 
   const state = {
-    gameId, currentTeam, skotiaTeammates, isMarked, isGm,
+    gameId, currentTeam, skotiaTeammates, isSus, isGm,
     currentGroupId, currentGroupNumber, currentGroupMembers,
     teamPoints, currentRound, totalRounds, currentMovement,
     movementBEndsAt, roundSummary, gameOverResult,
@@ -125,14 +125,14 @@ export function useGameState({ setCurrentScreen }) {
 
   const handlers = {
     handleTeamAssigned, handleGameStarted, handleMovementReady,
-    handleMovementAComplete, handleMovementCComplete, handleMarkStatusUpdate,
+    handleMovementAComplete, handleMovementCComplete, handleSusStatusUpdate,
     handleRoundSummary, handleGameStateUpdate, handleRoundSetup,
     handleRoundSummaryContinue, handleGameOver,
   };
 
   // Expose individual setters for App.js sync polling and checkExistingToken
   const setters = {
-    setGameId, setCurrentTeam, setIsGm, setIsMarked,
+    setGameId, setCurrentTeam, setIsGm, setIsSus,
     setCurrentGroupId, setCurrentGroupNumber, setCurrentGroupMembers,
     setTeamPoints, setCurrentMovement, setMovementBEndsAt,
     setCurrentRound, setTotalRounds,

@@ -48,6 +48,7 @@ export default function TaskRushScreen({
   currentTeam,
   roundNumber,
   movementBEndsAt,
+  isSus,
   onExitRush,
   onMovementComplete,
 }) {
@@ -302,6 +303,13 @@ export default function TaskRushScreen({
           <Text style={styles.exitBtnText}>EXIT</Text>
         </TouchableOpacity>
 
+        {/* ── Sus penalty banner ── */}
+        {isSus && (
+          <View style={styles.susBanner}>
+            <Text style={styles.susBannerText}>SUS PENALTY — 50% PTS</Text>
+          </View>
+        )}
+
         {/* ── Task title strip ── */}
         {currentTask && (
           <View style={styles.taskStrip}>
@@ -438,6 +446,21 @@ const styles = StyleSheet.create({
     fontSize: 9,
     letterSpacing: 2,
     color: colors.text.tertiary,
+  },
+
+  // ── Sus penalty banner ─────────────────────────────────────────────────
+  susBanner: {
+    alignItems: 'center',
+    paddingVertical: 4,
+    backgroundColor: colors.primary.neonRed + '20',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.primary.neonRed + '40',
+  },
+  susBannerText: {
+    fontFamily: fonts.display.bold,
+    fontSize: 8,
+    letterSpacing: 1.5,
+    color: colors.primary.neonRed,
   },
 
   // ── Task strip ──────────────────────────────────────────────────────────

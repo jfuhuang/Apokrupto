@@ -65,6 +65,7 @@ export default function MovementBScreen({
   currentTeam,
   roundNumber,
   movementBEndsAt: initialEndsAt,
+  isSus,
   onMovementComplete,
   onEnterRush,
 }) {
@@ -245,6 +246,15 @@ export default function MovementBScreen({
             +{sessionPoints}
           </Text>
         </View>
+
+        {/* ── Sus penalty banner ── */}
+        {isSus && (
+          <View style={styles.susBanner}>
+            <Text style={styles.susBannerText}>
+              SUS PENALTY ACTIVE — Tasks earn 50% points
+            </Text>
+          </View>
+        )}
 
         {/* ── Category tabs ── */}
         <View style={styles.tabRow}>
@@ -493,6 +503,24 @@ const styles = StyleSheet.create({
     fontFamily: fonts.accent.bold,
     fontSize: 20,
     letterSpacing: 1,
+  },
+
+  // ── Sus penalty banner ───────────────────────────────────────────────
+  susBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    backgroundColor: colors.primary.neonRed + '20',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.primary.neonRed + '40',
+  },
+  susBannerText: {
+    fontFamily: fonts.display.bold,
+    fontSize: 9,
+    letterSpacing: 1.5,
+    color: colors.primary.neonRed,
   },
 
   // ── Category tabs ─────────────────────────────────────────────────────

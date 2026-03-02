@@ -308,7 +308,7 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
                         >
                           {m.username}
                         </Text>
-                        {m.isMarked && <View style={styles.markDot} />}
+                        {m.isSus && <View style={styles.susDot} />}
                       </View>
                     ))}
                   </View>
@@ -323,7 +323,7 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
             {skotiaPlayers.map((p) => (
               <View key={p.id} style={[styles.playerRow, styles.skotiaRow]}>
                 <Text style={[styles.playerName, { color: colors.primary.neonRed }]}>{p.username}</Text>
-                {p.isMarked && <View style={styles.markDot} />}
+                {p.isSus && <View style={styles.susDot} />}
               </View>
             ))}
           </View>
@@ -334,7 +334,7 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
             {phosPlayers.map((p) => (
               <View key={p.id} style={styles.playerRow}>
                 <Text style={[styles.playerName, { color: colors.primary.electricBlue }]}>{p.username}</Text>
-                {p.isMarked && <View style={[styles.markDot, { backgroundColor: colors.primary.neonRed }]} />}
+                {p.isSus && <View style={[styles.susDot, { backgroundColor: colors.primary.neonRed }]} />}}
               </View>
             ))}
           </View>
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
   playerName: {
     ...typography.body,
   },
-  markDot: {
+  susDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
