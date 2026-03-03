@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { colors } from '../../theme/colors';
 import { MECHANIC } from '../../data/tasks';
 import { submitTaskCompletion } from '../../utils/api';
@@ -23,7 +22,13 @@ import BuildTask from './mechanics/BuildTask';
 
 const RESULT_DISPLAY_MS = 1500;
 
+// In sticky-immersive mode the system reports 0 insets, so SafeAreaView
+// can't help. Use a fixed bottom margin to keep content above the
+// Android gesture bar / rounded-corner zone.
+const BOTTOM_INSET = Platform.OS === 'android' ? 32 : 0;
+
 export default function TaskScreen({ task, role, isAlive, token, lobbyId, onComplete, onCancel, onCustomSubmit }) {
+  console.log('[TaskScreen] MOUNT — task.id:', task?.id, 'task.mechanic:', task?.mechanic, 'task.config:', JSON.stringify(task?.config));
   const [result, setResult] = useState(null); // null | { success, pointsEarned }
   const handledRef = useRef(false);
 
@@ -80,6 +85,8 @@ export default function TaskScreen({ task, role, isAlive, token, lobbyId, onComp
       taskId: task.id,
     };
 
+    console.log('[TaskScreen] renderMechanic — mechanic:', task.mechanic, 'taskId:', task.id, 'config:', JSON.stringify(task.config), 'MECHANIC.PATIENCE:', MECHANIC.PATIENCE, 'match:', task.mechanic === MECHANIC.PATIENCE);
+
     switch (task.mechanic) {
       case MECHANIC.SCRIPTURE_MEMORY:
         return <ScriptureMemoryTask {...props} />;
@@ -112,18 +119,18 @@ export default function TaskScreen({ task, role, isAlive, token, lobbyId, onComp
 
   return (
     <View style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <TaskHeader
-          title={task.title}
-          reference={task.reference}
-          timeLimit={task.timeLimit}
-          onCancel={onCancel}
-          onTimeUp={handleTimeUp}
-        />
-        <View style={styles.body}>
-          {renderMechanic()}
-        </View>
-      </SafeAreaView>
+      <TaskHeader
+        title={task.title}
+        reference={task.reference}
+        synopsis={task.synopsis}
+        timeLimit={task.timeLimit}
+        onCancel={onCancel}
+        onTimeUp={handleTimeUp}
+      />
+      <View style={styles.body}>
+        <Text style={{ color: 'lime', fontSize: 10 }}>[DEBUG TaskScreen] mechanic={task.mechanic} id={task.id}</Text>
+        {renderMechanic()}
+      </View>
 
       {result && (
         <TaskResultOverlay
@@ -140,10 +147,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background.space,
   },
-  safeArea: {
-    flex: 1,
-  },
   body: {
     flex: 1,
+    marginBottom: BOTTOM_INSET,
   },
 });

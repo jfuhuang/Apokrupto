@@ -667,20 +667,15 @@ export default function MovementAScreen({
           </View>
 
           <View style={styles.sketchTurnLayout}>
-            {/* Compact header: YOUR TURN + timer */}
-            <View style={styles.myTurnHeader}>
+            {/* Compact header: YOUR TURN + timer + prompt inline */}
+            <View style={styles.sketchTopBar}>
               <Text style={styles.yourTurnLabel}>YOUR TURN</Text>
-              <View style={[styles.timerCircle, turnSecondsLeft <= 10 && styles.timerCircleUrgent]}>
-                <Text style={[styles.timerValue, turnSecondsLeft <= 10 && styles.timerValueUrgent]}>
-                  {turnSecondsLeft}
+              <Text style={styles.sketchPromptInline} numberOfLines={1}>{prompt || '...'}</Text>
+              <View style={[styles.sketchTimerBadge, turnSecondsLeft <= 10 && styles.sketchTimerBadgeUrgent]}>
+                <Text style={[styles.sketchTimerText, turnSecondsLeft <= 10 && styles.sketchTimerTextUrgent]}>
+                  {turnSecondsLeft}s
                 </Text>
               </View>
-            </View>
-
-            {/* Compact prompt */}
-            <View style={styles.sketchPromptRow}>
-              <Text style={styles.promptLabel}>DRAW</Text>
-              <Text style={styles.sketchPromptText} numberOfLines={2}>{prompt || '...'}</Text>
             </View>
 
             {/* Canvas fills remaining space */}
@@ -690,9 +685,9 @@ export default function MovementAScreen({
               style={{ flex: 1 }}
             />
 
-            {/* Submit button */}
+            {/* Compact submit button */}
             <TouchableOpacity
-              style={[styles.submitBtn, !hasStrokes && styles.submitBtnDisabled]}
+              style={[styles.sketchSubmitBtn, !hasStrokes && styles.submitBtnDisabled]}
               onPress={() => handleSubmit()}
               disabled={!hasStrokes || submitting}
               activeOpacity={0.8}
@@ -847,28 +842,52 @@ const styles = StyleSheet.create({
   // ── Sketch turn (non-scrollable flex layout) ────────────────────────────
   sketchTurnLayout: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
-    gap: 10,
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 8,
+    gap: 8,
   },
-  sketchPromptRow: {
+  sketchTopBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: 'rgba(0, 212, 255, 0.05)',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.primary.electricBlue,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
   },
-  sketchPromptText: {
+  sketchPromptInline: {
     flex: 1,
     fontFamily: fonts.accent.bold,
+    fontSize: 14,
+    color: colors.text.secondary,
+    letterSpacing: 0.5,
+  },
+  sketchTimerBadge: {
+    backgroundColor: 'rgba(0, 212, 255, 0.12)',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  sketchTimerBadgeUrgent: {
+    backgroundColor: 'rgba(255, 51, 102, 0.12)',
+  },
+  sketchTimerText: {
+    fontFamily: fonts.accent.bold,
     fontSize: 16,
-    color: colors.text.primary,
+    color: colors.primary.electricBlue,
     letterSpacing: 1,
+  },
+  sketchTimerTextUrgent: {
+    color: colors.primary.neonRed,
+  },
+  sketchSubmitBtn: {
+    width: '100%',
+    paddingVertical: 12,
+    backgroundColor: colors.primary.electricBlue,
+    borderRadius: 10,
+    alignItems: 'center',
+    shadowColor: colors.shadow.electricBlue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 6,
   },
 
   // Prompt section (shared between waiting_turn and my_turn)

@@ -296,13 +296,11 @@ export default function TaskRushScreen({
                 {lastResult?.success ? `+${lastResult.basePoints + lastResult.bonusPoints}` : ''}
               </Animated.Text>
             </View>
+            <TouchableOpacity style={styles.exitBtn} onPress={onExitRush} activeOpacity={0.7}>
+              <Text style={styles.exitBtnText}>EXIT</Text>
+            </TouchableOpacity>
           </View>
         </View>
-
-        {/* Exit button */}
-        <TouchableOpacity style={styles.exitBtn} onPress={onExitRush} activeOpacity={0.7}>
-          <Text style={styles.exitBtnText}>EXIT</Text>
-        </TouchableOpacity>
 
         {/* ── Sus penalty banner ── */}
         {isSus && (
@@ -430,18 +428,15 @@ const styles = StyleSheet.create({
     color: colors.accent.neonGreen,
   },
 
-  // ── Exit button ─────────────────────────────────────────────────────────
+  // ── Exit button (inline in HUD points cell) ────────────────────────────
   exitBtn: {
-    position: 'absolute',
-    top: 52,
-    right: 12,
-    zIndex: 50,
+    marginTop: 4,
     backgroundColor: colors.background.void,
     borderWidth: 1,
     borderColor: colors.border.default,
     borderRadius: 6,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 3,
   },
   exitBtnText: {
     fontFamily: fonts.display.bold,
@@ -491,5 +486,6 @@ const styles = StyleSheet.create({
   // ── Mechanic area ───────────────────────────────────────────────────────
   mechanicArea: {
     flex: 1,
+    paddingBottom: 8,
   },
 });

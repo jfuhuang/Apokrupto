@@ -702,6 +702,7 @@
             <button class="primary" id="btn-add-dummy">+ Add Dummy</button>
             <button class="success" id="btn-start-game">&#9654; Start Game</button>
             <button class="danger" id="btn-force-end">&#9632; Force End</button>
+            <button class="danger" id="btn-remove-all">&#10006; Remove All</button>
             <div id="game-over-banner" style="display:none;color:var(--yellow);font-size:.85rem;align-self:center">
             </div>
           </div>
@@ -721,8 +722,8 @@
         <input id="new-lobby-name" type="text" placeholder="e.g. Alpha Station" />
       </div>
       <div class="field">
-        <label>Max Players (5–80)</label>
-        <input id="new-lobby-max" type="number" min="5" max="80" value="20" />
+        <label>Max Players (5–100)</label>
+        <input id="new-lobby-max" type="number" min="5" max="100" value="20" />
       </div>
       <div id="modal-error"></div>
       <div class="modal-actions">
@@ -982,8 +983,8 @@
       const errEl = document.getElementById('modal-error');
       errEl.textContent = '';
       if (!name) { errEl.textContent = 'Name is required.'; return; }
-      if (max_players < 5 || max_players > 80 || isNaN(max_players)) {
-        errEl.textContent = 'Max players must be 5–80.'; return;
+      if (max_players < 5 || max_players > 100 || isNaN(max_players)) {
+        errEl.textContent = 'Max players must be 5–100.'; return;
       }
       try {
         await apiFetch('/api/lobbies', { method: 'POST', body: JSON.stringify({ name, max_players }) });
@@ -1208,6 +1209,26 @@
       } catch (err) {
         showToast(err.message, 'error');
       }
+    });
+
+    document.getElementById('btn-remove-all').addEventListener('click', async () => {
+      if (!state.currentLobby) return;
+      const players = state.lobbyData?.players || [];
+      if (players.length === 0) { showToast('No players to remove', ''); return; }
+      if (!confirm(`Remove all ${players.length} player(s) and delete this lobby?`)) return;
+      const ids = players.map(p => p.id);
+      let closed = false;
+      for (const id of ids) {
+        if (closed) break;
+        try {
+          const result = await apiFetch(`/api/lobbies/${state.currentLobby.id}/kick/${id}`, { method: 'POST' });
+          if (result.lobbyClosed) closed = true;
+        } catch (_) { /* player may have already left */ }
+      }
+      disconnectSocket();
+      showScreen('lobbies');
+      startLobbyRefresh();
+      showToast('Lobby removed', 'success');
     });
 
     document.getElementById('btn-start-game').addEventListener('click', () => {

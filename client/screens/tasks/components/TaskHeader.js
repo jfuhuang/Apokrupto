@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
-export default function TaskHeader({ title, reference, timeLimit, onCancel, onTimeUp }) {
+export default function TaskHeader({ title, reference, synopsis, timeLimit, onCancel, onTimeUp }) {
   const [secondsLeft, setSecondsLeft] = useState(timeLimit > 0 ? timeLimit : null);
   const timerBarAnim = useRef(new Animated.Value(1)).current;
 
@@ -45,6 +45,10 @@ export default function TaskHeader({ title, reference, timeLimit, onCancel, onTi
           <Text style={styles.cancelText}>✕</Text>
         </TouchableOpacity>
       </View>
+
+      {synopsis ? (
+        <Text style={styles.synopsis} numberOfLines={2}>{synopsis}</Text>
+      ) : null}
 
       {timeLimit > 0 && (
         <View style={styles.timerRow}>
@@ -116,10 +120,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.tertiary,
   },
+  synopsis: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 11,
+    color: colors.text.secondary,
+    marginTop: 4,
+    lineHeight: 15,
+  },
   timerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
     gap: 8,
   },
   timerBarTrack: {

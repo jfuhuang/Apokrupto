@@ -1,15 +1,13 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
-import Svg, { Circle, Path, Ellipse, Line, Rect, G } from 'react-native-svg';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import Svg, { Circle, Path, Ellipse, Line } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
-const SIZE   = 180;
-const STROKE = 14;
+const SIZE   = 130;
+const STROKE = 10;
 const R      = (SIZE - STROKE) / 2;
 const CIRC   = 2 * Math.PI * R;
-
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 // ── Task-specific temptation visuals ────────────────────────────────────────
 
@@ -102,13 +100,16 @@ const TASK_CONFIG = {
 // ── Main component ──────────────────────────────────────────────────────────
 
 export default function PatienceTask({ config, onSuccess, onFail, taskId }) {
+  console.log('[PatienceTask] RENDER — taskId:', taskId, 'config:', JSON.stringify(config));
   const { duration } = config;
-  const fillAnim  = useRef(new Animated.Value(0)).current;
+  console.log('[PatienceTask] duration:', duration);
   const pulseAnim = useRef(new Animated.Value(0)).current;
+  const [progress, setProgress] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [failed, setFailed]       = useState(false);
   const doneRef = useRef(false);
   const readyRef = useRef(false);
+  const startTimeRef = useRef(null);
 
   // Delay before accepting touches — prevents the navigation tap from
   // immediately failing the task on mount
@@ -118,24 +119,40 @@ export default function PatienceTask({ config, onSuccess, onFail, taskId }) {
   }, []);
 
   const taskCfg = TASK_CONFIG[taskId] || TASK_CONFIG.still_waters;
+  console.log('[PatienceTask] taskCfg found:', !!taskCfg, 'for taskId:', taskId, 'keys:', Object.keys(TASK_CONFIG));
   const { ringColor, label, failMsg, Temptation } = taskCfg;
+  console.log('[PatienceTask] ringColor:', ringColor, 'label:', label, 'Temptation:', typeof Temptation);
 
-  // Auto-fill ring over duration
+  // Auto-fill ring over duration using requestAnimationFrame
+  // (Animated.createAnimatedComponent doesn't work reliably with react-native-svg)
   useEffect(() => {
-    Animated.timing(fillAnim, {
-      toValue:  1,
-      duration: duration * 1000,
-      useNativeDriver: false,
-    }).start(({ finished }) => {
-      if (finished && !doneRef.current) {
+    console.log('[PatienceTask] rAF effect mounted, duration:', duration);
+    startTimeRef.current = Date.now();
+    let frameId;
+    let logCount = 0;
+    const tick = () => {
+      if (doneRef.current) return;
+      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+      const p = Math.min(elapsed / duration, 1);
+      if (logCount < 5 || p >= 1) {
+        console.log('[PatienceTask] tick — elapsed:', elapsed.toFixed(2), 'progress:', p.toFixed(3));
+        logCount++;
+      }
+      setProgress(p);
+      if (p >= 1) {
         doneRef.current = true;
         setCompleted(true);
+        console.log('[PatienceTask] COMPLETED — calling onSuccess');
         onSuccess();
+      } else {
+        frameId = requestAnimationFrame(tick);
       }
-    });
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
   }, []);
 
-  // Temptation pulse loop
+  // Temptation pulse loop (uses native driver for View transforms — works fine)
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -146,23 +163,15 @@ export default function PatienceTask({ config, onSuccess, onFail, taskId }) {
   }, []);
 
   // Any touch = fail
-  const handleTouch = () => {
+  const handleTouch = useCallback(() => {
     if (doneRef.current) return;
     doneRef.current = true;
-    fillAnim.stopAnimation();
     setFailed(true);
-    Animated.timing(fillAnim, {
-      toValue:  0,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
+    setProgress(0);
     onFail();
-  };
+  }, [onFail]);
 
-  const dashOffset = fillAnim.interpolate({
-    inputRange:  [0, 1],
-    outputRange: [CIRC, 0],
-  });
+  const dashOffset = CIRC * (1 - progress);
 
   const currentColor = completed
     ? colors.accent.neonGreen
@@ -170,12 +179,19 @@ export default function PatienceTask({ config, onSuccess, onFail, taskId }) {
     ? colors.state.error
     : ringColor;
 
+  console.log('[PatienceTask] RENDERING — progress:', progress.toFixed(3), 'completed:', completed, 'failed:', failed, 'dashOffset:', dashOffset.toFixed(1), 'SIZE:', SIZE, 'R:', R, 'CIRC:', CIRC.toFixed(1));
+
   return (
     <View
       style={styles.container}
       onStartShouldSetResponder={() => !doneRef.current && readyRef.current}
       onResponderGrant={handleTouch}
     >
+      {/* DEBUG: visible marker to confirm component renders */}
+      <Text style={{ color: 'yellow', fontSize: 10, textAlign: 'center' }}>
+        [DEBUG] PatienceTask mounted | taskId={taskId} | progress={progress.toFixed(2)} | dur={duration} | color={currentColor}
+      </Text>
+
       <Text style={styles.instruction}>
         {completed
           ? 'Well done!'
@@ -183,8 +199,9 @@ export default function PatienceTask({ config, onSuccess, onFail, taskId }) {
           ? failMsg
           : label}
       </Text>
-
       <View style={styles.ringWrapper}>
+        {/* DEBUG: background color to see if ringWrapper has size */}
+        <View style={{ position: 'absolute', width: SIZE, height: SIZE, backgroundColor: 'rgba(255,0,0,0.15)' }} />
         <Svg width={SIZE} height={SIZE}>
           {/* Background track */}
           <Circle
@@ -194,7 +211,7 @@ export default function PatienceTask({ config, onSuccess, onFail, taskId }) {
             fill="none"
           />
           {/* Auto-filling progress arc */}
-          <AnimatedCircle
+          <Circle
             cx={SIZE / 2} cy={SIZE / 2} r={R}
             stroke={currentColor}
             strokeWidth={STROKE}
@@ -224,7 +241,7 @@ export default function PatienceTask({ config, onSuccess, onFail, taskId }) {
       </Text>
 
       {!completed && !failed && (
-        <Text style={styles.warning}>⚠ ANY touch = instant fail</Text>
+        <Text style={styles.warning}>ANY touch = instant fail</Text>
       )}
     </View>
   );
@@ -235,8 +252,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
-    gap: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    gap: 10,
   },
   instruction: {
     fontFamily: fonts.ui.semiBold,

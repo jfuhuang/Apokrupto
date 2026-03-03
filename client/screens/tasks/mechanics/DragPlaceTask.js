@@ -5,7 +5,6 @@ import {
   StyleSheet,
   PanResponder,
   Animated,
-  Dimensions,
 } from 'react-native';
 import Svg, {
   Rect, Circle, Ellipse, Path, Polygon, Line, G,
@@ -13,17 +12,8 @@ import Svg, {
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
-const { width: W, height: H } = Dimensions.get('window');
 const DRAG_SIZE   = 80;
 const TARGET_SIZE = 90;
-
-// Fixed target at center area
-const TARGET_X = W / 2 - TARGET_SIZE / 2;
-const TARGET_Y = H * 0.55;
-
-// Drag object starts top-left area
-const START_X = W * 0.15;
-const START_Y = H * 0.18;
 
 // ── Task-specific hint text ──────────────────────────────────────────────
 
@@ -225,6 +215,34 @@ export default function DragPlaceTask({ config, onSuccess, onFail, taskId }) {
   const { snapTolerance } = config;
   const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const [snapped, setSnapped] = useState(false);
+  const [layout, setLayout] = useState(null);
+  const layoutRef = useRef(null);
+
+  const onLayout = (e) => {
+    const { width, height } = e.nativeEvent.layout;
+    const l = { width, height };
+    layoutRef.current = l;
+    setLayout(l);
+  };
+
+  // Positions computed relative to the container, not the window
+  const cW = layout?.width || 300;
+  const cH = layout?.height || 250;
+
+  const targetX = cW / 2 - TARGET_SIZE / 2;
+  const targetY = cH * 0.45;
+  const startX = cW * 0.12;
+  const startY = cH * 0.08;
+
+  // Helper to compute positions from latest layout (avoids stale closures in PanResponder)
+  const getPositions = () => {
+    const l = layoutRef.current || { width: 300, height: 250 };
+    const tx = l.width / 2 - TARGET_SIZE / 2;
+    const ty = l.height * 0.45;
+    const sx = l.width * 0.12;
+    const sy = l.height * 0.08;
+    return { tx, ty, sx, sy };
+  };
 
   const panResponder = useRef(
     PanResponder.create({
@@ -234,18 +252,18 @@ export default function DragPlaceTask({ config, onSuccess, onFail, taskId }) {
         { useNativeDriver: false }
       ),
       onPanResponderRelease: (_, gesture) => {
-        const cx = START_X + gesture.dx + DRAG_SIZE / 2;
-        const cy = START_Y + gesture.dy + DRAG_SIZE / 2;
-        const tcx = TARGET_X + TARGET_SIZE / 2;
-        const tcy = TARGET_Y + TARGET_SIZE / 2;
+        const { tx, ty, sx, sy } = getPositions();
+        const cx = sx + gesture.dx + DRAG_SIZE / 2;
+        const cy = sy + gesture.dy + DRAG_SIZE / 2;
+        const tcx = tx + TARGET_SIZE / 2;
+        const tcy = ty + TARGET_SIZE / 2;
         const dist = Math.sqrt((cx - tcx) ** 2 + (cy - tcy) ** 2);
 
         if (dist <= snapTolerance) {
-          // Snap to target centre
-          const snapX = TARGET_X + TARGET_SIZE / 2 - DRAG_SIZE / 2;
-          const snapY = TARGET_Y + TARGET_SIZE / 2 - DRAG_SIZE / 2;
+          const snapX = tx + TARGET_SIZE / 2 - DRAG_SIZE / 2;
+          const snapY = ty + TARGET_SIZE / 2 - DRAG_SIZE / 2;
           Animated.spring(pan, {
-            toValue: { x: snapX - START_X, y: snapY - START_Y },
+            toValue: { x: snapX - sx, y: snapY - sy },
             friction: 5,
             useNativeDriver: false,
           }).start(() => {
@@ -253,7 +271,6 @@ export default function DragPlaceTask({ config, onSuccess, onFail, taskId }) {
             onSuccess();
           });
         } else {
-          // Bounce back
           Animated.spring(pan, {
             toValue: { x: 0, y: 0 },
             friction: 5,
@@ -283,23 +300,27 @@ export default function DragPlaceTask({ config, onSuccess, onFail, taskId }) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onLayout={onLayout}>
       <Text style={styles.hint}>
         {snapped ? hints.after : hints.before}
       </Text>
 
-      {/* Target zone */}
-      <View style={[styles.target, { left: TARGET_X, top: TARGET_Y }]}>
-        {renderTarget()}
-      </View>
+      {layout && (
+        <>
+          {/* Target zone */}
+          <View style={[styles.target, { left: targetX, top: targetY }]}>
+            {renderTarget()}
+          </View>
 
-      {/* Draggable object */}
-      <Animated.View
-        style={[styles.draggable, { left: START_X, top: START_Y }, { transform: pan.getTranslateTransform() }]}
-        {...panResponder.panHandlers}
-      >
-        {renderDraggable()}
-      </Animated.View>
+          {/* Draggable object */}
+          <Animated.View
+            style={[styles.draggable, { left: startX, top: startY }, { transform: pan.getTranslateTransform() }]}
+            {...panResponder.panHandlers}
+          >
+            {renderDraggable()}
+          </Animated.View>
+        </>
+      )}
     </View>
   );
 }

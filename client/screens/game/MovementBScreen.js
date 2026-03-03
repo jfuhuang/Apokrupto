@@ -176,6 +176,7 @@ export default function MovementBScreen({
 
   // ── Render active task ──────────────────────────────────────────────────
   if (activeTask) {
+    console.log('[MovementB] Rendering TaskScreen for:', activeTask.id, 'mechanic:', activeTask.mechanic, 'config:', JSON.stringify(activeTask.config));
     return (
       <TaskScreen
         task={activeTask}

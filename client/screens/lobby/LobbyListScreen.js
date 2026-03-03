@@ -349,7 +349,7 @@ export default function LobbyListScreen({ token, onLogout, onJoinLobby }) {
             </View>
 
             <View style={styles.modalInputContainer}>
-              <Text style={styles.modalLabel}>Max Players (4-15)</Text>
+              <Text style={styles.modalLabel}>Max Players (5–100, multiple of 5)</Text>
               <TextInput
                 style={styles.modalInput}
                 value={maxPlayers}

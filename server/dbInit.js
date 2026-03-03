@@ -26,7 +26,7 @@ async function init() {
     CREATE TABLE IF NOT EXISTS lobbies (
       id          SERIAL PRIMARY KEY,
       name        VARCHAR(100) NOT NULL,
-      max_players INT NOT NULL CHECK (max_players >= 5 AND max_players <= 80),
+      max_players INT NOT NULL CHECK (max_players >= 5 AND max_players <= 100),
       created_by  INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       status      VARCHAR(20) DEFAULT 'waiting'
                     CHECK (status IN ('waiting', 'in_progress', 'completed')),
@@ -172,6 +172,13 @@ async function init() {
     CREATE INDEX IF NOT EXISTS ix_mv_a_sub      ON movement_a_submissions (movement_id, group_id);
     CREATE INDEX IF NOT EXISTS ix_mv_c_votes    ON movement_c_votes (movement_id, group_id);
     CREATE INDEX IF NOT EXISTS ix_sus_events    ON sus_events (game_id, round_number);
+  `);
+
+  // Migrate: widen max_players constraint to 100 if it was created with the old 80 limit
+  await pool.query(`
+    ALTER TABLE lobbies DROP CONSTRAINT IF EXISTS lobbies_max_players_check;
+    ALTER TABLE lobbies ADD CONSTRAINT lobbies_max_players_check
+      CHECK (max_players >= 5 AND max_players <= 100);
   `);
 
   // Seed word prompt pairs (only if table is empty)
