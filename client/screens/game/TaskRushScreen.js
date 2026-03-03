@@ -83,19 +83,19 @@ export default function TaskRushScreen({
   // Points animation
   const pointsBounce = useRef(new Animated.Value(0)).current;
 
-  // Background flash
-  const bgFlashOpacity = useRef(new Animated.Value(0)).current;
-  const bgFlashColor   = useRef('#FFFFFF');
+  // Background flash (separate animated values per colour)
+  const successFlashOpacity = useRef(new Animated.Value(0)).current;
+  const failFlashOpacity    = useRef(new Animated.Value(0)).current;
 
-  const flashBg = useCallback((color) => {
-    bgFlashColor.current = color;
-    bgFlashOpacity.setValue(0.28);
-    Animated.timing(bgFlashOpacity, {
+  const flashBg = useCallback((type) => {
+    const anim = type === 'success' ? successFlashOpacity : failFlashOpacity;
+    anim.setValue(0.3);
+    Animated.timing(anim, {
       toValue: 0,
       duration: 500,
       useNativeDriver: true,
     }).start();
-  }, [bgFlashOpacity]);
+  }, [successFlashOpacity, failFlashOpacity]);
 
   const currentTask = rushQueue[currentIndex] || null;
 
@@ -220,7 +220,7 @@ export default function TaskRushScreen({
     submitMovementBTask(token, gameId, task.id, bonusPoints).catch(() => {});
 
     setTimeout(() => advanceToNextTask(), RUSH_RESULT_MS);
-  }, [currentIndex, rushQueue, streak, token, gameId, advanceToNextTask]);
+  }, [currentIndex, rushQueue, streak, token, gameId, advanceToNextTask, flashBg]);
 
   // ── Fail handler ────────────────────────────────────────────────────────
   const handleFail = useCallback(() => {
@@ -235,7 +235,7 @@ export default function TaskRushScreen({
     flashBg('fail');
 
     setTimeout(() => advanceToNextTask(), RUSH_RESULT_MS);
-  }, [streak, advanceToNextTask]);
+  }, [streak, advanceToNextTask, flashBg]);
 
   // ── Render mechanic ─────────────────────────────────────────────────────
   const renderMechanic = () => {
