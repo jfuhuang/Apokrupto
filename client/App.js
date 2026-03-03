@@ -456,6 +456,7 @@ export default function App() {
             isSus={isSus}
             token={token}
             lobbyId={currentLobbyId}
+            gameId={gameId}
             onRoundSetup={handleRoundSetup}
             onGameOver={handleGameOver}
             onContinue={handleRoundSummaryContinue}

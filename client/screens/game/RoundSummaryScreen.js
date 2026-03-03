@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
+import { fetchPlayerGameState } from '../../utils/api';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
 import SusIcon from '../../components/SusIcon';
@@ -15,11 +16,21 @@ export default function RoundSummaryScreen({
   isSus,
   token,
   lobbyId,
+  gameId,
   onRoundSetup,
   onGameOver,
 }) {
   const socketRef = useRef(null);
+  const gameOverFiredRef = useRef(false);
 
+  // Helper: fire onGameOver exactly once
+  const fireGameOver = (result) => {
+    if (gameOverFiredRef.current) return;
+    gameOverFiredRef.current = true;
+    if (onGameOver) onGameOver(result);
+  };
+
+  // ── Socket listener ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!token || !lobbyId) return;
     let socket;
@@ -43,7 +54,7 @@ export default function RoundSummaryScreen({
 
       // Game ended (final round or supermajority hit after this summary)
       socket.on('gameOver', (result) => {
-        if (onGameOver) onGameOver(result);
+        fireGameOver(result);
       });
     };
     connect().catch(console.error);
@@ -54,6 +65,34 @@ export default function RoundSummaryScreen({
       }
     };
   }, [token, lobbyId]);
+
+  // ── REST polling fallback — catches gameOver if socket missed the event ──
+  useEffect(() => {
+    if (!token || !gameId) return;
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled || gameOverFiredRef.current) return;
+      try {
+        const { ok, data } = await fetchPlayerGameState(token, gameId);
+        if (cancelled || gameOverFiredRef.current) return;
+        if (ok && data?.gameStatus === 'completed') {
+          fireGameOver({
+            winner:       data.winner ?? null,
+            condition:    data.winCondition ?? null,
+            phosPoints:   data.teamPoints?.phos ?? 0,
+            skotiaPoints: data.teamPoints?.skotia ?? 0,
+          });
+        }
+      } catch {
+        // non-fatal
+      }
+    };
+    const id = setInterval(poll, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [token, gameId]);
 
   const susApplied = summary?.susApplied ?? 0;
   const clearedApplied = summary?.clearedApplied ?? 0;
