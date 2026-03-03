@@ -6,13 +6,13 @@ const votingService = require('./votingService');
 // Point constants
 // ---------------------------------------------------------------------------
 const POINTS = {
-  CORRECT_SUS:   200, // Phos sus's Skotia → Phos earns
-  FALSE_SUS:     100, // Phos sus's Phos   → Skotia earns (was 150 — lowered to reduce random-marking incentive)
-  CORRECT_CLEAR: 150, // Clear Phos (vindication) → Phos earns
-  FALSE_CLEAR:   200, // Clear Skotia (re-hides)  → Skotia earns
-  SKOTIA_PASSIVE:  50, // Skotia flat bonus per Movement B
+  CORRECT_SUS:   8,   // Phos correctly sus Skotia → Phos earns
+  FALSE_SUS:     4,   // Phos sus innocent Phos    → Skotia earns
+  CORRECT_CLEAR: 6,   // Clear innocent Phos        → Phos earns
+  FALSE_CLEAR:   8,   // Clear Skotia (re-hides)    → Skotia earns
+  SKOTIA_PASSIVE: 2,  // Skotia flat bonus per Movement B
   SUS_CHALLENGE_MULTIPLIER: 0.5, // Sus players earn 50% of task points
-  SKOTIA_SURVIVAL_PER_PLAYER: 100, // Per undetected Skotia per voting round
+  SKOTIA_SURVIVAL_PER_PLAYER: 4, // Per undetected Skotia per voting round
 };
 
 // Local copy of voting duration used in activateC step (avoids re-require)
@@ -922,7 +922,8 @@ async function getPlayerState(gameId, userId) {
 
   // Game/round/movement — include 'summarizing' rounds so state is always available
   const gameRes = await pool.query(
-    `SELECT g.current_round, g.total_rounds, m.movement_type AS movement
+    `SELECT g.current_round, g.total_rounds, g.status AS game_status,
+            g.winner, g.win_condition, m.movement_type AS movement
      FROM games g
      LEFT JOIN rounds r    ON r.game_id = g.id AND r.status IN ('active', 'summarizing')
      LEFT JOIN movements m ON m.round_id = r.id AND m.status = 'active'
@@ -965,6 +966,9 @@ async function getPlayerState(gameId, userId) {
     currentRound:       game?.current_round ?? null,
     totalRounds:        game?.total_rounds ?? null,
     currentMovement:    game?.movement ?? null,
+    gameStatus:         game?.game_status ?? null,
+    winner:             game?.winner ?? null,
+    winCondition:       game?.win_condition ?? null,
     completedMovements,
     movementBEndsAt,
   };
