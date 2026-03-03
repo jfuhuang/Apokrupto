@@ -3,6 +3,10 @@ const coopService = require('../services/coopService');
 const { generateCoopTask, COOP_MULTIPLIER, COOP_BASE_POINTS } = require('../data/coopTasks');
 const pool = require('../db');
 
+// userId → timeout ID for deferred session-end after disconnect
+const _disconnectTimers = new Map();
+const DISCONNECT_GRACE_MS = 8000;
+
 /**
  * Award co-op points to a team in the DB, applying 50% Sus penalty if the
  * triggering player is marked.
@@ -85,9 +89,16 @@ function registerCoopHandlers(socket) {
 
   socket.on('coopInvite', async ({ gameId, targetUserId }, callback) => {
     try {
-      const invite = coopService.createInvite(gameId, socket.userId, socket.username, targetUserId);
+      const { invite, cancelledInvite } = coopService.createInvite(gameId, socket.userId, socket.username, targetUserId);
       const io = ioModule.getIO();
       if (io) {
+        // Notify previous invite target that their invite was cancelled
+        if (cancelledInvite) {
+          const prevTargetSockets = findSocketsForUser(io, cancelledInvite.targetUserId);
+          for (const s of prevTargetSockets) {
+            s.emit('coopInviteCancelled', { inviteId: cancelledInvite.id });
+          }
+        }
         const targetSockets = findSocketsForUser(io, targetUserId);
         for (const s of targetSockets) {
           s.emit('coopInviteReceived', {
@@ -370,6 +381,7 @@ function registerCoopHandlers(socket) {
             io.to(room).emit('coopTaskUpdate', {
               sessionId,
               phase: 'resolved',
+              success: true,
               elapsed: session.holdState.elapsed,
               pointsAwarded: awardedA + awardedB,
             });
@@ -419,6 +431,7 @@ function registerCoopHandlers(socket) {
             io.to(room).emit('coopTaskUpdate', {
               sessionId,
               phase: 'resolved',
+              success: true,
               elapsed: session.holdState.elapsed,
               pointsAwarded: awardedA + awardedB,
             });
@@ -437,7 +450,9 @@ function registerCoopHandlers(socket) {
       }
 
       else {
-        throw new Error(`Unknown action "${action}" for task type "${task.taskType}"`);
+        // Stale action from a previous task (race condition) — ignore silently
+        console.warn(`[Coop] Ignoring stale action "${action}" for task type "${task.taskType}"`);
+        if (callback) callback({ ok: true });
       }
     } catch (err) {
       console.error('[Coop] coopAction error:', err.message);
@@ -470,21 +485,57 @@ function registerCoopHandlers(socket) {
     }
   });
 
+  socket.on('coopRejoin', ({ sessionId }, callback) => {
+    try {
+      // Cancel any pending disconnect timer for this user
+      const existing = _disconnectTimers.get(socket.userId);
+      if (existing) {
+        clearTimeout(existing);
+        _disconnectTimers.delete(socket.userId);
+      }
+
+      const session = coopService.getSession(sessionId);
+      if (!session) throw new Error('Session not found');
+      const role = getPlayerRole(session, socket.userId);
+      if (!role) throw new Error('You are not in this session');
+
+      socket.join(`coop:${sessionId}`);
+      if (callback) callback({ ok: true, role });
+    } catch (err) {
+      console.error('[Coop] coopRejoin error:', err.message);
+      if (callback) callback({ error: err.message });
+    }
+  });
+
   socket.on('disconnect', () => {
     try {
       const session = coopService.getSessionByPlayer(socket.userId);
-      if (session) {
-        const ended = coopService.endSession(session.id);
-        const io = ioModule.getIO();
-        if (io && ended) {
-          io.to(`coop:${session.id}`).emit('coopSessionEnd', {
-            sessionId: session.id,
-            reason: 'disconnected',
-            sessionPoints: (ended.sessionPoints?.A || 0) + (ended.sessionPoints?.B || 0),
-            teamPoints: null,
-          });
+      if (!session) return;
+
+      // Grace period: give the client time to reconnect before ending the session
+      const timer = setTimeout(() => {
+        _disconnectTimers.delete(socket.userId);
+        try {
+          // Check the session is still there and this player hasn't reconnected
+          const stillActive = coopService.getSessionByPlayer(socket.userId);
+          if (!stillActive || stillActive.id !== session.id) return;
+
+          const ended = coopService.endSession(session.id);
+          const io = ioModule.getIO();
+          if (io && ended) {
+            io.to(`coop:${session.id}`).emit('coopSessionEnd', {
+              sessionId: session.id,
+              reason: 'disconnected',
+              sessionPoints: (ended.sessionPoints?.A || 0) + (ended.sessionPoints?.B || 0),
+              teamPoints: null,
+            });
+          }
+        } catch (innerErr) {
+          console.error('[Coop] deferred disconnect error:', innerErr.message);
         }
-      }
+      }, DISCONNECT_GRACE_MS);
+
+      _disconnectTimers.set(socket.userId, timer);
     } catch (err) {
       console.error('[Coop] disconnect cleanup error:', err.message);
     }

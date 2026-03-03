@@ -18,11 +18,17 @@ function createInvite(gameId, fromUserId, fromUsername, targetUserId) {
   if (_playerSessions.has(String(fromUserId))) {
     throw new Error('You are already in a co-op session');
   }
-  if (_playerInvites.has(String(fromUserId))) {
-    throw new Error('You already have a pending invite');
-  }
   if (String(fromUserId) === String(targetUserId)) {
     throw new Error('Cannot invite yourself');
+  }
+
+  // Auto-cancel any existing pending invite from this player
+  let cancelledInvite = null;
+  const existingInviteId = _playerInvites.get(String(fromUserId));
+  if (existingInviteId) {
+    cancelledInvite = _invites.get(existingInviteId) || null;
+    _invites.delete(existingInviteId);
+    _playerInvites.delete(String(fromUserId));
   }
 
   const id = crypto.randomUUID();
@@ -36,7 +42,7 @@ function createInvite(gameId, fromUserId, fromUsername, targetUserId) {
   };
   _invites.set(id, invite);
   _playerInvites.set(String(fromUserId), id);
-  return invite;
+  return { invite, cancelledInvite };
 }
 
 function cancelInvite(inviteId, userId) {
