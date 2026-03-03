@@ -39,7 +39,7 @@ The client dynamically detects the server's IP address via `client/utils/network
 - **Server:** Node.js + Express 4, listening on port 3000
 - **Database:** PostgreSQL (pg driver); schema auto-created on server start via `dbInit.js`
 - **Auth:** JWT tokens (7-day expiry), stored client-side in `expo-secure-store`
-- **Real-time:** Socket.IO on both client and server. Lobby screens use socket + 10s REST polling fallback. Game screens are socket-driven + occasional REST state fetches.
+- **Real-time:** Socket.IO on both client and server. Lobby screens use socket + 3s REST polling fallback. Game screens are socket-driven + 3s safety-net polling on every active game screen.
 
 ### Navigation (client)
 There is **no React Navigation library**. `client/App.js` manages a `currentScreen` string state and renders the appropriate screen component directly. To add a screen, add it to the `switch` block in `App.js`.
@@ -135,7 +135,7 @@ All endpoints require `Authorization: Bearer <token>` unless noted. Admin endpoi
 | POST | `/api/games` | `{ lobbyId, totalRounds? }` | `{ gameId }` | Creates game record; host only; **not used by client** (client uses `startGame` socket event) |
 | POST | `/api/games/:gameId/start` | — | `{ ok, gameId, groupCount }` | Starts game via REST; host only; **not used by client** — socket `startGame` is the actual path |
 | POST | `/api/games/:gameId/advance` | — | `{ ok, nextMovement, ... }` | REST equivalent of socket `gmAdvance`; GM only |
-| GET | `/api/games/:gameId/state` | — | `{ team, isMarked, groupId, groupIndex, groupMembers, teamPoints, currentRound, totalRounds, currentMovement }` | Per-player snapshot; used by RoundHubScreen on mount |
+| GET | `/api/games/:gameId/state` | — | `{ team, isMarked, groupId, groupIndex, groupMembers, teamPoints, currentRound, totalRounds, currentMovement, movementBEndsAt?, gameStatus?, winner?, winCondition? }` | Per-player snapshot; polled every 3 s by all active game screens as a safety net |
 | GET | `/api/games/:gameId/gm-state` | — | `{ players, gameState: { round, totalRounds, movement, status }, teamPoints }` | GM dashboard polling |
 | GET | `/api/games/:gameId/movement-a/prompt` | — | `{ prompt, themeLabel, currentPlayerId, completedCount, totalCount, timeLimit: 30 }` | Team-specific prompt |
 | POST | `/api/games/:gameId/movement-a/submit` | `{ word }` | `{ ok, phase: 'waiting'\|'deliberation', nextPlayerId?, words? }` | Validates turn order |
@@ -168,13 +168,13 @@ All endpoints require `Authorization: Bearer <token>` unless noted. Admin endpoi
 | `lobbyClosed` | lobby | `{ lobbyId, reason }` | |
 
 **Not yet implemented (server gaps):**
-- `gameStateUpdate` — both `RoundHubScreen` and `GmDashboardScreen` listen for this, but the server never emits it. Live score/mark-status pushes do not work without it. Workaround: GmDashboard polls `/api/games/:id/gm-state` every 10s; RoundHub relies on `movementStart` payload for round/score updates.
+- `gameStateUpdate` — both `RoundHubScreen` and `GmDashboardScreen` listen for this, but the server never emits it. Live score/mark-status pushes do not work without it. Workaround: GmDashboard polls `/api/games/:id/gm-state` every 3s; all active game screens poll `/api/games/:id/state` every 3s for recovery.
 - `taskAssigned` — `RoundHubScreen` listens for this (Movement B task assignment), but the server has no task assignment logic. Movement B is a stub.
 - `movementAComplete` — `MovementAScreen` has a legacy listener for this, but the server uses `movementStart` (to the lobby room) instead. **Client now also listens for `movementStart { movement !== 'A' }` to exit.** The server does NOT need to emit `movementAComplete`.
 
 ### Game flow: how a round works (server-side)
 
-1. **Host emits `startGame`** → server creates game + assigns teams (1 Skotia per 4 Phos, guaranteed 1 Skotia per group of 5) → emits `roleAssigned` per socket + `gameStarted` + `movementStart { movement: 'A' }` to lobby room.
+1. **Host emits `startGame`** → server creates game + assigns teams via `computeGroupCount(n)` (targets group size 5, min 4; always exactly 1 Skotia per group) → emits `roleAssigned` per socket + `gameStarted` + `movementStart { movement: 'A' }` to lobby room.
 2. **Client: countdown (5s) → roleReveal (6s) → roundHub** → roundHub fetches `GET /api/games/:id/state` on mount; if `currentMovement` is set, navigates immediately.
 3. **Movement A:** players fetch prompt via `GET /api/games/:id/movement-a/prompt`, submit words via `POST`, receive `turnStart`/`deliberationStart` on the group socket room.
 4. **GM emits `gmAdvance`** → server advances A→B → emits `movementStart { movement: 'B' }` to lobby room. MovementAScreen sees this and exits.
@@ -190,6 +190,8 @@ All endpoints require `Authorization: Bearer <token>` unless noted. Admin endpoi
 | Correct unmark (vindicate Phos) | +150 | Phos |
 | False unmark (free Skotia) | +200 | Skotia |
 | Movement B passive bonus | +50 | Skotia |
+
+Solo task points use a **1–10 scale** (alive/dead variants). Coop task base points: deception 3, coop_tap 2, coop_hold 3. `COOP_MULTIPLIER` is 1. See `server/data/tasks.js` and `server/data/coopTasks.js`.
 
 ### Client screen inventory
 | Screen | File | Status |
@@ -224,24 +226,30 @@ All endpoints require `Authorization: Bearer <token>` unless noted. Admin endpoi
 
 - **No testing framework is configured.** Testing is manual.
 - **Server-side game logic IS built** (Phase 1 complete). All DB tables, REST routes (`gameRoutes.js`), socket handlers (`lobbySocket.js`), and the game state machine (`services/gameService.js`) exist and are wired up.
-- **Movement B is a stub.** Server advances A→B→C correctly and awards Skotia the passive bonus (+50), but there is no task assignment server logic. `RoundHubScreen` shows in `movementBMode` waiting for a `taskAssigned` socket event that never comes. GM must manually advance past B.
-- **`gameStateUpdate` socket event is not emitted.** Clients listen for it but never receive it. Live score updates mid-round are not pushed; players see scores update when the next `movementStart` arrives with `teamPoints`.
+- **Movement B duration is 3 minutes** (`MOVEMENT_B_DURATION_MS = 180_000` on server; `MOVEMENT_B_DURATION_MS = 3 * 60 * 1000` in `client/constants/timings.js`). Movement B is still a stub — no task assignment server logic. `RoundHubScreen` shows in `movementBMode`. GM must manually advance past B.
+- **`gameStateUpdate` socket event is not emitted.** Clients listen for it but never receive it. Live score updates mid-round are not pushed; players see scores update when the next `movementStart` arrives or via the 3s safety-net poll.
 - Minimum lobby size is 5 (one complete group). Maximum is 100.
 - DB transactions are used in lobby join/leave and all game state mutations to prevent race conditions.
 - The server hardcodes `0.0.0.0:3000` as the bind address. The real IP is detected by the client dynamically.
 - JWT is decoded manually (no external library) in screens that need the user ID: `token.split('.')[1]` → base64 decode → `payload.sub`.
 - **Socket rooms:** `lobby:{lobbyId}` for lobby-wide events; `lobby:{groupId}` for group-specific events (Movement A turns). `MovementAScreen` joins BOTH rooms — the group room for `turnStart`/`deliberationStart`, and the lobby room to detect GM `gmAdvance` via `movementStart`.
 - **Turn state is in-memory** — `groupTurnState` Map in `gameService.js` stores Movement A turn order. Lost on server restart, which would break an in-progress Movement A.
-- **Group assignment** — always exactly 1 Skotia + 4 Phos per group of 5; reshuffled each round.
+- **Group assignment** — `computeGroupCount(n)` in `gameService.js` targets groups of 5 but allows 4–6 members so any player count works (not just multiples of 5). Always 1 Skotia per group. Groups are reshuffled each round.
 - **Prompt seeding** — 10 biblical prompt pairs inserted on first startup (if `prompts` table is empty).
 - **Legacy sabotage system** — still in the codebase (`lobbySocket.js`, `lobbyRoutes.js`). Not part of the Phos/Skotia game. Safe to ignore.
+- **Safety-net polling** — All active game screens (MovementA, MovementB, VotingScreen, RoundHub, RoundSummary, GameOverScreen) poll `GET /api/games/:id/state` every 3 s. If the movement has advanced while the socket was disconnected, the screen transitions automatically. This makes socket delivery non-critical for progression.
+- **Pull-to-refresh** — RoundHubScreen, MovementBScreen, VotingScreen, and RoundSummaryScreen support pull-to-refresh (ScrollView + RefreshControl) for manual state sync. MovementAScreen does not (no natural ScrollView).
+- **Coop: disconnect grace period** — `coopSocket.js` defers `coopService.endSession` by 8 s on disconnect. A `coopRejoin` socket event cancels the timer and re-adds the socket to `coop:{sessionId}`. Use this pattern when adding future coop reconnect logic.
+- **Coop: invite auto-cancel** — `createInvite()` in `coopService.js` cancels any previous pending invite from the same sender (rather than throwing). The replaced invite target receives a `coopInviteCancelled` socket event.
+- **Coop socket transport** — CoopRushScreen and CoopLobbyScreen use `transports: ['polling', 'websocket']` (polling-first) for improved reliability behind NAT and mobile networks.
 
 ## What Still Needs to Be Built
 
 | Feature | Where | Notes |
 |---------|-------|-------|
 | Movement B task assignment | `server/websocket/lobbySocket.js` or `gameRoutes.js` | Server should emit `taskAssigned` per socket when B starts; tasks exist in `server/data/tasks.js` |
-| `gameStateUpdate` emissions | `server/routes/gameRoutes.js` → `_emitAdvanceEvents` | Emit to lobby room after each `advanceMovement` with `{ teamPoints, currentRound, totalRounds }` so RoundHub and GmDashboard update live |
+| `gameStateUpdate` emissions | `server/routes/gameRoutes.js` → `_emitAdvanceEvents` | Emit to lobby room after each `advanceMovement` with `{ teamPoints, currentRound, totalRounds }` so RoundHub and GmDashboard update live (currently mitigated by 3s polling) |
 | Win condition: supermajority | `server/services/gameService.js` | 80%+ of Skotia correctly marked → Phos instant win; the check exists in `advanceMovement` but verify it works end-to-end |
 | Round summary display | `client/screens/game/RoundSummaryScreen.js` | Receives `summary` prop from `roundSummary` socket payload; verify display logic matches `{ marksApplied, unmarksApplied, phosPointsEarned, skotiaPointsEarned }` |
 | isMarked live push | Server | Players don't know their mark status changed until next round; emit `gameStateUpdate` or a dedicated `markStatusChanged` event |
+| Movement B solo tasks for players | `client/screens/game/MovementBScreen.js` + server | Players currently see a waiting screen during Movement B; need `taskAssigned` socket event wired up |
