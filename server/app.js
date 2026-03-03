@@ -6,6 +6,7 @@ const port = process.env.PORT || 3000; // Define the port number
 const userRoutes = require('./routes/userRoutes');
 const lobbyRoutes = require('./routes/lobbyRoutes');
 const gameRoutes = require('./routes/gameRoutes');
+const logRoutes = require('./routes/logRoutes');
 const { setupLobbySocket } = require('./websocket/lobbySocket');
 const { registerCoopHandlers } = require('./websocket/coopSocket');
 
@@ -14,6 +15,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Request logger for API routes ──────────────────────────────────────────
 app.use('/api', (req, res, next) => {
+  if (req.path.startsWith('/logs')) return next(); // don't log the logger
   const start = Date.now();
   res.on('finish', () => {
     const ms = Date.now() - start;
@@ -27,6 +29,7 @@ app.use('/api', (req, res, next) => {
 app.use('/api/users', userRoutes);
 app.use('/api/lobbies', lobbyRoutes);
 app.use('/api/games', gameRoutes);
+app.use('/api/logs', logRoutes);
 
 app.get('/', (req, res) => {
   res.send('Apokrupto Server - Lobby & Realtime System Active');

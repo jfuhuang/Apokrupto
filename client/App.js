@@ -19,6 +19,7 @@ import {
   Rajdhani_600SemiBold,
   Rajdhani_700Bold,
 } from '@expo-google-fonts/rajdhani';
+import logger from './utils/logger';
 import WelcomeScreen from './screens/welcome/WelcomeScreen';
 import LoginScreen from './screens/auth/LoginScreen';
 import RegistrationScreen from './screens/auth/RegistrationScreen';
@@ -40,6 +41,7 @@ import { colors } from './theme/colors';
 import { fetchCurrentLobby, fetchPlayerGameState } from './utils/api';
 import { useGameState } from './hooks/useGameState';
 import { GameContext } from './context/GameContext';
+import ConnectionDot from './components/ConnectionDot';
 
 function parseJwt(token) {
   try {
@@ -68,6 +70,7 @@ export default function App() {
     movementBEndsAt, roundSummary, gameOverResult,
   } = state;
   const [coopSessionId, setCoopSessionId] = useState(null);
+  const [socketConnected, setSocketConnected] = useState(false);
   const [coopPartnerId, setCoopPartnerId] = useState(null);
   const [coopPartnerUsername, setCoopPartnerUsername] = useState(null);
   const [coopRole, setCoopRole] = useState(null);
@@ -181,12 +184,12 @@ export default function App() {
         }
 
         if (currentScreen !== targetScreen) {
-          console.log(`[GameSync] ${currentScreen} → ${targetScreen} (movement: ${stateData.currentMovement})`);
+          logger.nav('GameSync', `${currentScreen} → ${targetScreen} (movement: ${stateData.currentMovement})`);
           setters.setCurrentMovement(stateData.currentMovement);
           setCurrentScreen(targetScreen);
         }
       } catch (err) {
-        console.warn('[GameSync] poll error:', err.message);
+        logger.poll('GameSync', `poll error: ${err.message}`);
       }
     };
   }); // intentionally no deps
@@ -221,7 +224,7 @@ export default function App() {
 
       setCurrentScreen('lobbyList');
     } catch (error) {
-      console.error('Error checking token:', error);
+      logger.error('App', 'Error checking token', error);
       setCurrentScreen('welcome');
     }
   };
@@ -546,6 +549,7 @@ export default function App() {
     lobbyId: currentLobbyId,
     currentUserId: token ? String(parseJwt(token).sub) : null,
     resetGameState,
+    setSocketConnected,
   };
 
   return (
@@ -553,6 +557,7 @@ export default function App() {
       <View style={styles.root}>
         <StatusBar style="auto" />
         {renderScreen()}
+        <ConnectionDot isConnected={socketConnected} />
       </View>
     </GameContext.Provider>
   );

@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apokrupto · Logs</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d0f1a;
+      --surface:  #131627;
+      --surface2: #1a1e35;
+      --border:   #252a45;
+      --blue:     #00d4ff;
+      --green:    #00ff9f;
+      --red:      #ff3366;
+      --yellow:   #ffd700;
+      --purple:   #b06aff;
+      --muted:    #4a5070;
+      --text:     #c8cfe8;
+      --font:     'Courier New', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--blue);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .logo {
+      font-size: 1.1rem;
+      font-weight: bold;
+      letter-spacing: 3px;
+      color: var(--blue);
+      text-transform: uppercase;
+      margin-right: auto;
+    }
+    .logo span { color: var(--green); }
+
+    /* ── Filter chips ── */
+    .filters { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    .chip {
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-family: var(--font);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .chip.active { color: var(--bg); font-weight: bold; }
+    .chip[data-cat="all"]    { border-color: var(--text);   }
+    .chip[data-cat="game"]   { border-color: var(--green);  }
+    .chip[data-cat="socket"] { border-color: var(--blue);   }
+    .chip[data-cat="nav"]    { border-color: var(--yellow); }
+    .chip[data-cat="error"]  { border-color: var(--red);    }
+    .chip[data-cat="poll"]   { border-color: var(--purple); }
+    .chip[data-cat="all"].active    { background: var(--text);   border-color: var(--text);   }
+    .chip[data-cat="game"].active   { background: var(--green);  border-color: var(--green);  }
+    .chip[data-cat="socket"].active { background: var(--blue);   border-color: var(--blue);   }
+    .chip[data-cat="nav"].active    { background: var(--yellow); border-color: var(--yellow); }
+    .chip[data-cat="error"].active  { background: var(--red);    border-color: var(--red);    }
+    .chip[data-cat="poll"].active   { background: var(--purple); border-color: var(--purple); }
+
+    /* ── Controls ── */
+    .controls { display: flex; gap: 8px; align-items: center; }
+
+    button.ctrl {
+      padding: 3px 12px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-family: var(--font);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: all 0.15s;
+    }
+    button.ctrl:hover { border-color: var(--blue); color: var(--blue); }
+    button.ctrl.active { border-color: var(--green); color: var(--green); }
+    button.ctrl.danger { border-color: var(--red); color: var(--red); }
+    button.ctrl.danger:hover { background: var(--red); color: var(--bg); }
+
+    #status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+    #status-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    #status-dot.error     { background: var(--red);   box-shadow: 0 0 6px var(--red);   }
+
+    #count { font-size: 0.72rem; color: var(--muted); min-width: 60px; text-align: right; }
+
+    /* ── Search ── */
+    #search {
+      padding: 3px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.78rem;
+      width: 180px;
+      outline: none;
+    }
+    #search:focus { border-color: var(--blue); }
+
+    /* ── Log pane ── */
+    #log-pane {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 12px;
+      text-align: left;
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      z-index: 1;
+    }
+    thead th:nth-child(1) { width: 78px; }
+    thead th:nth-child(2) { width: 70px; }
+    thead th:nth-child(3) { width: 120px; }
+    thead th:nth-child(4) { /* message flex */ }
+    thead th:nth-child(5) { width: 220px; max-width: 220px; }
+
+    tbody tr { border-bottom: 1px solid #1a1e2e; transition: background 0.1s; }
+    tbody tr:hover { background: var(--surface2); }
+    tbody tr.hidden { display: none; }
+
+    td { padding: 5px 12px; vertical-align: top; }
+
+    .ts    { color: var(--muted); white-space: nowrap; }
+    .cat   { white-space: nowrap; font-weight: bold; font-size: 0.68rem; letter-spacing: 1px; text-transform: uppercase; }
+    .tag   { color: var(--text); white-space: nowrap; }
+    .msg   { color: var(--text); word-break: break-word; }
+    .extra { font-size: 0.7rem; color: var(--muted); font-family: var(--font); word-break: break-all; max-width: 220px; overflow: hidden; cursor: pointer; }
+    .extra:hover { color: var(--text); max-height: none; }
+
+    .cat-game   { color: var(--green);  }
+    .cat-socket { color: var(--blue);   }
+    .cat-nav    { color: var(--yellow); }
+    .cat-error  { color: var(--red);    }
+    .cat-poll   { color: var(--purple); }
+
+    tr.cat-error-row { background: rgba(255,51,102,0.04); }
+    tr.cat-error-row:hover { background: rgba(255,51,102,0.09); }
+
+    /* ── Empty state ── */
+    #empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      letter-spacing: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">APOKRUPTO <span>·</span> LOGS</div>
+
+  <div class="filters" id="filters">
+    <button class="chip active" data-cat="all">All</button>
+    <button class="chip" data-cat="game">Game</button>
+    <button class="chip" data-cat="socket">Socket</button>
+    <button class="chip" data-cat="nav">Nav</button>
+    <button class="chip" data-cat="error">Error</button>
+    <button class="chip" data-cat="poll">Poll</button>
+  </div>
+
+  <input id="search" type="text" placeholder="Search…" autocomplete="off" />
+
+  <div class="controls">
+    <button class="ctrl active" id="btn-scroll" title="Toggle auto-scroll">↓ Auto</button>
+    <button class="ctrl danger" id="btn-clear">Clear</button>
+    <div id="status-dot" title="SSE connection"></div>
+    <span id="count">0 entries</span>
+  </div>
+</header>
+
+<div id="log-pane">
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Category</th>
+        <th>Tag</th>
+        <th>Message</th>
+        <th>Data</th>
+      </tr>
+    </thead>
+    <tbody id="log-body"></tbody>
+  </table>
+  <div id="empty">NO LOGS YET</div>
+</div>
+
+<script>
+  const body      = document.getElementById('log-body');
+  const empty     = document.getElementById('empty');
+  const pane      = document.getElementById('log-pane');
+  const countEl   = document.getElementById('count');
+  const dot       = document.getElementById('status-dot');
+  const btnScroll = document.getElementById('btn-scroll');
+  const btnClear  = document.getElementById('btn-clear');
+  const searchEl  = document.getElementById('search');
+  const filters   = document.getElementById('filters');
+
+  let autoScroll    = true;
+  let activeFilter  = 'all';
+  let searchQuery   = '';
+  let totalVisible  = 0;
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  function fmtTime(ts) {
+    const d = new Date(ts);
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    const ms = String(d.getMilliseconds()).padStart(3, '0');
+    return `${hh}:${mm}:${ss}.${ms}`;
+  }
+
+  function fmtData(data) {
+    if (data === undefined || data === null) return '';
+    if (typeof data === 'string') {
+      // might be a JSON string from the client
+      try { return JSON.stringify(JSON.parse(data), null, 1); } catch (_) { return data; }
+    }
+    try { return JSON.stringify(data, null, 1); } catch (_) { return String(data); }
+  }
+
+  function makeRow(entry) {
+    const tr = document.createElement('tr');
+    tr.dataset.cat = entry.category;
+    tr.dataset.msg = (entry.message + ' ' + entry.tag).toLowerCase();
+    if (entry.category === 'error') tr.classList.add('cat-error-row');
+
+    const dataStr = fmtData(entry.data);
+    tr.innerHTML = `
+      <td class="ts">${fmtTime(entry.ts)}</td>
+      <td class="cat cat-${entry.category}">${entry.category}</td>
+      <td class="tag">${escHtml(entry.tag)}</td>
+      <td class="msg">${escHtml(entry.message)}</td>
+      <td class="extra" title="${escHtml(dataStr)}">${escHtml(dataStr)}</td>
+    `;
+    return tr;
+  }
+
+  function escHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function isVisible(tr) {
+    const catOk = activeFilter === 'all' || tr.dataset.cat === activeFilter;
+    const searchOk = !searchQuery || tr.dataset.msg.includes(searchQuery);
+    return catOk && searchOk;
+  }
+
+  function appendEntry(entry) {
+    const tr = makeRow(entry);
+    const visible = isVisible(tr);
+    if (!visible) tr.classList.add('hidden');
+    body.appendChild(tr);
+    if (visible) totalVisible++;
+    updateCount();
+    updateEmpty();
+    if (autoScroll && visible) pane.scrollTop = pane.scrollHeight;
+  }
+
+  function refilter() {
+    totalVisible = 0;
+    for (const tr of body.rows) {
+      if (isVisible(tr)) {
+        tr.classList.remove('hidden');
+        totalVisible++;
+      } else {
+        tr.classList.add('hidden');
+      }
+    }
+    updateCount();
+    updateEmpty();
+    if (autoScroll) pane.scrollTop = pane.scrollHeight;
+  }
+
+  function clearAll() {
+    body.innerHTML = '';
+    totalVisible = 0;
+    updateCount();
+    updateEmpty();
+  }
+
+  function updateCount() {
+    const total = body.rows.length;
+    countEl.textContent = activeFilter === 'all'
+      ? `${total} entries`
+      : `${totalVisible}/${total}`;
+  }
+
+  function updateEmpty() {
+    empty.style.display = totalVisible === 0 ? 'flex' : 'none';
+  }
+
+  // ── Filter chips ─────────────────────────────────────────────────────────
+
+  filters.addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    activeFilter = chip.dataset.cat;
+    refilter();
+  });
+
+  // ── Search ───────────────────────────────────────────────────────────────
+
+  searchEl.addEventListener('input', () => {
+    searchQuery = searchEl.value.toLowerCase();
+    refilter();
+  });
+
+  // ── Auto-scroll toggle ───────────────────────────────────────────────────
+
+  btnScroll.addEventListener('click', () => {
+    autoScroll = !autoScroll;
+    btnScroll.classList.toggle('active', autoScroll);
+    if (autoScroll) pane.scrollTop = pane.scrollHeight;
+  });
+
+  pane.addEventListener('scroll', () => {
+    const atBottom = pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 30;
+    if (!atBottom && autoScroll) {
+      autoScroll = false;
+      btnScroll.classList.remove('active');
+    }
+  });
+
+  // ── Clear ────────────────────────────────────────────────────────────────
+
+  btnClear.addEventListener('click', () => {
+    fetch('/api/logs', { method: 'DELETE' }).catch(() => {});
+    clearAll();
+  });
+
+  // ── SSE connection ────────────────────────────────────────────────────────
+
+  function connectSSE() {
+    const es = new EventSource('/api/logs/stream');
+
+    es.onopen = () => {
+      dot.className = 'connected';
+    };
+
+    es.onmessage = (e) => {
+      let entry;
+      try { entry = JSON.parse(e.data); } catch (_) { return; }
+      if (entry.__clear) { clearAll(); return; }
+      appendEntry(entry);
+    };
+
+    es.onerror = () => {
+      dot.className = 'error';
+      es.close();
+      setTimeout(connectSSE, 3000);
+    };
+  }
+
+  connectSSE();
+</script>
+</body>
+</html>
