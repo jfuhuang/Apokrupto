@@ -7,6 +7,7 @@ import {
   Animated,
 } from 'react-native';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 export default function CoopTapTask({ task, role, currentTeam, onAction, update }) {
@@ -58,19 +59,19 @@ export default function CoopTapTask({ task, role, currentTeam, onAction, update 
   if (update?.phase === 'resolved') {
     const success = update.success;
     return (
-      <View style={styles.container}>
+      <TaskContainer>
         <Text style={[styles.resultTitle, { color: success ? colors.state.success : colors.primary.neonRed }]}>
           {success ? 'SUCCESS!' : 'TIME UP!'}
         </Text>
         <Text style={[styles.resultPoints, { color: success ? colors.state.success : colors.text.tertiary }]}>
           +{update.pointsAwarded ?? 0}
         </Text>
-      </View>
+      </TaskContainer>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <TaskContainer>
       <Text style={[styles.timer, timeLeft <= 5 && { color: colors.primary.neonRed }]}>
         {timeLeft}s
       </Text>
@@ -99,18 +100,11 @@ export default function CoopTapTask({ task, role, currentTeam, onAction, update 
         <Text style={styles.scoreDivider}>|</Text>
         <Text style={styles.scoreText}>Partner: {partnerTaps}</Text>
       </View>
-    </View>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-  },
   timer: {
     fontFamily: fonts.accent.bold,
     fontSize: 28,

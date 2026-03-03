@@ -7,6 +7,7 @@ import {
   Animated,
 } from 'react-native';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 export default function DeceptionTask({ task, role, currentTeam, onAction, update }) {
@@ -37,7 +38,7 @@ export default function DeceptionTask({ task, role, currentTeam, onAction, updat
     });
 
     return (
-      <View style={styles.container}>
+      <TaskContainer>
         <Text style={styles.resolvedTitle}>OPTION CHOSEN</Text>
         <View style={styles.resolvedCard}>
           <Text style={styles.resolvedOption}>
@@ -49,7 +50,7 @@ export default function DeceptionTask({ task, role, currentTeam, onAction, updat
         <Animated.Text style={[styles.pointsText, { opacity: glowOpacity }]}>
           +{update.pointsAwarded}
         </Animated.Text>
-      </View>
+      </TaskContainer>
     );
   }
 
@@ -57,14 +58,14 @@ export default function DeceptionTask({ task, role, currentTeam, onAction, updat
   if (role === 'A') {
     if (chosen !== null) {
       return (
-        <View style={styles.container}>
+        <TaskContainer>
           <Text style={styles.waitingText}>Waiting for result...</Text>
-        </View>
+        </TaskContainer>
       );
     }
 
     return (
-      <View style={styles.container}>
+      <TaskContainer>
         <Text style={styles.instruction}>Tap the word your partner says — but listen carefully.</Text>
         <View style={styles.optionRow}>
           <TouchableOpacity
@@ -89,13 +90,13 @@ export default function DeceptionTask({ task, role, currentTeam, onAction, updat
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </TaskContainer>
     );
   }
 
   // Player B view
   return (
-    <View style={styles.container}>
+    <TaskContainer>
       <Text style={[styles.themeTitle, { color: teamColor }]}>{task.config.theme}</Text>
       <Text style={styles.instruction}>Say the word out loud. Your partner has to figure out which one you mean.</Text>
 
@@ -110,18 +111,11 @@ export default function DeceptionTask({ task, role, currentTeam, onAction, updat
       </View>
 
       <Text style={styles.waitingSubtle}>Waiting for Player A to choose...</Text>
-    </View>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-  },
   instruction: {
     fontFamily: fonts.ui.regular,
     fontSize: 14,
