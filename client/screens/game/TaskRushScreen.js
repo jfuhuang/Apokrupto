@@ -15,6 +15,7 @@ import { TASKS, TASK_CATEGORY, MECHANIC } from '../../data/tasks';
 import { submitMovementBTask } from '../../utils/api';
 import RushResultOverlay from '../tasks/components/RushResultOverlay';
 import SusIcon from '../../components/SusIcon';
+import TaskSprite from '../../components/TaskSprite';
 
 // Mechanic components (same imports as TaskScreen)
 import SlingTask from '../tasks/mechanics/SlingTask';
@@ -26,6 +27,8 @@ import HoldTask from '../tasks/mechanics/HoldTask';
 import TraceTask from '../tasks/mechanics/TraceTask';
 import PatienceTask from '../tasks/mechanics/PatienceTask';
 import BuildTask from '../tasks/mechanics/BuildTask';
+import TriviaTask from '../tasks/mechanics/TriviaTask';
+import ScriptureBlankTask from '../tasks/mechanics/ScriptureBlankTask';
 
 const RUSH_RESULT_MS = 350;
 const CHALLENGE_TASKS = TASKS.filter((t) => t.category === TASK_CATEGORY.CHALLENGES);
@@ -55,6 +58,8 @@ export default function TaskRushScreen({
   onExitRush,
   onMovementComplete,
 }) {
+  const accentColor = currentTeam === 'skotia' ? colors.primary.neonRed : colors.primary.electricBlue;
+
   // Task queue
   const [rushQueue, setRushQueue] = useState(() => shuffled(CHALLENGE_TASKS));
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -77,6 +82,20 @@ export default function TaskRushScreen({
 
   // Points animation
   const pointsBounce = useRef(new Animated.Value(0)).current;
+
+  // Background flash
+  const bgFlashOpacity = useRef(new Animated.Value(0)).current;
+  const bgFlashColor   = useRef('#FFFFFF');
+
+  const flashBg = useCallback((color) => {
+    bgFlashColor.current = color;
+    bgFlashOpacity.setValue(0.28);
+    Animated.timing(bgFlashOpacity, {
+      toValue: 0,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }, [bgFlashOpacity]);
 
   const currentTask = rushQueue[currentIndex] || null;
 
@@ -186,6 +205,9 @@ export default function TaskRushScreen({
     setLastResult({ success: true, basePoints, bonusPoints, streakCount: newStreak });
     setPhase('result');
 
+    // Background flash
+    flashBg('success');
+
     // Animate points badge
     pointsBounce.setValue(1);
     Animated.timing(pointsBounce, {
@@ -209,6 +231,8 @@ export default function TaskRushScreen({
     setLastResult({ success: false, basePoints: 0, bonusPoints: 0, streakCount: streak });
     setStreak(0);
     setPhase('result');
+
+    flashBg('fail');
 
     setTimeout(() => advanceToNextTask(), RUSH_RESULT_MS);
   }, [streak, advanceToNextTask]);
@@ -234,8 +258,10 @@ export default function TaskRushScreen({
       case MECHANIC.HOLD:       return <HoldTask {...props} />;
       case MECHANIC.TRACE:      return <TraceTask {...props} />;
       case MECHANIC.PATIENCE:   return <PatienceTask {...props} />;
-      case MECHANIC.BUILD:      return <BuildTask {...props} />;
-      default:                  return null;
+      case MECHANIC.BUILD:            return <BuildTask {...props} />;
+      case MECHANIC.TRIVIA:           return <TriviaTask {...props} />;
+      case MECHANIC.SCRIPTURE_BLANK:  return <ScriptureBlankTask {...props} />;
+      default:                        return null;
     }
   };
 
@@ -252,6 +278,15 @@ export default function TaskRushScreen({
 
   return (
     <View style={styles.container}>
+      {/* Background flash overlays */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.flashOverlay, { opacity: successFlashOpacity, backgroundColor: colors.accent.amber }]}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.flashOverlay, { opacity: failFlashOpacity, backgroundColor: colors.primary.neonRed }]}
+      />
       <SafeAreaView style={styles.safeArea}>
         {/* ── Rush HUD ── */}
         <View style={styles.hud}>
@@ -270,9 +305,14 @@ export default function TaskRushScreen({
             )}
           </View>
 
-          {/* Timer */}
+          {/* Task title + Timer */}
           <View style={styles.hudCenterCell}>
-            <Text style={styles.hudTimerLabel}>CHALLENGE RUSH</Text>
+            <View style={styles.hudTaskRow}>
+              {currentTask && <TaskSprite taskId={currentTask.id} size={18} color={accentColor} />}
+              <Text style={styles.hudTaskTitle} numberOfLines={1}>
+                {currentTask ? currentTask.title : 'CHALLENGE RUSH'}
+              </Text>
+            </View>
             <Text style={[styles.hudTimer, timerUrgent && styles.hudTimerUrgent]}>
               {formatTime(secondsLeft)}
             </Text>
@@ -314,14 +354,6 @@ export default function TaskRushScreen({
           </View>
         )}
 
-        {/* ── Task title strip ── */}
-        {currentTask && (
-          <View style={styles.taskStrip}>
-            <Text style={styles.taskTitle} numberOfLines={1}>{currentTask.title}</Text>
-            <Text style={styles.taskSynopsis} numberOfLines={1}>{currentTask.synopsis}</Text>
-          </View>
-        )}
-
         {/* ── Mechanic area ── */}
         <View style={styles.mechanicArea} key={currentIndex}>
           {renderMechanic()}
@@ -345,6 +377,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.space,
+  },
+  flashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999,
   },
   safeArea: {
     flex: 1,
@@ -395,11 +431,18 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: colors.text.disabled,
   },
-  hudTimerLabel: {
+  hudTaskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    maxWidth: 160,
+  },
+  hudTaskTitle: {
     fontFamily: fonts.display.bold,
-    fontSize: 8,
-    letterSpacing: 2,
-    color: colors.primary.electricBlue,
+    fontSize: 10,
+    letterSpacing: 1,
+    color: colors.text.primary,
+    flexShrink: 1,
   },
   hudTimer: {
     fontFamily: fonts.accent.bold,
@@ -465,26 +508,6 @@ const styles = StyleSheet.create({
     fontSize: 8,
     letterSpacing: 1.5,
     color: colors.primary.neonRed,
-  },
-
-  // ── Task strip ──────────────────────────────────────────────────────────
-  taskStrip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
-    gap: 2,
-  },
-  taskTitle: {
-    fontFamily: fonts.display.bold,
-    fontSize: 13,
-    letterSpacing: 1,
-    color: colors.text.primary,
-  },
-  taskSynopsis: {
-    fontFamily: fonts.ui.regular,
-    fontSize: 11,
-    color: colors.text.tertiary,
   },
 
   // ── Mechanic area ───────────────────────────────────────────────────────
