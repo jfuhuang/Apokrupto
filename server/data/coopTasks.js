@@ -1,8 +1,8 @@
 const crypto = require('crypto');
 
-const COOP_MULTIPLIER = 3;
+const COOP_MULTIPLIER = 1;
 const COOP_TASK_TYPES = ['deception', 'secret_ballot', 'coop_tap', 'coop_hold'];
-const COOP_BASE_POINTS = { deception: 30, secret_ballot: 0, coop_tap: 25, coop_hold: 30 };
+const COOP_BASE_POINTS = { deception: 3, secret_ballot: 0, coop_tap: 2, coop_hold: 3 };
 
 const THEME_POOLS = {
   'Greek Letters': [
@@ -44,7 +44,7 @@ function pick(arr) {
 }
 
 function randomPoints() {
-  return (Math.floor(Math.random() * 6) + 1) * 5; // 5–30, multiple of 5
+  return Math.floor(Math.random() * 3) + 1; // 1–3
 }
 
 function shuffleArray(arr) {

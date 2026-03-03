@@ -754,7 +754,7 @@ export const TASKS = [
     mechanic: MECHANIC.BAIL_WATER,
     taskType: TASK_TYPE.FREE_ROAM,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 60, dead: 36 },
+    points: { alive: 2, dead: 1 },
     difficulty: 'medium',
     timeLimit: 25,           // seconds — slightly generous to allow learning the gesture
     config: {
