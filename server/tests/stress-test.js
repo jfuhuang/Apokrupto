@@ -243,9 +243,8 @@ async function startGame() {
 
   startMetric('roleAssigned');
 
-  // Host (or GM) starts the game
-  const starter = gmBot; // GM starts if GM_USERNAMES is configured
-  const ack = await emitWithAck(starter.socket, 'startGame', { lobbyId });
+  // Host starts the game (works whether or not GM_USERNAMES is configured)
+  const ack = await emitWithAck(hostBot.socket, 'startGame', { lobbyId });
   gameId = String(ack.gameId);
   log(`Game ${gameId} created.`);
 
@@ -275,7 +274,8 @@ async function startGame() {
 // Phase 5 — GM advance helper
 // ---------------------------------------------------------------------------
 async function gmAdvance(expectedStep) {
-  const ack = await emitWithAck(gmBot.socket, 'gmAdvance', { gameId });
+  // Use host for advancing — works whether or not GM_USERNAMES is configured
+  const ack = await emitWithAck(hostBot.socket, 'gmAdvance', { gameId });
   if (ack?.step && expectedStep && ack.step !== expectedStep) {
     log(`  Warning: expected step '${expectedStep}', got '${ack.step}'`);
   }
