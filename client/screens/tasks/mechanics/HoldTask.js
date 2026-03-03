@@ -56,39 +56,6 @@ function FurnaceCenter({ fillAnim }) {
   );
 }
 
-function WaterCenter({ fillAnim }) {
-  const waveAnim = useRef(new Animated.Value(0)).current;
-  React.useEffect(() => {
-    Animated.loop(
-      Animated.timing(waveAnim, { toValue: 1, duration: 1400, useNativeDriver: true })
-    ).start();
-  }, []);
-
-  const translateX = waveAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -20] });
-
-  return (
-    <View style={{ alignItems: 'center' }}>
-      {/* Figure silhouette */}
-      <Svg width={32} height={48} viewBox="0 0 32 48">
-        {/* Head */}
-        <Circle cx="16" cy="8" r="6" fill="#00D4FF" />
-        {/* Body */}
-        <Path d="M10 14 Q10 28 16 30 Q22 28 22 14Z" fill="#00D4FF" />
-        {/* Legs */}
-        <Line x1="13" y1="30" x2="11" y2="44" stroke="#00D4FF" strokeWidth="3" strokeLinecap="round" />
-        <Line x1="19" y1="30" x2="21" y2="44" stroke="#00D4FF" strokeWidth="3" strokeLinecap="round" />
-      </Svg>
-      {/* Animated waves */}
-      <Animated.View style={{ transform: [{ translateX }] }}>
-        <Svg width={80} height={20} viewBox="0 0 80 20">
-          <Path d="M0 10 Q10 4 20 10 Q30 16 40 10 Q50 4 60 10 Q70 16 80 10" stroke="#00D4FF" strokeWidth="2" fill="none" />
-          <Path d="M0 14 Q10 8 20 14 Q30 20 40 14 Q50 8 60 14" stroke="#00D4FF" strokeWidth="1.5" fill="none" opacity="0.5" />
-        </Svg>
-      </Animated.View>
-    </View>
-  );
-}
-
 function PrayerCenter({ color }) {
   return (
     <Svg width={60} height={60} viewBox="0 0 60 60">
@@ -108,7 +75,6 @@ function PrayerCenter({ color }) {
 const TASK_RING_COLOR = {
   gideons_torch:   '#FFA63D',  // amber
   fiery_furnace:   '#FF5500',  // orange-red
-  walking_on_water:'#0080FF',  // ocean blue
   circle_of_prayer:'#8B5CF6',  // ultraviolet
 };
 
@@ -188,8 +154,6 @@ export default function HoldTask({ config, onSuccess, onFail, taskId }) {
         return <TorchCenter fillAnim={fillAnim} color={ringColor} />;
       case 'fiery_furnace':
         return <FurnaceCenter fillAnim={fillAnim} />;
-      case 'walking_on_water':
-        return <WaterCenter fillAnim={fillAnim} />;
       case 'circle_of_prayer':
         return <PrayerCenter color={ringColor} />;
       default:

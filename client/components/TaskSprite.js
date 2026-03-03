@@ -48,6 +48,7 @@
  * jordan_river           jordan_river                 Two parted walls of water with dry path
  * nehemiah_wall          nehemiah_wall                Partial wall being built with trowel
  * building_the_altar     building_the_altar           Stacked stone altar with fire on top
+ * bucket                 jonah_storm (via TASK_SPRITE) Wooden water bucket with handle — bail task
  *
  * still_waters           still_waters                 Calm oval lake with concentric ripples
  * be_still               be_still                     Two open upturned palms — peace
@@ -497,17 +498,25 @@ const SPRITES = {
     </G>
   ),
 
-  // Robed stick-figure walking confidently upright on rolling waves // AI-generated
+  // Figure striding on waves toward a glowing cross in the distance // AI-generated
   walking_on_water: (c) => (
     <G>
-      <Circle cx="16" cy="4"  r="3"    fill={c} />
-      <Line   x1="16" y1="7"  x2="16" y2="17" stroke={c} strokeWidth="2.5" />
-      <Line   x1="16" y1="10" x2="10" y2="14" stroke={c} strokeWidth="2" />
-      <Line   x1="16" y1="10" x2="22" y2="14" stroke={c} strokeWidth="2" />
-      <Line   x1="16" y1="17" x2="13" y2="22" stroke={c} strokeWidth="2" />
-      <Line   x1="16" y1="17" x2="19" y2="22" stroke={c} strokeWidth="2" />
-      <Path d="M2 23 Q8 19 14 23 Q20 27 26 23 Q28 21 30 23" stroke={c} strokeWidth="2.5" fill="none" />
-      <Path d="M2 27 Q8 23 14 27 Q20 31 26 27" stroke={c} strokeWidth="1.5" fill="none" opacity="0.5" />
+      {/* Glowing cross in upper distance */}
+      <Rect x="23" y="2" width="2" height="8" rx="1" fill={FIRE} />
+      <Rect x="20" y="4" width="8" height="2" rx="1" fill={FIRE} />
+      <Line x1="21" y1="3" x2="19" y2="1" stroke={FIRE} strokeWidth="1" opacity="0.6" />
+      <Line x1="27" y1="3" x2="29" y2="1" stroke={FIRE} strokeWidth="1" opacity="0.6" />
+      {/* Figure — head, robed body, outstretched arms */}
+      <Circle cx="12" cy="6" r="3" fill={c} />
+      <Path d="M8 9 Q8 18 12 20 Q16 18 16 9Z" fill={c} />
+      <Line x1="8"  y1="11" x2="4"  y2="8"  stroke={c} strokeWidth="2" strokeLinecap="round" />
+      <Line x1="16" y1="11" x2="20" y2="8"  stroke={c} strokeWidth="2" strokeLinecap="round" />
+      {/* Legs in stride */}
+      <Line x1="10" y1="20" x2="8"  y2="25" stroke={c} strokeWidth="2" strokeLinecap="round" />
+      <Line x1="14" y1="20" x2="16" y2="25" stroke={c} strokeWidth="2" strokeLinecap="round" />
+      {/* Waves */}
+      <Path d="M1 26 Q6 22 12 26 Q18 30 24 26 Q27 24 31 26" stroke={c} strokeWidth="2.5" fill="none" />
+      <Path d="M1 29 Q7 25 13 29 Q19 33 25 29" stroke={c} strokeWidth="1.5" fill="none" opacity="0.5" />
     </G>
   ),
 
@@ -575,8 +584,25 @@ const SPRITES = {
     </G>
   ),
 
-  // ── PATIENCE (don't tap) ─────────────────────────────────────────────
+  // Wooden water bucket with handle — used by jonah_storm (BAIL_WATER mechanic) // AI-generated
+  bucket: (c) => (
+    <G>
+      {/* Bucket body (trapezoid: wider at top) */}
+      <Path d="M8 10 L7 26 L25 26 L24 10 Z" fill={c} />
+      {/* Rim at top */}
+      <Ellipse cx="16" cy="10" rx="8" ry="2.5" fill={c} />
+      {/* Bottom */}
+      <Ellipse cx="16" cy="26" rx="9" ry="2.5" fill={c} opacity="0.8" />
+      {/* Handle arc */}
+      <Path d="M8 10 Q16 3 24 10" stroke={c} strokeWidth="2" fill="none" strokeLinecap="round" />
+      {/* Metal band (accent stripe) */}
+      <Path d="M7.5 18 L24.5 18" stroke={BG} strokeWidth="1.5" opacity="0.5" />
+      {/* Water inside (shown as a highlight) */}
+      <Ellipse cx="16" cy="14" rx="5.5" ry="2" fill="#00D4FF" opacity="0.45" />
+    </G>
+  ),
 
+  // ── PATIENCE (don't tap) ─────────────────────────────────────────────
   // Peaceful oval water surface with concentric ripple rings // AI-generated
   still_waters: (c) => (
     <G>

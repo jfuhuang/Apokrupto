@@ -138,25 +138,6 @@ function RockButton({ done, size }) {
   );
 }
 
-function BucketButton({ done, size }) {
-  const c = done ? colors.accent.neonGreen : colors.primary.electricBlue;
-  return (
-    <Svg width={size} height={size} viewBox="0 0 180 180">
-      {/* Handle */}
-      <Path d="M50 60 Q90 20 130 60" stroke={c} strokeWidth="8" fill="none" strokeLinecap="round" />
-      {/* Bucket body */}
-      <Path d="M45 65 Q40 130 50 155 L130 155 Q140 130 135 65Z" fill={c} opacity="0.85" />
-      {/* Rim */}
-      <Ellipse cx="90" cy="65" rx="45" ry="13" fill={c} />
-      {/* Water bands */}
-      <Ellipse cx="90" cy="100" rx="38" ry="8" fill="#0B0C10" opacity="0.25" />
-      <Ellipse cx="90" cy="125" rx="40" ry="8" fill="#0B0C10" opacity="0.2" />
-      {/* Wave label */}
-      <Path d="M55 90 Q70 84 85 90 Q100 96 115 90" stroke="#87CEEB" strokeWidth="2" fill="none" opacity="0.6" />
-    </Svg>
-  );
-}
-
 function DefaultButton({ done }) {
   return (
     <View style={[
@@ -165,53 +146,6 @@ function DefaultButton({ done }) {
     ]}>
       <Text style={styles.tapBtnText}>TAP!</Text>
     </View>
-  );
-}
-
-// ── Wave animation for jonah ──────────────────────────────────────────────
-
-function WaveBackground({ taps, targetTaps }) {
-  const waveAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.timing(waveAnim, { toValue: 1, duration: 1200, useNativeDriver: true })
-    ).start();
-  }, []);
-
-  const progress   = Math.min(taps / targetTaps, 1);
-  const translateX = waveAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -30] });
-  const waveOpacity = waveAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.8, 1, 0.8] });
-
-  // Amplitudes in viewBox units (0–100); shrink as player progresses
-  const amp0 = Math.max(1, 5 - progress * 4);
-  const amp1 = Math.max(0.5, 4 - progress * 3);
-
-  return (
-    <Animated.View
-      style={[StyleSheet.absoluteFill, { transform: [{ translateX }], opacity: waveOpacity }]}
-      pointerEvents="none"
-    >
-      <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
-        {/* Front wave */}
-        <Path
-          d={`M0 30 Q25 ${30 - amp0} 50 30 Q75 ${30 + amp0} 100 30 L100 100 L0 100Z`}
-          fill="#003060"
-          opacity="0.5"
-        />
-        {/* Mid wave */}
-        <Path
-          d={`M-5 40 Q25 ${40 - amp1} 50 40 Q75 ${40 + amp1} 105 40 L105 100 L-5 100Z`}
-          fill="#004080"
-          opacity="0.4"
-        />
-        {/* Back wave */}
-        <Path
-          d="M-10 22 Q25 19 50 22 Q75 25 110 22 L110 100 L-10 100Z"
-          fill="#002050"
-          opacity="0.35"
-        />
-      </Svg>
-    </Animated.View>
   );
 }
 
@@ -312,8 +246,6 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit, tas
         return wrapped(<WallButton taps={taps} targetTaps={targetTaps} done={done} size={btnSize} />);
       case 'water_from_rock':
         return wrapped(<RockButton done={done} size={btnSize} />);
-      case 'jonah_storm':
-        return wrapped(<BucketButton done={done} size={btnSize} />);
       default:
         return (
           <Animated.View style={{ transform: [{ scale: scaleAnim }], marginTop: 8 }}>
@@ -332,9 +264,6 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit, tas
 
   return (
     <View style={styles.container} onLayout={e => setContainerH(e.nativeEvent.layout.height)}>
-      {/* Wave background for jonah_storm */}
-      {taskId === 'jonah_storm' && <WaveBackground taps={taps} targetTaps={targetTaps} />}
-
       <Text style={styles.counter}>{taps} / {targetTaps}</Text>
       <View style={styles.barTrack}>
         <Animated.View

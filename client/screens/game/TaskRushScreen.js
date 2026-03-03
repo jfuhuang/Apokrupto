@@ -17,7 +17,7 @@ import RushResultOverlay from '../tasks/components/RushResultOverlay';
 import SusIcon from '../../components/SusIcon';
 import TaskSprite from '../../components/TaskSprite';
 
-// Mechanic components (same imports as TaskScreen)
+// Mechanic components
 import SlingTask from '../tasks/mechanics/SlingTask';
 import CollectTask from '../tasks/mechanics/CollectTask';
 import DragPlaceTask from '../tasks/mechanics/DragPlaceTask';
@@ -29,6 +29,9 @@ import PatienceTask from '../tasks/mechanics/PatienceTask';
 import BuildTask from '../tasks/mechanics/BuildTask';
 import TriviaTask from '../tasks/mechanics/TriviaTask';
 import ScriptureBlankTask from '../tasks/mechanics/ScriptureBlankTask';
+import BailWaterTask from '../tasks/mechanics/BailWaterTask';
+import MarchJerichoTask from '../tasks/mechanics/MarchJerichoTask';
+import FocusTask from '../tasks/mechanics/FocusTask';
 
 const RUSH_RESULT_MS = 350;
 const CHALLENGE_TASKS = TASKS.filter((t) => t.category === TASK_CATEGORY.CHALLENGES);
@@ -261,6 +264,9 @@ export default function TaskRushScreen({
       case MECHANIC.BUILD:            return <BuildTask {...props} />;
       case MECHANIC.TRIVIA:           return <TriviaTask {...props} />;
       case MECHANIC.SCRIPTURE_BLANK:  return <ScriptureBlankTask {...props} />;
+      case MECHANIC.BAIL_WATER:       return <BailWaterTask {...props} />;
+      case MECHANIC.MARCH_JERICHO:    return <MarchJerichoTask {...props} />;
+      case MECHANIC.FOCUS:            return <FocusTask {...props} />;
       default:                        return null;
     }
   };

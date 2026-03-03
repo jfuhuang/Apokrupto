@@ -72,30 +72,50 @@ function WolfSvg() {
   );
 }
 
-// ── Soldier SVG (for pillar_of_fire) ─────────────────────────────────────
+// ── Soldier SVG (for pillar_of_fire) — Egyptian warrior ──────────────────
 
 function SoldierSvg() {
   return (
     <Svg width={ENEMY_SIZE} height={ENEMY_SIZE} viewBox="0 0 56 56">
       <G>
-        {/* Body */}
-        <Rect x="18" y="24" width="20" height="22" rx="4" fill="#2A3A2A" />
-        {/* Head */}
-        <Ellipse cx="28" cy="15" rx="10" ry="11" fill="#2A3A2A" />
-        {/* Helmet crest */}
-        <Rect x="24" y="4" width="8" height="10" rx="2" fill="#1A2A1A" />
-        {/* Eyes */}
-        <Ellipse cx="23" cy="14" rx="2.5" ry="2.5" fill="#FF3366" opacity="0.8" />
-        <Ellipse cx="33" cy="14" rx="2.5" ry="2.5" fill="#FF3366" opacity="0.8" />
-        {/* Arms */}
-        <Rect x="6"  y="26" width="13" height="6" rx="3" fill="#2A3A2A" />
-        <Rect x="37" y="26" width="13" height="6" rx="3" fill="#2A3A2A" />
+        {/* Dark cape/cloak behind body — gives silhouette width */}
+        <Path d="M24 24 Q15 33 14 56 L21 56 Q22 38 28 30Z" fill="#1A0900" opacity="0.85" />
+        <Path d="M32 24 Q41 33 42 56 L35 56 Q34 38 28 30Z" fill="#1A0900" opacity="0.85" />
         {/* Legs */}
-        <Rect x="18" y="44" width="9"  height="12" rx="3" fill="#1A2A1A" />
-        <Rect x="29" y="44" width="9"  height="12" rx="3" fill="#1A2A1A" />
-        {/* Spear */}
-        <Rect x="47" y="10" width="3" height="40" rx="1" fill="#8B6914" />
-        <Polygon points="48.5,10 45,3 52,3" fill="#C0C0C0" />
+        <Rect x="19" y="42" width="8"  height="14" rx="3" fill="#2A1200" />
+        <Rect x="29" y="42" width="8"  height="14" rx="3" fill="#2A1200" />
+        {/* Body armor / breastplate */}
+        <Rect x="19" y="24" width="18" height="20" rx="3" fill="#3A1E0A" />
+        {/* Bronze scale-armour detail lines */}
+        <Line x1="22" y1="29" x2="34" y2="29" stroke="#6B3A00" strokeWidth="1" opacity="0.6" />
+        <Line x1="22" y1="34" x2="34" y2="34" stroke="#6B3A00" strokeWidth="1" opacity="0.6" />
+        <Line x1="22" y1="39" x2="34" y2="39" stroke="#6B3A00" strokeWidth="1" opacity="0.6" />
+        {/* Left arm */}
+        <Rect x="8"  y="27" width="12" height="5" rx="2.5" fill="#3A1E0A" />
+        {/* Shield on left arm */}
+        <Rect x="4"  y="20" width="9"  height="17" rx="3" fill="#5C3A00" />
+        <Ellipse cx="8.5" cy="28.5" rx="3.2" ry="6.5" fill="#8B6000" opacity="0.65" />
+        <Circle  cx="8.5" cy="28.5" r="1.6"              fill="#CFB200" opacity="0.85" />
+        {/* Right arm */}
+        <Rect x="36" y="27" width="12" height="5" rx="2.5" fill="#3A1E0A" />
+        {/* Neck */}
+        <Rect x="24" y="18" width="8"  height="7"  rx="2" fill="#3A1E0A" />
+        {/* Head */}
+        <Ellipse cx="28" cy="13" rx="9" ry="10" fill="#3A1E0A" />
+        {/* Khepresh helmet shape */}
+        <Path d="M20 10 Q19 4 28 3 Q37 4 36 10 L34 10 Q33 6 28 5 Q23 6 22 10Z" fill="#1A0900" />
+        <Rect x="23" y="3" width="10" height="7" rx="3" fill="#1A0900" />
+        <Line x1="23" y1="3" x2="33" y2="3" stroke="#6B3A00" strokeWidth="1.5" opacity="0.45" />
+        {/* Glowing ember eyes */}
+        <Ellipse cx="24" cy="12" rx="2.5" ry="2" fill="#FF6A00" />
+        <Ellipse cx="32" cy="12" rx="2.5" ry="2" fill="#FF6A00" />
+        <Circle  cx="24" cy="12" r="1"          fill="#FFD700" opacity="0.9" />
+        <Circle  cx="32" cy="12" r="1"          fill="#FFD700" opacity="0.9" />
+        {/* Spear shaft */}
+        <Rect x="45" y="7" width="3" height="46" rx="1.5" fill="#7A5C22" />
+        {/* Spearhead */}
+        <Path d="M44.5 7 L46.5 1 L48.5 7Z" fill="#D4D4D4" />
+        <Rect  x="44"  y="7"  width="5"  height="3" rx="1" fill="#9B7A2A" />
       </G>
     </Svg>
   );
@@ -139,25 +159,151 @@ function SheepPenBg({ areaH }) {
   );
 }
 
-// ── Pillar of fire background ─────────────────────────────────────────────
+// ── Star positions (fraction of width × height) ──────────────────────────
+const STARS = [
+  [0.05, 0.04], [0.14, 0.02], [0.27, 0.09], [0.41, 0.03],
+  [0.58, 0.07], [0.69, 0.02], [0.81, 0.08], [0.93, 0.05],
+  [0.08, 0.17], [0.34, 0.14], [0.54, 0.19], [0.74, 0.13],
+  [0.89, 0.22], [0.19, 0.26], [0.47, 0.24], [0.63, 0.28],
+  [0.84, 0.21], [0.11, 0.33], [0.40, 0.31], [0.77, 0.30],
+];
 
-function PillarOfFireBg({ pulseAnim }) {
+// ── Camp tent positions (fraction of width) ───────────────────────────────
+const TENTS = [
+  { fx: 0.08, w: 24, h: 20 },
+  { fx: 0.18, w: 30, h: 25 },
+  { fx: 0.78, w: 28, h: 22 },
+  { fx: 0.90, w: 22, h: 18 },
+];
+
+// ── Pillar of fire background — full nighttime desert scene ───────────────
+
+function PillarOfFireBg({ pulseAnim, areaH }) {
+  const H  = areaH || 600;
+  const cx = W / 2;
+  const gY = H * 0.70;  // ground line
+
   return (
-    <Animated.View
-      style={[StyleSheet.absoluteFill, { transform: [{ scale: pulseAnim }] }]}
-      pointerEvents="none"
-    >
-      <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
-        {/* Desert ground */}
-        <Rect x="0" y="72" width="100" height="28" fill="#5C3A1A" />
-        {/* Fire column outer glow */}
-        <Ellipse cx="50" cy="40" rx="12" ry="34" fill="#FFA63D" opacity="0.3" />
-        {/* Fire column bright core */}
-        <Ellipse cx="50" cy="40" rx="6" ry="25" fill="#FFE082" opacity="0.45" />
-        {/* Base ground glow */}
-        <Ellipse cx="50" cy="72" rx="18" ry="4" fill="#FFA63D" opacity="0.3" />
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {/* ── Static scene ── */}
+      <Svg width={W} height={H} style={StyleSheet.absoluteFill}>
+        {/* Night sky */}
+        <Rect x="0" y="0" width={W} height={gY} fill="#0D0810" />
+
+        {/* Stars */}
+        {STARS.map(([fx, fy], i) => (
+          <Circle
+            key={i}
+            cx={W * fx}
+            cy={H * fy}
+            r={i % 3 === 0 ? 1.8 : 1.1}
+            fill="white"
+            opacity={0.45 + (i % 4) * 0.13}
+          />
+        ))}
+
+        {/* Distant camp tent silhouettes */}
+        {TENTS.map(({ fx, w, h }, i) => {
+          const tx = W * fx;
+          return (
+            <Polygon
+              key={i}
+              points={`${tx - w / 2},${gY} ${tx},${gY - h} ${tx + w / 2},${gY}`}
+              fill="#1A0A00"
+              opacity="0.75"
+            />
+          );
+        })}
+
+        {/* Fire-pillar outer halo — layered ellipses simulate glow */}
+        <Ellipse cx={cx} cy={H * 0.30} rx={W * 0.22} ry={H * 0.40} fill="#FF4500" opacity="0.04" />
+        <Ellipse cx={cx} cy={H * 0.30} rx={W * 0.16} ry={H * 0.34} fill="#FF6A00" opacity="0.06" />
+        <Ellipse cx={cx} cy={H * 0.30} rx={W * 0.11} ry={H * 0.28} fill="#FF8C00" opacity="0.09" />
+        <Ellipse cx={cx} cy={H * 0.30} rx={W * 0.07} ry={H * 0.22} fill="#FFA500" opacity="0.12" />
+        <Ellipse cx={cx} cy={H * 0.30} rx={W * 0.04} ry={H * 0.16} fill="#FFD700" opacity="0.16" />
+        <Ellipse cx={cx} cy={H * 0.30} rx={W * 0.025} ry={H * 0.11} fill="#FFFDE7" opacity="0.20" />
+
+        {/* Ground illumination from the fire */}
+        <Ellipse cx={cx} cy={gY} rx={W * 0.32} ry={15} fill="#FF6A00" opacity="0.18" />
+        <Ellipse cx={cx} cy={gY} rx={W * 0.18} ry={8}  fill="#FFD700" opacity="0.22" />
+
+        {/* Desert dunes */}
+        <Path
+          d={`M0 ${gY} Q${W*0.15} ${gY-22} ${W*0.35} ${gY} Q${W*0.50} ${gY+14} ${W*0.65} ${gY-14} Q${W*0.82} ${gY-26} ${W} ${gY} L${W} ${H} L0 ${H} Z`}
+          fill="#4A2A08"
+        />
+        <Path
+          d={`M0 ${gY+12} Q${W*0.22} ${gY} ${W*0.46} ${gY+16} Q${W*0.72} ${gY+26} ${W} ${gY+10} L${W} ${H} L0 ${H} Z`}
+          fill="#5C3A12"
+        />
       </Svg>
-    </Animated.View>
+
+      {/* ── Animated fire-core pulse (only this element scales) ── */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: cx - 22,
+          top: H * 0.05,
+          width: 44,
+          height: H * 0.65,
+          transform: [{ scale: pulseAnim }],
+        }}
+      >
+        <Svg width={44} height={H * 0.65}>
+          <Ellipse
+            cx={22}
+            cy={H * 0.325}
+            rx={22}
+            ry={H * 0.29}
+            fill="#FFD700"
+            opacity="0.32"
+          />
+          <Ellipse
+            cx={22}
+            cy={H * 0.325}
+            rx={12}
+            ry={H * 0.19}
+            fill="#FFFDE7"
+            opacity="0.42"
+          />
+        </Svg>
+      </Animated.View>
+    </View>
+  );
+}
+
+// ── Pillar fire icon (center target) ──────────────────────────────────────
+
+function PillarFireIcon() {
+  return (
+    <Svg width={56} height={56} viewBox="0 0 56 56">
+      {/* Base ground glow */}
+      <Ellipse cx="28" cy="51" rx="20" ry="5"  fill="#FF8C00" opacity="0.35" />
+      <Ellipse cx="28" cy="51" rx="12" ry="3"  fill="#FFD700" opacity="0.50" />
+      {/* Outer flame */}
+      <Path
+        d="M13 51 Q9 36 15 24 Q12 31 14 21 Q17 11 28 6 Q39 11 42 21 Q44 31 41 24 Q47 36 43 51Z"
+        fill="#FF4500"
+        opacity="0.92"
+      />
+      {/* Mid flame */}
+      <Path
+        d="M17 51 Q14 38 18 28 Q16 34 18 25 Q21 16 28 12 Q35 16 38 25 Q40 34 38 28 Q42 38 39 51Z"
+        fill="#FFA500"
+      />
+      {/* Inner flame */}
+      <Path
+        d="M21 51 Q19 41 22 33 Q21 38 23 30 Q25 22 28 18 Q31 22 33 30 Q35 38 34 33 Q37 41 35 51Z"
+        fill="#FFD700"
+      />
+      {/* White-hot core */}
+      <Path
+        d="M25 51 Q24 44 26 38 Q27.5 44 28 38 Q28.5 44 30 38 Q32 44 31 51Z"
+        fill="#FFFDE7"
+        opacity="0.95"
+      />
+    </Svg>
   );
 }
 
@@ -196,13 +342,15 @@ function GuardTaskInner({ config, onSuccess, onFail, taskId, areaW, areaH }) {
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Pillar of fire pulse
+  // Pillar of fire — fire-core flicker pulse
   useEffect(() => {
     if (taskId !== 'pillar_of_fire') return;
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.06, duration: 700, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,    duration: 700, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.08, duration: 600,  useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.96, duration: 500,  useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.04, duration: 400,  useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 600,  useNativeDriver: true }),
       ])
     ).start();
   }, [taskId]);
@@ -267,7 +415,7 @@ function GuardTaskInner({ config, onSuccess, onFail, taskId, areaW, areaH }) {
   return (
     <>
       {/* Backgrounds */}
-      {isPillar && <PillarOfFireBg pulseAnim={pulseAnim} />}
+      {isPillar && <PillarOfFireBg pulseAnim={pulseAnim} areaH={areaH} />}
       {isSheep  && <SheepPenBg areaH={areaH} />}
 
       <Text style={styles.hint}>{hint}</Text>
@@ -279,9 +427,12 @@ function GuardTaskInner({ config, onSuccess, onFail, taskId, areaW, areaH }) {
         ))}
       </View>
 
-      {/* Center: sheep emoji for sheep tasks, fire glyph for pillar */}
+      {/* Center target: SVG fire column for pillar, sheep emoji for sheep tasks */}
       <View style={[styles.center, { left: CENTER_X, top: centerY }]}>
-        <Text style={styles.centerIcon}>{isPillar ? '🔥' : '🐑'}</Text>
+        {isPillar
+          ? <PillarFireIcon />
+          : <Text style={styles.centerIcon}>🐑</Text>
+        }
       </View>
 
       {enemies.map((e) => (

@@ -515,7 +515,7 @@ const SpriteComponent = SPRITES[spriteKey] || SPRITES['_fallback'];
 
 ---
 
-## TASK 7 — Jonah Bail-Water Task: Pick Up → Fill → Dump Mechanic
+## ✅ TASK 7 — Jonah Bail-Water Task: Pick Up → Fill → Dump Mechanic *(COMPLETE)*
 
 > Standalone task. No dependency on other tasks.  
 > The `jonah_storm` task currently uses `MECHANIC.RAPID_TAP` (tap 40 times). This task replaces
@@ -669,8 +669,8 @@ player has bailed out the boat and `onSuccess` fires.
   `Animated.parallel` on position + opacity (same splash pattern as RapidTapTask floating particles)
 
 **Failure path:**
-- If `timeLimit` runs out → `onFail()` (handled by `TaskHeader`'s `onTimeUp` → passed down through
-  `TaskScreen` as `handleTimeUp`)
+- If `timeLimit` runs out → `onFail()` is called by `TaskRushScreen`'s per-task timer directly
+  (same pattern as all other mechanic components — `TaskScreen` has been deleted)
 - No in-task fail state; the only way to fail is time expiry
 
 #### Props contract (same as all other mechanic components)
@@ -690,9 +690,9 @@ BailWaterTask.propTypes = {
 
 ---
 
-### 7D — Register the new mechanic in `TaskScreen.js`
+### 7D — Register the new mechanic in `TaskRushScreen.js`
 
-**File: `client/screens/tasks/TaskScreen.js`**
+**File: `client/screens/game/TaskRushScreen.js`**
 
 1. Import the new component:
 ```js
@@ -752,16 +752,16 @@ them or relocate them to `BailWaterTask.js` for internal use there.
 ---
 
 **Acceptance criteria:**
-- [ ] `jonah_storm` task uses `MECHANIC.BAIL_WATER` and no longer appears in `RapidTapTask.js`
-- [ ] Playing the task requires completing a pick-up → fill → dump cycle 6 times
-- [ ] Dragging the bucket outside the rail zone snaps it back to the start position
-- [ ] Releasing early during fill resets to the pick-up step
-- [ ] A water level gauge decreases visibly with each successful cycle
-- [ ] Step indicator correctly highlights the current step
-- [ ] A splash particle animation plays on each successful dump
-- [ ] `onSuccess` is called after 6 completed cycles; `onFail` is called on time expiry
-- [ ] The bucket sprite renders correctly at the standard 32×32 viewBox in task card thumbnails
-- [ ] No regressions in other tasks that use `RAPID_TAP`
+- [x] `jonah_storm` task uses `MECHANIC.BAIL_WATER` and no longer appears in `RapidTapTask.js`
+- [x] Playing the task requires completing a pick-up → fill → dump cycle 6 times
+- [x] Dragging the bucket outside the rail zone snaps it back to the start position
+- [x] Releasing early during fill resets to the pick-up step
+- [x] A water level gauge decreases visibly with each successful cycle
+- [x] Step indicator correctly highlights the current step
+- [x] A splash particle animation plays on each successful dump
+- [x] `onSuccess` is called after 6 completed cycles; `onFail` is called on time expiry
+- [x] The bucket sprite renders correctly at the standard 32×32 viewBox in task card thumbnails
+- [x] No regressions in other tasks that use `RAPID_TAP`
 
 ---
 

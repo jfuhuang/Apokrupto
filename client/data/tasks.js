@@ -13,6 +13,9 @@ export const MECHANIC = {
   BUILD: 'BUILD',
   TRIVIA: 'TRIVIA',
   SCRIPTURE_BLANK: 'SCRIPTURE_BLANK',
+  BAIL_WATER: 'BAIL_WATER',   // Jonah bail-water: pick up → fill → dump loop
+  MARCH_JERICHO: 'MARCH_JERICHO', // Trace orbit ring 7 times around Jericho
+  FOCUS: 'FOCUS',                 // Keep finger on drifting icon (Walking on Water)
 };
 
 export const TASK_TYPE = {
@@ -71,15 +74,16 @@ export const TASK_SPRITE = {
   protect_the_sheep: '🐑',
   feeding_five_thousand: '🍞',
   manna_wilderness:  '🍯',
-  walls_of_jericho:  '🏰',
+  walls_of_jericho:      '🏰',
+  march_around_jericho:  '🏃',
   ark_of_covenant:   '🌈',
   gideons_torch:     '🕯️',
   fiery_furnace:     '🔥',
   solomons_temple:   '🏛️',
   water_from_rock:   '💧',
   the_lost_sheep:    '🐑',
-  jonah_storm:       '🌊',
-  walking_on_water:  '🌊',
+  jonah_storm:       'bucket',
+  walking_on_water:  '🏄',
   pillar_of_fire:    '🗡️',
   jordan_river:      '🪨',
 
@@ -521,7 +525,7 @@ export const TASKS = [
   {
     id: 'david_and_goliath',
     title: 'David & Goliath',
-    synopsis: 'Wind up the sling! Circle the stone around Goliath to build momentum.',
+    synopsis: 'Trace the ring around Goliath to sling your stone!',
     reference: '1 Samuel 17:49',
     mechanic: MECHANIC.SLING,
     taskType: TASK_TYPE.FREE_ROAM,
@@ -529,9 +533,7 @@ export const TASKS = [
     points: { alive: 2, dead: 1 },
     difficulty: 'medium',
     timeLimit: 8,
-    config: {
-      circles: 2,
-    },
+    config: {},
   },
   {
     id: 'pauls_belongings',
@@ -641,6 +643,19 @@ export const TASKS = [
     },
   },
   {
+    id: 'march_around_jericho',
+    title: 'March Around Jericho',
+    synopsis: 'On the seventh day, march around the city seven times! Trace the orbit ring all the way around — 7 full laps.',
+    reference: 'Joshua 6:4',
+    mechanic: MECHANIC.MARCH_JERICHO,
+    taskType: TASK_TYPE.FREE_ROAM,
+    category: TASK_CATEGORY.CHALLENGES,
+    points: { alive: 7, dead: 4 },
+    difficulty: 'hard',
+    timeLimit: 45,
+    config: {},
+  },
+  {
     id: 'ark_of_covenant',
     title: 'Ark of the Covenant',
     synopsis: 'Carry the Ark carefully. Drag it to the designated holy place without letting it fall.',
@@ -734,31 +749,36 @@ export const TASKS = [
   {
     id: 'jonah_storm',
     title: 'Jonah in the Storm',
-    synopsis: 'The ship is sinking! Bail water as fast as you can before the waves swamp the deck.',
+    synopsis: 'The ship is sinking! Grab the bucket, fill it with seawater, and heave it overboard — fast!',
     reference: 'Jonah 1:4–5',
-    mechanic: MECHANIC.RAPID_TAP,
+    mechanic: MECHANIC.BAIL_WATER,
     taskType: TASK_TYPE.FREE_ROAM,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 60, dead: 36 },
     difficulty: 'medium',
-    timeLimit: 8,
+    timeLimit: 25,           // seconds — slightly generous to allow learning the gesture
     config: {
-      targetTaps: 25,
+      cyclesRequired: 6,     // number of full pick-up→fill→dump cycles to win
+      fillDurationMs: 1500,  // ms the player must hold over water to fill bucket
     },
   },
   {
     id: 'walking_on_water',
     title: 'Walking on Water',
-    synopsis: '"Keep your eyes on Jesus." Press and hold to stay above the waves — doubt and you sink.',
+    synopsis: '"Keep your eyes on Jesus." Follow the glowing cross — look away and you sink.',
     reference: 'Matthew 14:29–30',
-    mechanic: MECHANIC.HOLD,
+    mechanic: MECHANIC.FOCUS,
     taskType: TASK_TYPE.FREE_ROAM,
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 3, dead: 2 },
     difficulty: 'hard',
     timeLimit: 0,
     config: {
-      duration: 7,
+      duration: 8,
+      drainRate: 1.8,
+      iconSpeed: 0.6,
+      tolerance: 45,
+      startFaith: 0.5,
     },
   },
   {
