@@ -19,6 +19,7 @@ export default function ScriptureMemoryTask({ config, onSuccess, onFail, taskId 
   const [typed, setTyped] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState(null);
+  const [showVerse, setShowVerse] = useState(false);
   const threshold = config.accuracy ?? 0.80;
 
   const score = typed.trim().length > 0
@@ -59,7 +60,20 @@ export default function ScriptureMemoryTask({ config, onSuccess, onFail, taskId 
         <Text style={styles.hint}>Type the verse from memory:</Text>
         <Text style={styles.refLabel}>{config.reference}</Text>
 
-        {submitted && result && !result.passed && (
+        {!submitted && (
+          <TouchableOpacity
+            style={[styles.dontKnowBtn, showVerse && styles.dontKnowBtnRevealed]}
+            onPress={() => setShowVerse(true)}
+            activeOpacity={0.8}
+            disabled={showVerse}
+          >
+            <Text style={styles.dontKnowBtnText}>
+              {showVerse ? '📖  VERSE REVEALED' : "I DON'T KNOW"}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {(showVerse || (submitted && result && !result.passed)) && (
           <>
             <Text style={styles.verseReveal}>The verse (ESV):</Text>
             <Text style={styles.verseText}>{config.verseText}</Text>
@@ -213,6 +227,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     letterSpacing: 3,
     color: colors.background.space,
+  },
+  dontKnowBtn: {
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: colors.accent.amber,
+    backgroundColor: 'transparent',
+  },
+  dontKnowBtnRevealed: {
+    borderColor: colors.text.disabled,
+    opacity: 0.5,
+  },
+  dontKnowBtnText: {
+    fontFamily: fonts.display.bold,
+    fontSize: 13,
+    color: colors.accent.amber,
+    letterSpacing: 1,
   },
   failBtn: {
     borderRadius: 10,

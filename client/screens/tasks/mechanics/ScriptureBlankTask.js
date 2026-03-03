@@ -69,6 +69,7 @@ function ScriptureBlankTaskInner({ config, onSuccess, onFail, areaW, areaH }) {
   const [placedSlots, setPlacedSlots] = useState(() => new Array(6).fill(null));
   const [draggingTileIdx, setDraggingTileIdx] = useState(null);
   const [flashResult, setFlashResult] = useState(null); // null | 'correct' | 'wrong'
+  const [showHint, setShowHint] = useState(false);
 
   const placedSlotsRef = useRef(new Array(6).fill(null)); // [tileIdx] → slotIdx | null
   const occupiedRef = useRef(new Set()); // slotIdx values currently occupied
@@ -282,6 +283,30 @@ function ScriptureBlankTaskInner({ config, onSuccess, onFail, areaW, areaH }) {
             </React.Fragment>
           ))}
         </Text>
+
+        {showHint && (
+          <View style={styles.hintBox}>
+            {blanks.map((word, i) => (
+              <View key={i} style={styles.hintItem}>
+                <Text style={styles.hintNum}>{i + 1}</Text>
+                <Text style={styles.hintWord}>{word}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {!flashResult && (
+          <TouchableOpacity
+            style={[styles.dontKnowBtn, showHint && styles.dontKnowBtnUsed]}
+            onPress={() => setShowHint(true)}
+            activeOpacity={0.8}
+            disabled={showHint || doneRef.current}
+          >
+            <Text style={[styles.dontKnowBtnText, showHint && styles.dontKnowBtnTextUsed]}>
+              {showHint ? '📖  HINT SHOWN' : "I DON'T KNOW"}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* ── Slot label row ── */}
@@ -354,7 +379,7 @@ function ScriptureBlankTaskInner({ config, onSuccess, onFail, areaW, areaH }) {
         );
       })}
 
-      {/* ── Draggable tiles ── */}
+      {/* ── Draggable tiles ── */
       {renderOrder.map(i => {
         const isPlaced = placedSlots[i] !== null;
         return (
@@ -439,7 +464,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.default,
     padding: 14,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
   },
   verseText: {
     fontFamily: fonts.ui.regular,
@@ -485,5 +510,54 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     textAlign: 'center',
     paddingHorizontal: 3,
+  },
+
+  dontKnowBtn: {
+    marginTop: 8,
+    paddingVertical: 6,
+    alignItems: 'center',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.accent.amber,
+    backgroundColor: 'transparent',
+  },
+  dontKnowBtnUsed: {
+    borderColor: colors.text.disabled,
+    opacity: 0.4,
+  },
+  dontKnowBtnText: {
+    fontFamily: fonts.display.bold,
+    fontSize: 12,
+    color: colors.accent.amber,
+    letterSpacing: 1,
+  },
+  dontKnowBtnTextUsed: {
+    color: colors.text.disabled,
+  },
+
+  hintBox: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 8,
+  },
+  hintItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  hintNum: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 11,
+    color: colors.accent.amber,
+  },
+  hintWord: {
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 12,
+    color: colors.text.secondary,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accent.amber,
+    paddingBottom: 1,
   },
 });

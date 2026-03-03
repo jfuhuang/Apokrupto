@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Ellipse, Line, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Rect } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
@@ -28,65 +28,7 @@ function CrossSvg() {
   );
 }
 
-function PeterSvg() {
-  return (
-    <Svg width={40} height={64} viewBox="0 0 40 64">
-      <Circle cx="20" cy="8" r="7" fill={colors.primary.electricBlue} />
-      <Path
-        d="M12 15 Q12 36 20 40 Q28 36 28 15Z"
-        fill={colors.primary.electricBlue}
-      />
-      <Path d="M12 20 L2 14" stroke={colors.primary.electricBlue} strokeWidth="3.5" strokeLinecap="round" />
-      <Path d="M28 20 L38 14" stroke={colors.primary.electricBlue} strokeWidth="3.5" strokeLinecap="round" />
-      <Line x1="16" y1="40" x2="13" y2="58" stroke={colors.primary.electricBlue} strokeWidth="3.5" strokeLinecap="round" />
-      <Line x1="24" y1="40" x2="28" y2="56" stroke={colors.primary.electricBlue} strokeWidth="3.5" strokeLinecap="round" />
-      <Ellipse cx="13" cy="60" rx="5" ry="2" fill={colors.primary.electricBlue} opacity={0.3} />
-      <Ellipse cx="28" cy="58" rx="5" ry="2" fill={colors.primary.electricBlue} opacity={0.3} />
-    </Svg>
-  );
-}
 
-function WaveLayer({ faithAnim, waveOffsetAnim, areaW, areaH }) {
-  const translateX = waveOffsetAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -30],
-  });
-
-  const waveTopY = faithAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [areaH * 0.25, areaH * 0.85],
-  });
-
-  const w = Math.ceil(areaW * 1.15);
-
-  return (
-    <Animated.View
-      style={[
-        styles.waveContainer,
-        { top: waveTopY, transform: [{ translateX }] },
-      ]}
-      pointerEvents="none"
-    >
-      <Svg width={w} height={areaH} viewBox={`0 0 ${w} ${areaH}`}>
-        <Path
-          d={`M0 20 Q${w * 0.15} 10 ${w * 0.3} 20 Q${w * 0.45} 30 ${w * 0.6} 20 Q${w * 0.75} 10 ${w * 0.9} 20 Q${w * 0.95} 25 ${w} 20 L${w} ${areaH} L0 ${areaH} Z`}
-          fill="#003060"
-          opacity="0.65"
-        />
-        <Path
-          d={`M0 35 Q${w * 0.2} 25 ${w * 0.35} 35 Q${w * 0.5} 45 ${w * 0.7} 35 Q${w * 0.85} 25 ${w} 35 L${w} ${areaH} L0 ${areaH} Z`}
-          fill="#004080"
-          opacity="0.5"
-        />
-        <Path
-          d={`M0 50 Q${w * 0.25} 42 ${w * 0.5} 50 Q${w * 0.75} 58 ${w} 50 L${w} ${areaH} L0 ${areaH} Z`}
-          fill="#002050"
-          opacity="0.4"
-        />
-      </Svg>
-    </Animated.View>
-  );
-}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -143,7 +85,6 @@ function FocusTaskInner({ config, onSuccess, onFail, areaW, areaH }) {
   const faithAnim = useRef(new Animated.Value(startFaith)).current;
   const iconX = useRef(new Animated.Value(iconPosRef.current.x)).current;
   const iconY = useRef(new Animated.Value(iconPosRef.current.y)).current;
-  const waveOffsetAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
   // ── PanResponder ──────────────────────────────────────────────────────
@@ -180,16 +121,6 @@ function FocusTaskInner({ config, onSuccess, onFail, areaW, areaH }) {
   ).current;
 
   // ── looping animations ─────────────────────────────────────────────────
-  useEffect(() => {
-    Animated.loop(
-      Animated.timing(waveOffsetAnim, {
-        toValue: 1,
-        duration: 1400,
-        useNativeDriver: false,
-      })
-    ).start();
-  }, []);
-
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -303,11 +234,6 @@ function FocusTaskInner({ config, onSuccess, onFail, areaW, areaH }) {
     outputRange: [0.7, 0.2, 0],
   });
 
-  const peterTop = faithAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [areaH * 0.75, areaH * 0.35],
-  });
-
   const meterWidth = faithAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0%', '100%'],
@@ -337,25 +263,8 @@ function FocusTaskInner({ config, onSuccess, onFail, areaW, areaH }) {
         pointerEvents="none"
       />
 
-      {/* Waves */}
-      <WaveLayer
-        faithAnim={faithAnim}
-        waveOffsetAnim={waveOffsetAnim}
-        areaW={areaW}
-        areaH={areaH}
-      />
-
-      {/* Peter figure */}
-      <Animated.View
-        style={[styles.figure, { left: areaW / 2 - 20, top: peterTop }]}
-        pointerEvents="none"
-      >
-        <PeterSvg />
-      </Animated.View>
-
       {/* Faith meter */}
       <View style={styles.meterContainer}>
-        <Text style={styles.meterLabel}>FAITH</Text>
         <View style={styles.meterTrack}>
           <Animated.View
             style={[styles.meterFill, { width: meterWidth, backgroundColor: meterColor }]}
@@ -377,8 +286,8 @@ function FocusTaskInner({ config, onSuccess, onFail, areaW, areaH }) {
         {completed
           ? 'Your faith held firm!'
           : failed
-          ? 'You took your eyes off Jesus...'
-          : 'Keep your eyes on Jesus'}
+          ? 'You let go... you sank.'
+          : 'Press and hold your finger on the glowing cross — keep it there as it moves!'}
       </Text>
 
       {/* Drifting cross icon */}
@@ -449,19 +358,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#001830',
   },
 
-  waveContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-  },
-
-  figure: {
-    position: 'absolute',
-    width: 40,
-    height: 64,
-    alignItems: 'center',
-  },
-
   meterContainer: {
     position: 'absolute',
     top: 12,
@@ -469,12 +365,6 @@ const styles = StyleSheet.create({
     right: 20,
     alignItems: 'center',
     gap: 4,
-  },
-  meterLabel: {
-    fontFamily: fonts.accent.bold,
-    fontSize: 11,
-    letterSpacing: 3,
-    color: colors.text.tertiary,
   },
   meterTrack: {
     width: '100%',

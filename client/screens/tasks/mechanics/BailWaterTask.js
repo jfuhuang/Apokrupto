@@ -15,8 +15,9 @@ import { fonts } from '../../../theme/typography';
 const { width: WINDOW_W } = Dimensions.get('window');
 const PARTICLE_EMOJIS = ['💧', '🌊', '💧', '💧', '🌊'];
 
+// step values: 'carry' | 'filling' | 'dump'
+
 // ── Wave background ───────────────────────────────────────────────────────────
-// Adapted from the WaveBackground previously in RapidTapTask.js (jonah_storm case)
 
 function WaveBackground({ urgent }) {
   const wave = useRef(new Animated.Value(0)).current;
@@ -40,19 +41,16 @@ function WaveBackground({ urgent }) {
       pointerEvents="none"
     >
       <Svg width="110%" height="100%" viewBox="0 0 110 100" preserveAspectRatio="none">
-        {/* Front wave */}
         <Path
           d={`M0 55 Q27 ${55 - amp} 55 55 Q82 ${55 + amp} 110 55 L110 100 L0 100Z`}
           fill="#003060"
           opacity="0.55"
         />
-        {/* Mid wave */}
         <Path
           d={`M-5 68 Q27 ${68 - amp + 1} 55 68 Q82 ${68 + amp - 1} 115 68 L115 100 L-5 100Z`}
           fill="#004080"
           opacity="0.4"
         />
-        {/* Back wave */}
         <Path
           d="M-10 78 Q27 76 55 78 Q82 80 115 78 L115 100 L-10 100Z"
           fill="#002050"
@@ -93,7 +91,6 @@ function BucketSvg({ size, isFull }) {
             opacity="0.45"
           />
           <Ellipse cx="30" cy="25" rx="17" ry="4" fill={colors.primary.electricBlue} opacity="0.55" />
-          {/* Water drops at rim */}
           <Ellipse cx="20" cy="22" rx="2.5" ry="2" fill={colors.primary.electricBlue} opacity="0.7" />
           <Ellipse cx="40" cy="22" rx="2.5" ry="2" fill={colors.primary.electricBlue} opacity="0.7" />
         </>
@@ -129,10 +126,14 @@ function computeZones(W, H) {
   const BUCKET_SIZE = Math.min(72, W * 0.19);
   return {
     BUCKET_SIZE,
-    BUCKET_START:     { x: W * 0.12, y: H * 0.58 },
-    RAIL_POS:         { x: W * 0.62, y: H * 0.30 },
-    RAIL_ZONE:        { x: W * 0.44, y: H * 0.18, w: W * 0.46, h: H * 0.32 },
-    DUMP_THRESHOLD_X: W * 0.40,
+    // bucket resting position (bottom-centre)
+    BUCKET_START: { x: W * 0.5 - BUCKET_SIZE * 0.5, y: H * 0.70 },
+    // where the bucket snaps when dropped in the fill zone
+    CENTER_POS:   { x: W * 0.5 - BUCKET_SIZE * 0.5, y: H * 0.35 },
+    // hit-test rectangle for "is bucket over the fill zone?"
+    CENTER_ZONE:  { x: W * 0.28, y: H * 0.22, w: W * 0.44, h: H * 0.32 },
+    // how far from each edge a release counts as "tossed overboard"
+    DUMP_MARGIN:  W * 0.22,
   };
 }
 
@@ -143,18 +144,18 @@ let particleSeq = 0;
 export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, taskId }) {
   const {
     cyclesRequired = 6,
-    fillDurationMs = 1500,
+    fillDurationMs = 600,   // fast passive fill
   } = config || {};
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [step, setStep]                   = useState('pickup'); // 'pickup'|'fill'|'dump'
+  const [step, setStep]                   = useState('carry'); // 'carry'|'filling'|'dump'
   const [cyclesCompleted, setCycles]      = useState(0);
   const [containerSize, setContainerSize] = useState({ width: WINDOW_W, height: 500 });
   const [isFull, setIsFull]               = useState(false);
   const [particles, setParticles]         = useState([]);
 
-  // ── Stable refs (PanResponder access) ──────────────────────────────────────
-  const stepRef         = useRef('pickup');
+  // ── Stable refs ────────────────────────────────────────────────────────────
+  const stepRef         = useRef('carry');
   const isFullRef       = useRef(false);
   const cyclesRef       = useRef(0);
   const zonesRef        = useRef(computeZones(WINDOW_W, 500));
@@ -162,11 +163,11 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
   const fillAnimRef     = useRef(null);
 
   // Animated values
-  const bucketPos     = useRef(new Animated.ValueXY({
+  const bucketPos    = useRef(new Animated.ValueXY({
     x: zonesRef.current.BUCKET_START.x,
     y: zonesRef.current.BUCKET_START.y,
   })).current;
-  const fillProgress  = useRef(new Animated.Value(0)).current;
+  const fillProgress = useRef(new Animated.Value(0)).current;
 
   // ── Sync state → refs ──────────────────────────────────────────────────────
   useEffect(() => { stepRef.current = step; }, [step]);
@@ -178,38 +179,27 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
     zonesRef.current = computeZones(containerSize.width, containerSize.height);
   }, [containerSize]);
 
-  // ── Reset bucket to start pos when container size settles ─────────────────
+  // ── Reset bucket position when container size settles ─────────────────────
   useEffect(() => {
-    const { BUCKET_START } = zonesRef.current;
-    bucketPos.setValue({ x: BUCKET_START.x, y: BUCKET_START.y });
+    bucketPos.setValue(zonesRef.current.BUCKET_START);
   }, [containerSize]);
 
-  // ── Action helpers (stable via useCallback, refs ensure fresh zone access) ─
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
-  const snapToStart = useCallback(() => {
-    const { BUCKET_START } = zonesRef.current;
+  const snapTo = useCallback((pos) => {
     Animated.spring(bucketPos, {
-      toValue: BUCKET_START,
+      toValue: pos,
       useNativeDriver: false,
       friction: 7,
     }).start();
   }, []);
 
-  const dockAtRail = useCallback(() => {
-    Animated.spring(bucketPos, {
-      toValue: zonesRef.current.RAIL_POS,
-      useNativeDriver: false,
-      friction: 7,
-    }).start();
-  }, []);
+  const snapToStart  = useCallback(() => snapTo(zonesRef.current.BUCKET_START), [snapTo]);
+  const snapToCenter = useCallback(() => snapTo(zonesRef.current.CENTER_POS), [snapTo]);
 
-  const spawnSplash = useCallback(() => {
-    const { RAIL_POS, BUCKET_SIZE } = zonesRef.current;
-    const cx = RAIL_POS.x + BUCKET_SIZE * 0.4;
-    const cy = RAIL_POS.y + BUCKET_SIZE * 0.4;
-
+  const spawnSplash = useCallback((cx, cy) => {
     const batch = Array.from({ length: 5 }, (_, i) => {
-      const pid = ++particleSeq;
+      const pid     = ++particleSeq;
       const posAnim = new Animated.ValueXY({ x: cx, y: cy });
       const opAnim  = new Animated.Value(1);
       const emoji   = PARTICLE_EMOJIS[i % PARTICLE_EMOJIS.length];
@@ -217,8 +207,8 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
       Animated.parallel([
         Animated.timing(posAnim, {
           toValue: {
-            x: cx + (Math.random() - 0.4) * 130,
-            y: cy - 50 - Math.random() * 70,
+            x: cx + (Math.random() - 0.5) * 160,
+            y: cy - 40 - Math.random() * 80,
           },
           duration: 700,
           useNativeDriver: false,
@@ -232,12 +222,16 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
 
       return { id: pid, posAnim, opAnim, emoji };
     });
-
     setParticles((p) => [...p, ...batch]);
   }, []);
 
   const completeCycle = useCallback(() => {
-    spawnSplash();
+    const { BUCKET_SIZE } = zonesRef.current;
+    spawnSplash(
+      bucketPos.x._value + BUCKET_SIZE * 0.4,
+      bucketPos.y._value + BUCKET_SIZE * 0.4,
+    );
+
     const next = cyclesRef.current + 1;
     cyclesRef.current = next;
     setCycles(next);
@@ -248,17 +242,16 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
       return;
     }
 
-    // Reset for next cycle
     isFullRef.current = false;
-    stepRef.current   = 'pickup';
+    stepRef.current   = 'carry';
     setIsFull(false);
-    setStep('pickup');
+    setStep('carry');
     fillProgress.setValue(0);
     snapToStart();
   }, [cyclesRequired, onSuccess, spawnSplash, snapToStart]);
 
-  const startFill = useCallback(() => {
-    if (stepRef.current !== 'fill') return;
+  // Auto-fill: starts passively once bucket is dropped in the center zone
+  const startAutoFill = useCallback(() => {
     fillProgress.setValue(0);
     const anim = Animated.timing(fillProgress, {
       toValue: 1,
@@ -267,7 +260,7 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
     });
     fillAnimRef.current = anim;
     anim.start(({ finished }) => {
-      if (finished && stepRef.current === 'fill') {
+      if (finished && stepRef.current === 'filling') {
         isFullRef.current = true;
         stepRef.current   = 'dump';
         setIsFull(true);
@@ -276,100 +269,79 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
     });
   }, [fillDurationMs]);
 
-  const cancelFill = useCallback(() => {
-    if (fillAnimRef.current) {
-      fillAnimRef.current.stop();
-      fillAnimRef.current = null;
-    }
-    fillProgress.setValue(0);
-    if (stepRef.current === 'fill') {
-      isFullRef.current = false;
-      stepRef.current   = 'pickup';
-      setIsFull(false);
-      setStep('pickup');
-      snapToStart();
-    }
-  }, [snapToStart]);
-
   // ── PanResponder ──────────────────────────────────────────────────────────
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      // In 'fill' mode we only need press, not move
-      onMoveShouldSetPanResponder:  () => stepRef.current !== 'fill',
+      // Block gestures while the bucket is auto-filling
+      onStartShouldSetPanResponder: () => stepRef.current !== 'filling',
+      onMoveShouldSetPanResponder:  () => stepRef.current !== 'filling',
 
       onPanResponderGrant: () => {
-        if (stepRef.current === 'fill') {
-          startFill();
-          return;
-        }
-        // Capture current position for drag
         bucketPos.setOffset({ x: bucketPos.x._value, y: bucketPos.y._value });
         bucketPos.setValue({ x: 0, y: 0 });
       },
 
       onPanResponderMove: (evt, gestureState) => {
-        if (stepRef.current === 'fill') return;
         bucketPos.setValue({ x: gestureState.dx, y: gestureState.dy });
       },
 
       onPanResponderRelease: (evt, gestureState) => {
-        if (stepRef.current === 'fill') {
-          cancelFill();
-          return;
-        }
-
         bucketPos.flattenOffset();
         const finalX = bucketPos.x._value;
         const finalY = bucketPos.y._value;
-        const { RAIL_ZONE, DUMP_THRESHOLD_X } = zonesRef.current;
+        const { CENTER_ZONE, DUMP_MARGIN, BUCKET_SIZE } = zonesRef.current;
+        const W = containerSize.width;
 
-        if (stepRef.current === 'pickup') {
-          const inRail =
-            finalX >= RAIL_ZONE.x &&
-            finalX <= RAIL_ZONE.x + RAIL_ZONE.w &&
-            finalY >= RAIL_ZONE.y &&
-            finalY <= RAIL_ZONE.y + RAIL_ZONE.h;
+        if (stepRef.current === 'carry') {
+          // Hit-test: bucket centre over fill zone?
+          const cx = finalX + BUCKET_SIZE * 0.5;
+          const cy = finalY + BUCKET_SIZE * 0.5;
+          const inCenter =
+            cx >= CENTER_ZONE.x &&
+            cx <= CENTER_ZONE.x + CENTER_ZONE.w &&
+            cy >= CENTER_ZONE.y &&
+            cy <= CENTER_ZONE.y + CENTER_ZONE.h;
 
-          if (inRail) {
-            stepRef.current = 'fill';
-            setStep('fill');
-            dockAtRail();
+          if (inCenter) {
+            stepRef.current = 'filling';
+            setStep('filling');
+            snapToCenter();
+            startAutoFill();
           } else {
             snapToStart();
           }
         } else if (stepRef.current === 'dump') {
-          if (finalX < DUMP_THRESHOLD_X) {
+          // Toss to either side
+          const tossedLeft  = finalX < DUMP_MARGIN;
+          const tossedRight = finalX + BUCKET_SIZE > W - DUMP_MARGIN;
+          if (tossedLeft || tossedRight) {
             completeCycle();
           } else {
-            dockAtRail();
+            snapToCenter();
           }
         }
       },
 
       onPanResponderTerminate: () => {
-        if (stepRef.current === 'fill') {
-          cancelFill();
-          return;
-        }
         bucketPos.flattenOffset();
-        snapToStart();
+        if (stepRef.current !== 'filling') snapToStart();
       },
     })
   ).current;
 
   // ── Derived display values ────────────────────────────────────────────────
 
-  const H             = containerSize.height;
-  const { BUCKET_SIZE } = zonesRef.current;
-  const gaugeH        = H * 0.55;
-  const gaugeFillH    = ((cyclesRequired - cyclesCompleted) / cyclesRequired) * gaugeH;
+  const H = containerSize.height;
+  const W = containerSize.width;
+  const { BUCKET_SIZE, CENTER_ZONE, DUMP_MARGIN } = zonesRef.current;
+  const gaugeH     = H * 0.55;
+  const gaugeFillH = ((cyclesRequired - cyclesCompleted) / cyclesRequired) * gaugeH;
 
   const stepLabels = [
-    { key: 'pickup', label: 'PICK UP' },
-    { key: 'fill',   label: 'FILL' },
-    { key: 'dump',   label: 'DUMP' },
+    { key: 'carry',   label: 'CARRY' },
+    { key: 'filling', label: 'FILL' },
+    { key: 'dump',    label: 'TOSS' },
   ];
 
   return (
@@ -391,20 +363,38 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
       </View>
       <Text style={[styles.gaugeLabel, { top: H * 0.16 - 16 }]}>WATER</Text>
 
-      {/* ── Rail / overboard zone hint ── */}
-      <View
-        style={[
-          styles.railHint,
-          {
-            right: 14,
-            top:   H * 0.18,
-            width: containerSize.width * 0.32,
-            height: H * 0.32,
-          },
-        ]}
-      >
-        <Text style={styles.railLabel}>OVERBOARD</Text>
-      </View>
+      {/* ── Center fill zone indicator (shown while carrying) ── */}
+      {step === 'carry' && (
+        <View
+          style={[
+            styles.centerHint,
+            {
+              left:   CENTER_ZONE.x,
+              top:    CENTER_ZONE.y,
+              width:  CENTER_ZONE.w,
+              height: CENTER_ZONE.h,
+            },
+          ]}
+        >
+          <Text style={styles.centerHintLabel}>DROP HERE</Text>
+        </View>
+      )}
+
+      {/* ── Side dump hints (shown when ready to toss) ── */}
+      {step === 'dump' && (
+        <>
+          <View style={[styles.dumpHint, {
+            left: 0, width: DUMP_MARGIN, top: H * 0.28, height: H * 0.44,
+          }]}>
+            <Text style={styles.dumpArrow}>{'<'}</Text>
+          </View>
+          <View style={[styles.dumpHint, {
+            right: 0, width: DUMP_MARGIN, top: H * 0.28, height: H * 0.44,
+          }]}>
+            <Text style={styles.dumpArrow}>{'>'}</Text>
+          </View>
+        </>
+      )}
 
       {/* ── Cycles counter ── */}
       <Text style={[styles.cyclesText, { top: H * 0.10 }]}>
@@ -424,11 +414,8 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
         ]}
         {...panResponder.panHandlers}
       >
-        {step === 'fill' && <FillRing progress={fillProgress} size={BUCKET_SIZE} />}
+        {step === 'filling' && <FillRing progress={fillProgress} size={BUCKET_SIZE} />}
         <BucketSvg size={BUCKET_SIZE} isFull={isFull} />
-        {step === 'fill' && (
-          <Text style={styles.holdHint}>HOLD</Text>
-        )}
       </Animated.View>
 
       {/* ── Step indicator ── */}
@@ -502,21 +489,33 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
 
-  // ── Rail hint ───────────────────────────────────────────────────────────
-  railHint: {
+  // ── Center fill zone hint ────────────────────────────────────────────────
+  centerHint: {
     position: 'absolute',
     borderWidth: 1,
-    borderColor: 'rgba(0,212,255,0.2)',
+    borderColor: 'rgba(0,212,255,0.35)',
     borderStyle: 'dashed',
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
-    paddingTop: 5,
+    justifyContent: 'center',
   },
-  railLabel: {
+  centerHintLabel: {
     fontFamily: fonts.accent.bold,
-    fontSize: 8,
+    fontSize: 10,
     letterSpacing: 1.5,
-    color: 'rgba(0,212,255,0.35)',
+    color: 'rgba(0,212,255,0.50)',
+  },
+
+  // ── Dump side hints ──────────────────────────────────────────────────────
+  dumpHint: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dumpArrow: {
+    fontFamily: fonts.display.bold,
+    fontSize: 28,
+    color: 'rgba(0,212,255,0.45)',
   },
 
   // ── Cycles counter ──────────────────────────────────────────────────────
@@ -536,14 +535,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  holdHint: {
-    position: 'absolute',
-    bottom: -14,
-    fontFamily: fonts.accent.bold,
-    fontSize: 9,
-    letterSpacing: 2,
-    color: colors.primary.electricBlue,
   },
 
   // ── Step indicator ──────────────────────────────────────────────────────
