@@ -12,6 +12,7 @@ import { fonts } from '../../../theme/typography';
 export default function CoopHoldTask({ task, role, currentTeam, onAction, update }) {
   const [holding, setHolding] = useState(false);
   const [timeLeft, setTimeLeft] = useState(task.config?.timeLimit || 20);
+  const [localElapsedMs, setLocalElapsedMs] = useState(0);
   const youRingAnim = useRef(new Animated.Value(0)).current;
   const partnerRingAnim = useRef(new Animated.Value(0)).current;
 
@@ -19,12 +20,41 @@ export default function CoopHoldTask({ task, role, currentTeam, onAction, update
     currentTeam === 'skotia' ? colors.primary.neonRed : colors.primary.electricBlue;
 
   const targetMs = task.config?.targetMs || 5000;
-  const elapsedMs = update?.elapsed ?? 0;
-  const progress = Math.min(elapsedMs / targetMs, 1);
 
   const partnerHolding = role === 'A'
     ? (update?.holdB ?? false)
     : (update?.holdA ?? false);
+
+  const bothHolding = holding && partnerHolding;
+
+  // Sync local elapsed from server whenever a new update arrives
+  useEffect(() => {
+    if (update?.elapsed !== undefined) {
+      setLocalElapsedMs(update.elapsed);
+    }
+  }, [update?.elapsed]);
+
+  // Client-side ticker: advance elapsed while both players are actively holding
+  const holdCheckFiredRef = useRef(false);
+  useEffect(() => {
+    if (!bothHolding || update?.phase === 'resolved') return;
+    holdCheckFiredRef.current = false;
+    const TICK = 50;
+    const id = setInterval(() => {
+      setLocalElapsedMs((prev) => {
+        const next = Math.min(prev + TICK, targetMs);
+        if (next >= targetMs && !holdCheckFiredRef.current) {
+          holdCheckFiredRef.current = true;
+          onAction('holdCheck', {});
+        }
+        return next;
+      });
+    }, TICK);
+    return () => clearInterval(id);
+  }, [bothHolding, update?.phase, targetMs, onAction]);
+
+  const elapsedMs = localElapsedMs;
+  const progress = Math.min(elapsedMs / targetMs, 1);
 
   // Animate ring fills
   useEffect(() => {

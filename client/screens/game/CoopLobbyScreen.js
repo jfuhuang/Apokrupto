@@ -88,7 +88,7 @@ export default function CoopLobbyScreen({
       const baseUrl = await getApiUrl();
       socket = io(baseUrl, {
         auth: { token },
-        transports: ['websocket', 'polling'],
+        transports: ['polling', 'websocket'],
         reconnection: true,
       });
       socketRef.current = socket;

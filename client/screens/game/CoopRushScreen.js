@@ -35,9 +35,11 @@ export default function CoopRushScreen({
   const [currentTask, setCurrentTask] = useState(initialTask);
   const [taskUpdate, setTaskUpdate] = useState(null);
   const [sessionPoints, setSessionPoints] = useState(0);
+  const sessionPointsRef = useRef(0);
   const [secondsLeft, setSecondsLeft] = useState(null);
   const [showResult, setShowResult] = useState(false);
   const endsAtRef = useRef(null);
+  const sessionEndedRef = useRef(false);
   const timerBarAnim = useRef(new Animated.Value(1)).current;
   const resultFadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -70,7 +72,12 @@ export default function CoopRushScreen({
       const remaining = endsAtRef.current
         ? Math.ceil((endsAtRef.current - Date.now()) / 1000)
         : 0;
-      setSecondsLeft(Math.max(0, remaining));
+      const next = Math.max(0, remaining);
+      setSecondsLeft(next);
+      if (next <= 0 && !sessionEndedRef.current) {
+        sessionEndedRef.current = true;
+        onSessionEnd({ reason: 'movementEnd', sessionPoints: sessionPointsRef.current, teamPoints: null });
+      }
     }, 1000);
     return () => clearInterval(id);
   }, [secondsLeft !== null]);
@@ -82,13 +89,18 @@ export default function CoopRushScreen({
       const baseUrl = await getApiUrl();
       socket = io(baseUrl, {
         auth: { token },
-        transports: ['websocket', 'polling'],
+        transports: ['polling', 'websocket'],
         reconnection: true,
       });
       socketRef.current = socket;
 
       socket.on('connect', () => {
         socket.emit('joinRoom', { lobbyId });
+        if (sessionId) {
+          socket.emit('coopRejoin', { sessionId }, (res) => {
+            if (res?.error) console.warn('[CoopRush] Rejoin error:', res.error);
+          });
+        }
       });
 
       socket.on('coopTaskUpdate', (data) => {
@@ -99,30 +111,34 @@ export default function CoopRushScreen({
 
       socket.on('coopNextTask', ({ sessionId: sid, task, sessionPoints: pts }) => {
         if (sid !== sessionId) return;
-        // Show result briefly
+        // Switch to the new task immediately, show overlay on top
+        setCurrentTask(task);
+        setTaskUpdate(null);
+        setSessionPoints(pts);
+        sessionPointsRef.current = pts;
         setShowResult(true);
         resultFadeAnim.setValue(1);
         Animated.timing(resultFadeAnim, {
           toValue: 0,
-          duration: 1500,
+          duration: 1000,
           useNativeDriver: true,
         }).start(() => {
           setShowResult(false);
-          setCurrentTask(task);
-          setTaskUpdate(null);
-          setSessionPoints(pts);
         });
       });
 
       socket.on('coopSessionEnd', ({ sessionId: sid, reason, sessionPoints: pts, teamPoints }) => {
         if (sid !== sessionId) return;
+        if (sessionEndedRef.current) return;
+        sessionEndedRef.current = true;
         onSessionEnd({ reason, sessionPoints: pts, teamPoints });
       });
 
       socket.on('movementComplete', ({ movement }) => {
-        if (movement === 'B') {
-          onSessionEnd({ reason: 'movementEnd', sessionPoints, teamPoints: null });
-        }
+        if (movement !== 'B') return;
+        if (sessionEndedRef.current) return;
+        sessionEndedRef.current = true;
+        onSessionEnd({ reason: 'movementEnd', sessionPoints: sessionPointsRef.current, teamPoints: null });
       });
 
       socket.on('connect_error', (err) =>
@@ -154,8 +170,10 @@ export default function CoopRushScreen({
     if (socket) {
       socket.emit('coopExit', { sessionId }, () => {});
     }
-    onSessionEnd({ reason: 'exit', sessionPoints, teamPoints: null });
-  }, [sessionId, sessionPoints, onSessionEnd]);
+    if (sessionEndedRef.current) return;
+    sessionEndedRef.current = true;
+    onSessionEnd({ reason: 'exit', sessionPoints: sessionPointsRef.current, teamPoints: null });
+  }, [sessionId, onSessionEnd]);
 
   const formatTime = (s) => {
     if (s === null || s === undefined) return '--:--';

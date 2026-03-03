@@ -24,9 +24,6 @@ export default function DeceptionTask({ task, role, currentTeam, onAction, updat
 
   // Resolved state
   if (update?.phase === 'resolved') {
-    const benefitColor =
-      update.benefitTeam === 'phos' ? colors.primary.electricBlue : colors.primary.neonRed;
-
     Animated.loop(
       Animated.sequence([
         Animated.timing(glowAnim, { toValue: 1, duration: 800, useNativeDriver: false }),
@@ -42,17 +39,14 @@ export default function DeceptionTask({ task, role, currentTeam, onAction, updat
     return (
       <View style={styles.container}>
         <Text style={styles.resolvedTitle}>OPTION CHOSEN</Text>
-        <View style={[styles.resolvedCard, { borderColor: benefitColor }]}>
+        <View style={styles.resolvedCard}>
           <Text style={styles.resolvedOption}>
             {update.chosenIndex === 0
               ? task.config.optionA.label
               : task.config.optionB.label}
           </Text>
-          <Text style={[styles.resolvedTeam, { color: benefitColor }]}>
-            {update.benefitTeam === 'phos' ? 'ΦΩΣ' : 'ΣΚΟΤΊΑ'} BENEFITED
-          </Text>
         </View>
-        <Animated.Text style={[styles.pointsText, { color: benefitColor, opacity: glowOpacity }]}>
+        <Animated.Text style={[styles.pointsText, { opacity: glowOpacity }]}>
           +{update.pointsAwarded}
         </Animated.Text>
       </View>
@@ -213,6 +207,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.void,
     borderRadius: 16,
     borderWidth: 2,
+    borderColor: colors.background.frost,
     padding: 24,
     alignItems: 'center',
     gap: 8,
@@ -222,14 +217,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.text.primary,
   },
-  resolvedTeam: {
-    fontFamily: fonts.display.bold,
-    fontSize: 11,
-    letterSpacing: 2,
-  },
   pointsText: {
     fontFamily: fonts.accent.bold,
     fontSize: 36,
     letterSpacing: 2,
+    color: colors.text.primary,
   },
 });

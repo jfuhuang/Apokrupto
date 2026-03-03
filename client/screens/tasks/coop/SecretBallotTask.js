@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -29,24 +29,6 @@ function DecreeCard({ decree, onPress, disabled }) {
 }
 
 function AnimatedDots() {
-  const dotAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.timing(dotAnim, {
-        toValue: 3,
-        duration: 1500,
-        useNativeDriver: false,
-      })
-    ).start();
-  }, [dotAnim]);
-
-  const dots = dotAnim.interpolate({
-    inputRange: [0, 1, 2, 3],
-    outputRange: ['.', '..', '...', ''],
-  });
-
-  // Simple fallback since Animated.Text interpolation to string is limited
   return <Text style={styles.dotsText}>...</Text>;
 }
 
