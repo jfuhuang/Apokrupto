@@ -7,6 +7,7 @@ const userRoutes = require('./routes/userRoutes');
 const lobbyRoutes = require('./routes/lobbyRoutes');
 const gameRoutes = require('./routes/gameRoutes');
 const { setupLobbySocket } = require('./websocket/lobbySocket');
+const { registerCoopHandlers } = require('./websocket/coopSocket');
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -43,8 +44,9 @@ async function start() {
 
     // Create HTTP server and wire up Socket.IO lobby handlers
     const httpServer = http.createServer(app);
-    setupLobbySocket(httpServer);
-    console.log('[Startup] WebSocket server initialized');
+    const io = setupLobbySocket(httpServer);
+    io.on('connection', (socket) => { registerCoopHandlers(socket); });
+    console.log('[Startup] WebSocket server initialized (lobby + coop)');
 
     // Start listening
     httpServer.listen(port, '0.0.0.0', () => {

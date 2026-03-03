@@ -4,6 +4,7 @@ const pool = require('../db');
 const { GM_USERNAMES, JWT_SECRET } = require('../utils/config');
 const ioModule = require('./io');
 const gameService = require('../services/gameService');
+const coopService = require('../services/coopService');
 
 // In-memory map of lobbyId -> Set of connected userIds (as strings)
 const lobbyConnections = new Map();
@@ -596,8 +597,17 @@ function _emitAdvanceEvents(io, result) {
 
   // ── completeB: B timer (or GM force) finished Challenges Stage ───────────
   else if (result.step === 'completeB') {
+    // End all active co-op sessions for this game
+    const ended = coopService.endAllSessionsForGame(result.gameId);
+    for (const s of ended) {
+      io.to(`coop:${s.id}`).emit('coopSessionEnd', {
+        sessionId: s.id,
+        reason: 'movementOver',
+        sessionPoints: (s.sessionPoints?.A || 0) + (s.sessionPoints?.B || 0),
+      });
+    }
     io.to(lobbyRoom).emit('movementComplete', { movement: 'B' });
-    console.log(`[Socket] completeB → movementComplete {B} to ${lobbyRoom}`);
+    console.log(`[Socket] completeB → movementComplete {B} to ${lobbyRoom} (ended ${ended.length} coop sessions)`);
   }
 
   // ── summarizeRound: GM triggers summary screen — voting events already sent at completeC ──

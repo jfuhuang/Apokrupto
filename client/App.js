@@ -29,6 +29,8 @@ import RoleRevealScreen from './screens/game/RoleRevealScreen';
 import RoundHubScreen from './screens/game/RoundHubScreen';
 import MovementAScreen from './screens/game/MovementAScreen';
 import MovementBScreen from './screens/game/MovementBScreen';
+import CoopLobbyScreen from './screens/game/CoopLobbyScreen';
+import CoopRushScreen from './screens/game/CoopRushScreen';
 import TaskRushScreen from './screens/game/TaskRushScreen';
 import VotingScreen from './screens/game/VotingScreen';
 import RoundSummaryScreen from './screens/game/RoundSummaryScreen';
@@ -65,6 +67,11 @@ export default function App() {
     teamPoints, currentRound, totalRounds, currentMovement,
     movementBEndsAt, roundSummary, gameOverResult,
   } = state;
+  const [coopSessionId, setCoopSessionId] = useState(null);
+  const [coopPartnerId, setCoopPartnerId] = useState(null);
+  const [coopPartnerUsername, setCoopPartnerUsername] = useState(null);
+  const [coopRole, setCoopRole] = useState(null);
+  const [coopInitialTask, setCoopInitialTask] = useState(null);
   const {
     handleTeamAssigned, handleGameStarted, handleMovementReady,
     handleMovementAComplete, handleMovementCComplete, handleSusStatusUpdate,
@@ -93,7 +100,7 @@ export default function App() {
   const SYNC_SKIP_SCREENS = [
     'loading', 'welcome', 'login', 'register', 'lobbyList',
     'countdown', 'roleReveal', 'roundSummary', 'gameOver',
-    'taskRush',
+    'taskRush', 'coopLobby', 'coopRush',
   ];
 
   const syncCallbackRef = useRef(null);
@@ -410,6 +417,7 @@ export default function App() {
             isSus={isSus}
             onMovementComplete={() => setCurrentScreen('roundHub')}
             onEnterRush={() => setCurrentScreen('taskRush')}
+            onEnterCoop={() => setCurrentScreen('coopLobby')}
           />
         );
 
@@ -425,6 +433,53 @@ export default function App() {
             isSus={isSus}
             onExitRush={() => setCurrentScreen('movementB')}
             onMovementComplete={() => setCurrentScreen('roundHub')}
+          />
+        );
+
+      case 'coopLobby':
+        return (
+          <CoopLobbyScreen
+            token={token}
+            gameId={gameId}
+            lobbyId={currentLobbyId}
+            currentTeam={currentTeam}
+            groupMembers={currentGroupMembers}
+            isSus={isSus}
+            movementBEndsAt={movementBEndsAt}
+            onSessionStart={({ sessionId: sid, partner, role: r, task }) => {
+              setCoopSessionId(sid);
+              setCoopPartnerId(partner?.userId ?? null);
+              setCoopPartnerUsername(partner?.username ?? null);
+              setCoopRole(r);
+              setCoopInitialTask(task);
+              setCurrentScreen('coopRush');
+            }}
+            onBack={() => setCurrentScreen('movementB')}
+          />
+        );
+
+      case 'coopRush':
+        return (
+          <CoopRushScreen
+            token={token}
+            gameId={gameId}
+            lobbyId={currentLobbyId}
+            currentTeam={currentTeam}
+            isSus={isSus}
+            movementBEndsAt={movementBEndsAt}
+            sessionId={coopSessionId}
+            partnerId={coopPartnerId}
+            partnerUsername={coopPartnerUsername}
+            role={coopRole}
+            initialTask={coopInitialTask}
+            onSessionEnd={() => {
+              setCoopSessionId(null);
+              setCoopPartnerId(null);
+              setCoopPartnerUsername(null);
+              setCoopRole(null);
+              setCoopInitialTask(null);
+              setCurrentScreen('movementB');
+            }}
           />
         );
 
