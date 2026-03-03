@@ -2,11 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-native';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
-
-const TILE_BACKS = {
-  fruits_of_spirit: '🍇',
-  noahs_animals:    '🚢',
-};
+import TaskSprite from '../../../components/TaskSprite';
 
 function shuffle(arr) {
   const a = [...arr];
@@ -100,8 +96,6 @@ export default function MatchPairTask({ config, onSuccess, onFail, taskId }) {
     ];
   };
 
-  const backIcon = TILE_BACKS[taskId] || '?';
-
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.hint}>Tap two tiles to match a term with its meaning</Text>
@@ -126,7 +120,7 @@ export default function MatchPairTask({ config, onSuccess, onFail, taskId }) {
                 {isRevealed ? (
                   <Text style={styles.tileLabel} numberOfLines={3}>{tile.label}</Text>
                 ) : (
-                  <Text style={styles.tileBack}>{backIcon}</Text>
+                  <TaskSprite taskId={taskId} size={40} color={colors.primary.electricBlue} />
                 )}
               </TouchableOpacity>
             </Animated.View>
@@ -183,9 +177,6 @@ const styles = StyleSheet.create({
   tileMatched: {
     borderColor: colors.accent.neonGreen,
     backgroundColor: 'rgba(0,255,159,0.08)',
-  },
-  tileBack: {
-    fontSize: 28,
   },
   tileLabel: {
     fontFamily: fonts.ui.medium,

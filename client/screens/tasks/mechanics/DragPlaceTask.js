@@ -28,38 +28,31 @@ const TASK_HINTS = {
 function LampstandSvg({ snapped }) {
   return (
     <Svg width={TARGET_SIZE} height={TARGET_SIZE} viewBox="0 0 90 90">
-      {/* Base */}
-      <Rect x="28" y="82" width="34" height="6" rx="2" fill="#8B6914" />
-      {/* Stepped foot */}
-      <Rect x="34" y="76" width="22" height="7" rx="2" fill="#C09030" />
-      {/* Column shaft */}
-      <Rect x="42" y="32" width="6" height="45" fill="#8B6914" />
-      {/* Capital / platform */}
-      <Rect x="32" y="27" width="26" height="6" rx="2" fill="#C09030" />
-      {/* Highlight on platform */}
-      <Rect x="32" y="27" width="26" height="2" rx="1" fill="#E8B84B" opacity="0.5" />
-      {/* Drop-zone ring at top of platform */}
+      {/* Glow when shade is placed */}
+      {snapped && (
+        <G>
+          <Ellipse cx="45" cy="46" rx="16" ry="6" fill="#FFA63D" opacity="0.22" />
+          <Path d="M45 48 C43 44 42 40 44 36 C44 39 46 39 45 37 C47 39 48 44 47 48Z" fill="#FFA63D" />
+          <Path d="M45 47 C44 44 44.5 41 45 39 C45.5 41 46 44 45 47Z" fill="#FFE082" opacity="0.9" />
+        </G>
+      )}
+      {/* Drop-zone ring — snaps to center of this target box */}
       <Circle
-        cx="45" cy="20" r="13"
+        cx="45" cy="45" r="13"
         stroke={snapped ? '#FFE082' : '#FFA63D'}
         strokeWidth="2"
         strokeDasharray={snapped ? '0' : '5,4'}
         fill={snapped ? 'rgba(255,224,130,0.18)' : 'rgba(255,166,61,0.06)'}
       />
-      {/* Flame when lamp is placed */}
-      {snapped && (
-        <G>
-          <Path
-            d="M45 18 C43 14 42 10 44 6 C44 9 46 9 45 7 C47 9 48 14 47 18Z"
-            fill="#FFA63D"
-          />
-          <Path
-            d="M45 17 C44 14 44.5 11 45 9 C45.5 11 46 14 45 17Z"
-            fill="#FFE082"
-            opacity="0.9"
-          />
-        </G>
-      )}
+      {/* Collar / socket platform at top of stand */}
+      <Rect x="33" y="51" width="24" height="5" rx="2" fill="#C09030" />
+      <Rect x="33" y="51" width="24" height="2" rx="1" fill="#E8B84B" opacity="0.5" />
+      {/* Column shaft */}
+      <Rect x="42" y="56" width="6" height="24" fill="#8B6914" />
+      {/* Stepped foot */}
+      <Rect x="35" y="78" width="20" height="5" rx="2" fill="#C09030" />
+      {/* Base */}
+      <Rect x="28" y="82" width="34" height="6" rx="2" fill="#8B6914" />
     </Svg>
   );
 }
@@ -67,25 +60,22 @@ function LampstandSvg({ snapped }) {
 function LampSvg() {
   return (
     <Svg width={DRAG_SIZE} height={DRAG_SIZE} viewBox="0 0 80 80">
-      {/* Lamp bowl base (flat ellipse) */}
-      <Ellipse cx="38" cy="50" rx="24" ry="12" fill="#C09030" />
-      {/* Dome/body */}
-      <Path d="M14 50 Q14 36 38 36 Q62 36 62 50" fill="#D4A030" />
-      {/* Spout extending right */}
-      <Path
-        d="M60 44 Q68 40 72 38"
-        stroke="#C09030" strokeWidth="6" fill="none" strokeLinecap="round"
-      />
-      {/* Wick glow at spout tip */}
-      <Circle cx="72" cy="38" r="4" fill="#FFA63D" opacity="0.9" />
-      <Circle cx="72" cy="38" r="2" fill="#FFE082" />
-      {/* Handle loop on left */}
-      <Path
-        d="M16 46 Q8 46 8 50 Q8 56 16 54"
-        stroke="#C09030" strokeWidth="4" fill="none" strokeLinecap="round"
-      />
-      {/* Highlight sheen */}
-      <Ellipse cx="32" cy="40" rx="9" ry="4" fill="#E8B84B" opacity="0.4" />
+      {/* Finial / top knob */}
+      <Circle cx="40" cy="11" r="5" fill="#8B6914" />
+      {/* Top rim */}
+      <Ellipse cx="40" cy="17" rx="15" ry="4" fill="#8B6914" />
+      {/* Shade body — narrow top, wide bottom (cone/trapezoid) */}
+      <Path d="M25 17 L9 63 L71 63 L55 17 Z" fill="#D4A030" />
+      {/* Inner shading to give depth */}
+      <Path d="M28 17 L13 61 L67 61 L52 17 Z" fill="#B8860B" opacity="0.3" />
+      {/* Highlight stripe on left face */}
+      <Path d="M31 19 L15 63" stroke="#E8B84B" strokeWidth="2" opacity="0.35" strokeLinecap="round" />
+      {/* Bottom rim */}
+      <Ellipse cx="40" cy="63" rx="31" ry="8" fill="#8B6914" />
+      {/* Warm inner glow visible at bottom opening */}
+      <Ellipse cx="40" cy="63" rx="24" ry="5" fill="#FFA63D" opacity="0.25" />
+      {/* Socket / neck below shade */}
+      <Rect x="37" y="71" width="6" height="6" rx="1" fill="#8B6914" />
     </Svg>
   );
 }

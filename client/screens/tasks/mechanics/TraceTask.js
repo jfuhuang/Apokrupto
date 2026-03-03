@@ -11,10 +11,9 @@ import Svg, { Circle, Ellipse, Polyline } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
-const { width: W, height: H } = Dimensions.get('window');
+const { width: W } = Dimensions.get('window');
 
 const GUIDE_CX    = W / 2;
-const GUIDE_CY    = H * 0.45;
 const GUIDE_R     = W * 0.30;
 
 const TASK_RING_COLOR = {
@@ -96,9 +95,10 @@ export default function TraceTask({ config, onSuccess, onFail, taskId }) {
   const ringColor  = TASK_RING_COLOR[taskId] || colors.primary.electricBlue;
   const doneRef    = useRef(false);
 
-  const [drawnPoints, setDrawnPoints]   = useState([]);
-  const [status, setStatus]             = useState('idle'); // idle | drawing | success | fail
-  const [message, setMessage]           = useState('');
+  const [layout, setLayout]               = useState(null);
+  const [drawnPoints, setDrawnPoints]      = useState([]);
+  const [status, setStatus]                = useState('idle'); // idle | drawing | success | fail
+  const [message, setMessage]              = useState('');
 
   const pointsRef   = useRef([]);
   const frameCount  = useRef(0);
@@ -124,12 +124,12 @@ export default function TraceTask({ config, onSuccess, onFail, taskId }) {
         setDrawnPoints([]);
         setStatus('drawing');
         setMessage('');
-        const { pageX: x, pageY: y } = evt.nativeEvent;
+        const { locationX: x, locationY: y } = evt.nativeEvent;
         pointsRef.current.push({ x, y });
       },
       onPanResponderMove: (evt) => {
         if (doneRef.current) return;
-        const { pageX: x, pageY: y } = evt.nativeEvent;
+        const { locationX: x, locationY: y } = evt.nativeEvent;
         pointsRef.current.push({ x, y });
         frameCount.current += 1;
         // Throttle state updates to every 3rd point
@@ -198,60 +198,72 @@ export default function TraceTask({ config, onSuccess, onFail, taskId }) {
     ? message
     : 'Trace a complete circle';
 
+  // Derive layout-dependent positions from measured container
+  const guideCY    = layout ? layout.height * 0.45 : 0;
+  const textAreaTop = layout ? layout.height * 0.78 : 0;
+
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
-      {/* Guide circle — pulsing dashed ring */}
-      <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          { transform: [{ scale: pulseAnim }] },
-        ]}
-        pointerEvents="none"
-      >
-        <Svg style={StyleSheet.absoluteFill}>
-          <Circle
-            cx={GUIDE_CX}
-            cy={GUIDE_CY}
-            r={GUIDE_R}
-            stroke={ringColor}
-            strokeWidth={2}
-            strokeDasharray="12,8"
-            fill="none"
-            opacity={0.35}
-          />
-        </Svg>
-      </Animated.View>
+    <View
+      style={styles.container}
+      onLayout={e => setLayout(e.nativeEvent.layout)}
+      {...panResponder.panHandlers}
+    >
+      {layout && (
+        <>
+          {/* Guide circle — pulsing dashed ring */}
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { transform: [{ scale: pulseAnim }] },
+            ]}
+            pointerEvents="none"
+          >
+            <Svg style={StyleSheet.absoluteFill}>
+              <Circle
+                cx={GUIDE_CX}
+                cy={guideCY}
+                r={GUIDE_R}
+                stroke={ringColor}
+                strokeWidth={2}
+                strokeDasharray="12,8"
+                fill="none"
+                opacity={0.35}
+              />
+            </Svg>
+          </Animated.View>
 
-      {/* Center art */}
-      <View
-        style={[styles.centerArt, { left: GUIDE_CX - 40, top: GUIDE_CY - 40 }]}
-        pointerEvents="none"
-      >
-        <PrayerRingSvg color={ringColor} />
-      </View>
+          {/* Center art */}
+          <View
+            style={[styles.centerArt, { left: GUIDE_CX - 40, top: guideCY - 40 }]}
+            pointerEvents="none"
+          >
+            <PrayerRingSvg color={ringColor} />
+          </View>
 
-      {/* Live trace path */}
-      {polylinePoints && (
-        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Polyline
-            points={polylinePoints}
-            stroke={status === 'success' ? colors.accent.neonGreen : status === 'fail' ? '#FF3366' : ringColor}
-            strokeWidth={3.5}
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity={0.85}
-          />
-        </Svg>
+          {/* Live trace path */}
+          {polylinePoints && (
+            <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+              <Polyline
+                points={polylinePoints}
+                stroke={status === 'success' ? colors.accent.neonGreen : status === 'fail' ? '#FF3366' : ringColor}
+                strokeWidth={3.5}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={0.85}
+              />
+            </Svg>
+          )}
+
+          {/* UI text */}
+          <View style={[styles.textArea, { top: textAreaTop }]} pointerEvents="none">
+            <Text style={styles.instruction}>{instructionText}</Text>
+            {status === 'idle' && (
+              <Text style={styles.subText}>Draw with your finger</Text>
+            )}
+          </View>
+        </>
       )}
-
-      {/* UI text */}
-      <View style={styles.textArea} pointerEvents="none">
-        <Text style={styles.instruction}>{instructionText}</Text>
-        {status === 'idle' && (
-          <Text style={styles.subText}>Draw with your finger</Text>
-        )}
-      </View>
     </View>
   );
 }
@@ -270,7 +282,6 @@ const styles = StyleSheet.create({
   },
   textArea: {
     position: 'absolute',
-    top: H * 0.78,
     left: 0,
     right: 0,
     alignItems: 'center',

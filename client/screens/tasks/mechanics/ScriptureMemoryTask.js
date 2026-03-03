@@ -13,18 +13,9 @@ import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 import { scoreVerse } from '../../../utils/scriptureUtils';
 
-const SCRIPTURE_SEALS = {
-  scripture_memory:  '✝️',
-  john_3_16:         '❤️',
-  psalm_23:          '🌿',
-  romans_8_28:       '⚓',
-  philippians_4_13:  '💪',
-  isaiah_40_31:      '🦅',
-  hebrews_11_1:      '⭐',
-};
+import TaskSprite from '../../../components/TaskSprite';
 
 export default function ScriptureMemoryTask({ config, onSuccess, onFail, taskId }) {
-  const waxSeal = SCRIPTURE_SEALS[taskId] || '📖';
   const [typed, setTyped] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState(null);
@@ -77,7 +68,9 @@ export default function ScriptureMemoryTask({ config, onSuccess, onFail, taskId 
 
         <View style={styles.parchment}>
           <View style={styles.scrollCurl} />
-          <Text style={styles.waxSeal}>{waxSeal}</Text>
+          <View style={styles.waxSeal}>
+            <TaskSprite taskId={taskId} size={40} color='#FFA63D' />
+          </View>
           <TextInput
             style={styles.input}
             value={typed}
@@ -175,8 +168,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   waxSeal: {
-    fontSize: 28,
-    textAlign: 'center',
+    alignItems: 'center',
     marginBottom: 4,
   },
   input: {

@@ -8,6 +8,7 @@ import {
   Dimensions,
 } from 'react-native';
 import Svg, { Path, Circle, Rect, Ellipse, Line, G } from 'react-native-svg';
+import TaskSprite from '../../../components/TaskSprite';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
@@ -322,7 +323,7 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit, tas
               activeOpacity={0.8}
               disabled={done}
             >
-              <Text style={styles.tapBtnText}>TAP!</Text>
+              <TaskSprite taskId={taskId} size={Math.round(btnSize * 0.55)} color={done ? colors.accent.neonGreen : colors.primary.electricBlue} />
             </TouchableOpacity>
           </Animated.View>
         );

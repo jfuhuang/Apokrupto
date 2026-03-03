@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, PanResponder, Dimensions } from 'react-native';
 import Svg, { Circle, Path, Ellipse, Rect, Line, G } from 'react-native-svg';
+import TaskSprite from '../../../components/TaskSprite';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
@@ -192,9 +193,7 @@ export default function HoldTask({ config, onSuccess, onFail, taskId }) {
       case 'circle_of_prayer':
         return <PrayerCenter color={ringColor} />;
       default:
-        return (
-          <Text style={[styles.holdText, { color: ringColor }]}>HOLD</Text>
-        );
+        return <TaskSprite taskId={taskId} size={52} color={ringColor} />;
     }
   };
 

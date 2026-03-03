@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
+import TaskSprite from '../../../components/TaskSprite';
 
 const QUIZ_BANNERS = {
-  ten_commandments: { icon: '📜', color: '#FFA63D', label: 'EXODUS 20'   },
-  rebuilding_wall:  { icon: '🧱', color: '#8B6914', label: 'NEHEMIAH'    },
-  jesus_miracles:   { icon: '✨', color: '#00D4FF', label: 'JOHN 20:30'  },
-  prophets_quiz:    { icon: '🔥', color: '#FF6600', label: 'HEBREWS 1:1' },
-  parables_quiz:    { icon: '🌾', color: '#A0C040', label: 'MATTHEW 13'  },
-  acts_quiz:        { icon: '⛵', color: '#00D4FF', label: 'ACTS 1:8'    },
+  ten_commandments: { color: '#FFA63D', label: 'EXODUS 20'   },
+  rebuilding_wall:  { color: '#8B6914', label: 'NEHEMIAH'    },
+  jesus_miracles:   { color: '#00D4FF', label: 'JOHN 20:30'  },
+  prophets_quiz:    { color: '#FF6600', label: 'HEBREWS 1:1' },
+  parables_quiz:    { color: '#A0C040', label: 'MATTHEW 13'  },
+  acts_quiz:        { color: '#00D4FF', label: 'ACTS 1:8'    },
 };
 
 export default function QuizTask({ config, onSuccess, onFail, taskId }) {
@@ -73,7 +74,7 @@ export default function QuizTask({ config, onSuccess, onFail, taskId }) {
 
       {banner && (
         <View style={[styles.banner, { borderColor: banner.color + '60', backgroundColor: banner.color + '15' }]}>
-          <Text style={styles.bannerIcon}>{banner.icon}</Text>
+          <TaskSprite taskId={taskId} size={28} color={banner.color} />
           <Text style={[styles.bannerLabel, { color: banner.color }]}>{banner.label}</Text>
         </View>
       )}
@@ -128,9 +129,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     marginBottom: 4,
-  },
-  bannerIcon: {
-    fontSize: 20,
   },
   bannerLabel: {
     fontFamily: fonts.display.bold,

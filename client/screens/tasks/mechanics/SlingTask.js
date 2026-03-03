@@ -11,18 +11,13 @@ import Svg, { Path, Circle, Rect, Ellipse, Line, Polygon } from 'react-native-sv
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
-const { width: W, height: H } = Dimensions.get('window');
+const { width: W } = Dimensions.get('window');
 const STONE_SIZE = 36;
 const ORBIT_R    = 90;           // initial distance from Goliath center to stone
 const ARC_R      = 110;          // radius of the visual orbit guide ring
 const GX         = W / 2;        // Goliath center X (view-relative)
-const GY         = H * 0.38;     // Goliath center Y (view-relative)
 const TARGET_W   = 80;
 const TARGET_H   = 140;
-
-// Stone starts to the right of Goliath
-const STONE_START_X = GX + ORBIT_R - STONE_SIZE / 2;
-const STONE_START_Y = GY - STONE_SIZE / 2;
 
 // ── Goliath SVG silhouette ───────────────────────────────────────────────
 
@@ -113,6 +108,7 @@ function buildArcPath(cx, cy, r, progress) {
 export default function SlingTask({ config, onSuccess }) {
   const { circles } = config;
 
+  const [layout,   setLayout]   = useState(null);
   const [progress, setProgress] = useState(0);
   const [hit,      setHit]      = useState(false);
   const [done,     setDone]     = useState(false);
@@ -184,53 +180,62 @@ export default function SlingTask({ config, onSuccess }) {
     })
   ).current;
 
-  const arcD             = buildArcPath(GX, GY, ARC_R, progress);
+  // Derive layout-dependent positions from measured container
+  const gY         = layout ? layout.height * 0.38 : 0;
+  const stoneStartX = GX + ORBIT_R - STONE_SIZE / 2;
+  const stoneStartY = gY - STONE_SIZE / 2;
+
+  const arcD             = buildArcPath(GX, gY, ARC_R, progress);
   const completedCircles = Math.floor(progress * circles);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.hint}>
-        {done ? 'Goliath falls!' : 'Circle the stone around Goliath!'}
-      </Text>
-      {!done && (
-        <Text style={styles.counter}>{completedCircles} / {circles} circles</Text>
+    <View style={styles.container} onLayout={e => setLayout(e.nativeEvent.layout)}>
+      {layout && (
+        <>
+          <Text style={styles.hint}>
+            {done ? 'Goliath falls!' : 'Circle the stone around Goliath!'}
+          </Text>
+          {!done && (
+            <Text style={styles.counter}>{completedCircles} / {circles} circles</Text>
+          )}
+
+          {/* Orbit guide ring + progress arc */}
+          <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+            <Circle
+              cx={GX}
+              cy={gY}
+              r={ARC_R}
+              stroke={colors.text.tertiary}
+              strokeWidth={1}
+              strokeDasharray="8,6"
+              fill="none"
+              opacity={0.3}
+            />
+            {arcD ? (
+              <Path
+                d={arcD}
+                stroke={colors.primary.electricBlue}
+                strokeWidth={3}
+                fill="none"
+                strokeLinecap="round"
+              />
+            ) : null}
+          </Svg>
+
+          {/* Goliath */}
+          <View style={{ position: 'absolute', left: GX - TARGET_W / 2, top: gY - TARGET_H / 2 }}>
+            <GoliathSvg hit={hit} />
+          </View>
+
+          {/* Stone — follows the finger */}
+          <Animated.View
+            style={[styles.stone, { left: stoneStartX, top: stoneStartY }, pan.getLayout()]}
+            {...panResponder.panHandlers}
+          >
+            <StoneSvg />
+          </Animated.View>
+        </>
       )}
-
-      {/* Orbit guide ring + progress arc */}
-      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Circle
-          cx={GX}
-          cy={GY}
-          r={ARC_R}
-          stroke={colors.text.tertiary}
-          strokeWidth={1}
-          strokeDasharray="8,6"
-          fill="none"
-          opacity={0.3}
-        />
-        {arcD ? (
-          <Path
-            d={arcD}
-            stroke={colors.primary.electricBlue}
-            strokeWidth={3}
-            fill="none"
-            strokeLinecap="round"
-          />
-        ) : null}
-      </Svg>
-
-      {/* Goliath */}
-      <View style={{ position: 'absolute', left: GX - TARGET_W / 2, top: GY - TARGET_H / 2 }}>
-        <GoliathSvg hit={hit} />
-      </View>
-
-      {/* Stone — follows the finger */}
-      <Animated.View
-        style={[styles.stone, { left: STONE_START_X, top: STONE_START_Y }, pan.getLayout()]}
-        {...panResponder.panHandlers}
-      >
-        <StoneSvg />
-      </Animated.View>
     </View>
   );
 }
