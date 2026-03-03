@@ -8,6 +8,15 @@ Apokrupto is a social-deduction party game for Campus Ministry events, supportin
 
 > The original "Among Us IRL" GPS-based version is archived at `github.com/jfuhuang/among-us-irl`.
 
+## Workflow Guidelines
+
+After completing work for a prompt, always git commit your changes with a clear, descriptive commit message summarizing what was done. Use standard git commands:
+
+```bash
+git add -A
+git commit -m "short description of changes"
+```
+
 ## Development Commands
 
 ### Server (run from `server/`)
@@ -221,10 +230,16 @@ Solo task points use a **1–10 scale** (alive/dead variants). Coop task base po
 - Role reveal uses `colors.accent.ultraviolet` for both teams (intentional — prevents onlookers from reading roles)
 - `client/components/AnimatedBackground.js` is a reusable particle animation
 - `client/components/LobbyCard.js` is the reusable lobby list item
+- `client/components/ConnectionDot.js` — absolute-positioned 8px dot (green/grey) rendered by App.js to show live socket connection status on every screen
+- `client/components/TaskContainer.js` — shared layout wrapper for all task components (scrollable, centered, padded props); ensure consistent sizing and scroll behaviour
+- `client/utils/logger.js` — structured logger (categories: game, socket, nav, error, poll); each entry is fire-and-forgotten to `POST /api/logs` for the live viewer at `http://<server>:3000/logs.html`
+- `server/routes/logRoutes.js` — in-memory 500-entry ring buffer; SSE stream for the log viewer; `DELETE /api/logs` clears it
 
 ## Key Implementation Notes
 
 - **No testing framework is configured.** Testing is manual.
+- **Logger + remote log viewer** — All screens use `client/utils/logger.js` instead of console.log/warn/error. Logs are posted to the server ring buffer and visible at `http://<server-ip>:3000/logs.html` in real-time via SSE. Use `logger.setCategory('poll', false)` to suppress noisy polling logs.
+- **ConnectionDot** — `GameContext` exposes `setSocketConnected`; each screen calls it on socket connect/disconnect. `App.js` renders `<ConnectionDot isConnected={socketConnected} />` as an absolute overlay so connection status is always visible.
 - **Server-side game logic IS built** (Phase 1 complete). All DB tables, REST routes (`gameRoutes.js`), socket handlers (`lobbySocket.js`), and the game state machine (`services/gameService.js`) exist and are wired up.
 - **Movement B duration is 3 minutes** (`MOVEMENT_B_DURATION_MS = 180_000` on server; `MOVEMENT_B_DURATION_MS = 3 * 60 * 1000` in `client/constants/timings.js`). Movement B is still a stub — no task assignment server logic. `RoundHubScreen` shows in `movementBMode`. GM must manually advance past B.
 - **`gameStateUpdate` socket event is not emitted.** Clients listen for it but never receive it. Live score updates mid-round are not pushed; players see scores update when the next `movementStart` arrives or via the 3s safety-net poll.
@@ -242,6 +257,11 @@ Solo task points use a **1–10 scale** (alive/dead variants). Coop task base po
 - **Coop: disconnect grace period** — `coopSocket.js` defers `coopService.endSession` by 8 s on disconnect. A `coopRejoin` socket event cancels the timer and re-adds the socket to `coop:{sessionId}`. Use this pattern when adding future coop reconnect logic.
 - **Coop: invite auto-cancel** — `createInvite()` in `coopService.js` cancels any previous pending invite from the same sender (rather than throwing). The replaced invite target receives a `coopInviteCancelled` socket event.
 - **Coop socket transport** — CoopRushScreen and CoopLobbyScreen use `transports: ['polling', 'websocket']` (polling-first) for improved reliability behind NAT and mobile networks.
+- **Coop: Deception task clue fix** — `generateDeception()` in `server/data/coopTasks.js` now gives each role the correct opposing clue: Phos player is told the Phos-benefit word, Skotia player the Skotia-benefit word.
+- **Movement A deliberation** — `MovementAScreen` deliberation phase shows a horizontal `SketchCarousel` (snap-scrolling, dot indicators); player's own sketch is highlighted with a blue border.
+- **ScriptureBlankTask hint** — Players can tap 'I DON'T KNOW' to reveal a hint box listing all correct words in order. One-shot, non-closeable.
+- **`ScriptureMemoryTask` removed** — Replaced by `ScriptureBlankTask` which covers the same mechanic with a richer drag-and-drop UI.
+- **DB cleanup timeout** — `gameService.js` game cleanup uses a dedicated pool client with `statement_timeout = 120_000` (2 min) to prevent cascading DELETEs from timing out on large games.
 
 ## What Still Needs to Be Built
 
