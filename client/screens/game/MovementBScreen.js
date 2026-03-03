@@ -26,6 +26,7 @@ export default function MovementBScreen({
   onEnterRush,
   onEnterCoop,
 }) {
+  const [activeTab, setActiveTab] = useState('rush'); // 'rush' | 'coop'
   const [sessionPoints, setSessionPoints] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(null);
 
@@ -174,33 +175,57 @@ export default function MovementBScreen({
           </View>
         )}
 
-        {/* ── Mode cards ── */}
-        <View style={styles.modeContainer}>
-
-          <TouchableOpacity style={styles.modeCard} onPress={onEnterRush} activeOpacity={0.8}>
-            <Text style={styles.modeCardIcon}>⚡</Text>
-            <Text style={styles.modeCardTitle}>CHALLENGE RUSH</Text>
-            <Text style={styles.modeCardDesc}>
-              Rapid-fire skill challenges — build streaks for up to 2× bonus points
+        {/* ── Tab bar ── */}
+        <View style={styles.tabBar}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'rush' && styles.tabActive]}
+            onPress={() => setActiveTab('rush')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.tabIcon}>⚡</Text>
+            <Text style={[styles.tabLabel, activeTab === 'rush' && styles.tabLabelActive]}>
+              CHALLENGE RUSH
             </Text>
-            <View style={styles.modeCardBtn}>
-              <Text style={styles.modeCardBtnText}>ENTER RUSH</Text>
-            </View>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'coop' && styles.tabActive]}
+            onPress={() => setActiveTab('coop')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.tabIcon}>🤝</Text>
+            <Text style={[styles.tabLabel, activeTab === 'coop' && styles.tabLabelActive]}>
+              CO-OP
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-          <TouchableOpacity style={styles.modeCard} onPress={onEnterCoop} activeOpacity={0.8}>
-            <Text style={styles.modeCardIcon}>🤝</Text>
-            <Text style={styles.modeCardTitle}>CO-OP</Text>
-            <Text style={styles.modeCardDesc}>Complete group challenges with your team</Text>
-            <View style={styles.modeCardBtn}>
-              <Text style={styles.modeCardBtnText}>FIND PARTNER</Text>
+        {/* ── Tab content ── */}
+        <View style={styles.tabContent}>
+          {activeTab === 'rush' ? (
+            <View style={styles.tabPane}>
+              <Text style={styles.paneTitle}>CHALLENGE RUSH</Text>
+              <Text style={styles.paneDesc}>
+                Rapid-fire skill challenges — build streaks for up to 2× bonus points
+              </Text>
+              <TouchableOpacity style={styles.paneBtn} onPress={onEnterRush} activeOpacity={0.8}>
+                <Text style={styles.paneBtnText}>ENTER RUSH</Text>
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+          ) : (
+            <View style={styles.tabPane}>
+              <Text style={styles.paneTitle}>CO-OP RUSH</Text>
+              <Text style={styles.paneDesc}>
+                Pair up with a group member for cooperative challenges worth 3× points
+              </Text>
+              <TouchableOpacity style={styles.paneBtn} onPress={onEnterCoop} activeOpacity={0.8}>
+                <Text style={styles.paneBtnText}>FIND PARTNER</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {sessionPoints > 0 && (
             <Text style={styles.sessionPtsNote}>This round: +{sessionPoints} pts</Text>
           )}
-
         </View>
       </SafeAreaView>
     </View>
@@ -305,93 +330,100 @@ const styles = StyleSheet.create({
     color: colors.primary.neonRed,
   },
 
-  // ── Mode cards ────────────────────────────────────────────────────────
-  modeContainer: {
+  // ── Tab bar ─────────────────────────────────────────────────────────
+  tabBar: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 14,
+    borderRadius: 12,
+    backgroundColor: colors.background.void,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    overflow: 'hidden',
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 6,
+  },
+  tabActive: {
+    backgroundColor: colors.primary.electricBlue + '20',
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primary.electricBlue,
+  },
+  tabIcon: {
+    fontSize: 16,
+  },
+  tabLabel: {
+    fontFamily: fonts.display.bold,
+    fontSize: 11,
+    letterSpacing: 2,
+    color: colors.text.tertiary,
+  },
+  tabLabelActive: {
+    color: colors.primary.electricBlue,
+  },
+
+  // ── Tab content ────────────────────────────────────────────────────
+  tabContent: {
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 20,
-    gap: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  modeCard: {
+  tabPane: {
+    width: '100%',
     backgroundColor: colors.background.void,
     borderRadius: 16,
     borderWidth: 2,
     borderColor: colors.primary.electricBlue,
-    paddingVertical: 28,
-    paddingHorizontal: 22,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
     alignItems: 'center',
-    gap: 8,
-    position: 'relative',
+    gap: 10,
     shadowColor: colors.primary.electricBlue,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.25,
     shadowRadius: 14,
     elevation: 5,
   },
-  modeCardDisabled: {
-    borderColor: colors.border.default,
-    shadowOpacity: 0,
-    opacity: 0.6,
-  },
-  modeCardIcon: {
-    fontSize: 34,
-    marginBottom: 2,
-  },
-  modeCardTitle: {
+  paneTitle: {
     fontFamily: fonts.display.bold,
-    fontSize: 18,
+    fontSize: 20,
     letterSpacing: 3,
     color: colors.primary.electricBlue,
     textShadowColor: colors.primary.electricBlue,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 10,
   },
-  modeCardDesc: {
+  paneDesc: {
     fontFamily: fonts.ui.regular,
-    fontSize: 13,
+    fontSize: 14,
     color: colors.text.secondary,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
+    marginBottom: 6,
   },
-  modeCardBtn: {
-    marginTop: 10,
+  paneBtn: {
     backgroundColor: colors.primary.electricBlue,
     borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 36,
+    paddingVertical: 14,
+    paddingHorizontal: 40,
     shadowColor: colors.primary.electricBlue,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 10,
     elevation: 5,
   },
-  modeCardBtnDisabled: {
-    backgroundColor: colors.background.frost,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  modeCardBtnText: {
+  paneBtnText: {
     fontFamily: fonts.display.bold,
-    fontSize: 13,
+    fontSize: 14,
     letterSpacing: 3,
     color: colors.background.space,
-  },
-  comingSoonBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: colors.accent.amber + '30',
-    borderWidth: 1,
-    borderColor: colors.accent.amber,
-    borderRadius: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  comingSoonText: {
-    fontFamily: fonts.display.bold,
-    fontSize: 7,
-    letterSpacing: 1.5,
-    color: colors.accent.amber,
   },
   sessionPtsNote: {
     fontFamily: fonts.accent.semiBold,
