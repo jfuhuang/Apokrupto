@@ -9,17 +9,157 @@ import {
   Platform,
   ScrollView,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
+import logger from '../../utils/logger';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
 import { MOVEMENT_NAMES } from '../../constants/movementNames';
 import SketchCanvas from '../../components/SketchCanvas';
 import SketchThumbnail from '../../components/SketchThumbnail';
+import { useGame } from '../../context/GameContext';
 
 const TURN_TIME_LIMIT = 30;
+
+// ── Sketch carousel component used in deliberation phase ─────────────────────
+function SketchCarousel({ sketches, currentUserId, slideSize }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollRef = useRef(null);
+
+  const handleScroll = (e) => {
+    const index = Math.round(e.nativeEvent.contentOffset.x / (slideSize + 16));
+    setActiveIndex(index);
+  };
+
+  if (!sketches || sketches.length === 0) return null;
+
+  return (
+    <View style={sketchCarouselStyles.wrapper}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled={false}
+        snapToInterval={slideSize + 16}
+        snapToAlignment="center"
+        decelerationRate="fast"
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={sketchCarouselStyles.scrollContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
+        {sketches.map((entry, i) => {
+          const isMe = String(entry.userId) === String(currentUserId);
+          return (
+            <View
+              key={i}
+              style={[
+                sketchCarouselStyles.slide,
+                { width: slideSize, height: slideSize },
+                isMe && sketchCarouselStyles.slideMine,
+              ]}
+            >
+              <Text style={isMe ? sketchCarouselStyles.authorMe : sketchCarouselStyles.author}>
+                {isMe ? 'You' : entry.username}
+              </Text>
+              <View style={sketchCarouselStyles.thumbnailWrapper}>
+                <SketchThumbnail
+                  sketchData={entry.sketchData}
+                  size={slideSize - 48}
+                  strokeColor={colors.text.primary}
+                  strokeWidth={2.5}
+                />
+              </View>
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {/* Dot indicators */}
+      {sketches.length > 1 && (
+        <View style={sketchCarouselStyles.dots}>
+          {sketches.map((_, i) => (
+            <View
+              key={i}
+              style={[
+                sketchCarouselStyles.dot,
+                i === activeIndex && sketchCarouselStyles.dotActive,
+              ]}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const sketchCarouselStyles = StyleSheet.create({
+  wrapper: {
+    alignItems: 'center',
+    gap: 10,
+  },
+  scrollContent: {
+    paddingHorizontal: 8,
+    gap: 16,
+    alignItems: 'center',
+  },
+  slide: {
+    backgroundColor: colors.background.void,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 8,
+  },
+  slideMine: {
+    borderColor: colors.primary.electricBlue,
+    shadowColor: colors.primary.electricBlue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  author: {
+    fontFamily: fonts.display.bold,
+    fontSize: 11,
+    letterSpacing: 2,
+    color: colors.text.tertiary,
+    textTransform: 'uppercase',
+  },
+  authorMe: {
+    fontFamily: fonts.display.bold,
+    fontSize: 11,
+    letterSpacing: 2,
+    color: colors.primary.electricBlue,
+    textTransform: 'uppercase',
+  },
+  thumbnailWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dots: {
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.border.default,
+  },
+  dotActive: {
+    backgroundColor: colors.primary.electricBlue,
+    width: 16,
+    borderRadius: 3,
+  },
+});
 
 // phase: 'waiting_turn' | 'my_turn' | 'waiting_others' | 'deliberation'
 
@@ -34,6 +174,9 @@ export default function MovementAScreen({
   groupMembers,
   onMovementComplete,
 }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const { setSocketConnected } = useGame();
+
   const [phase, setPhase] = useState('waiting_turn');
   const [prompt, setPrompt] = useState('');
   const [promptMode, setPromptMode] = useState('word'); // 'word' | 'sketch'
@@ -82,11 +225,11 @@ export default function MovementAScreen({
           try { errBody = await res.json(); } catch (_) {}
           const errMsg = errBody?.error ?? '(no body)';
           if (n <= retries) {
-            console.warn(`[MovementA] Prompt fetch attempt ${n} failed — HTTP ${res.status}: ${errMsg}. Retrying in 1.5s...`);
+            logger.poll('MovementA', `prompt fetch attempt ${n} failed — HTTP ${res.status}: ${errMsg}. Retrying...`);
             await new Promise((r) => setTimeout(r, 1500));
             return attempt(n + 1);
           }
-          console.warn(`[MovementA] Prompt fetch failed after ${n} attempt(s) — HTTP ${res.status}: ${errMsg}`);
+          logger.error('MovementA', `prompt fetch failed after ${n} attempt(s) — HTTP ${res.status}: ${errMsg}`);
           return;
         }
         const data = await res.json();
@@ -99,7 +242,7 @@ export default function MovementAScreen({
           await new Promise((r) => setTimeout(r, 1500));
           return attempt(n + 1);
         }
-        console.warn('[MovementA] Could not fetch prompt:', err.message);
+        logger.error('MovementA', 'could not fetch prompt', err);
       }
     };
     await attempt();
@@ -130,6 +273,7 @@ export default function MovementAScreen({
       socketRef.current = socket;
 
       socket.on('connect', () => {
+        logger.socket('MovementA', 'connected');
         // Join group room for turn-level events (turnStart, deliberationStart)
         socket.emit('joinRoom', { lobbyId: groupId });
         // Join lobby room to receive GM advance signals (movementStart)
@@ -138,6 +282,7 @@ export default function MovementAScreen({
 
       // Server announces whose turn it is
       socket.on('turnStart', ({ currentPlayerId, completedCount: cc, timeLimit, lastWord, turnOrder: order }) => {
+        logger.game('MovementA', `turn ${cc + 1} start — currentPlayer: ${currentPlayerId}`);
         if (order) setTurnOrder(order);
         clearInterval(turnTimerRef.current);
         submittedRef.current = false; // reset for this new turn
@@ -213,6 +358,7 @@ export default function MovementAScreen({
       // All players submitted — show content for deliberation.
       // Timer comes separately via deliberationReady (game-level, not per-group).
       socket.on('deliberationStart', (data) => {
+        logger.game('MovementA', 'deliberation started');
         clearInterval(turnTimerRef.current);
         setSubmittedIds(new Set((groupMembers || []).map((m) => String(m.id))));
 
@@ -258,15 +404,16 @@ export default function MovementAScreen({
       // Fallback: GM force-advanced past A without waiting for deliberation timer
       socket.on('movementStart', ({ movement }) => {
         if (movement !== 'A') {
+          logger.game('MovementA', `movementStart → ${movement}, exiting`);
           clearInterval(turnTimerRef.current);
           clearInterval(deliberationTimerRef.current);
           if (onMovementComplete) onMovementComplete();
         }
       });
-      socket.on('connect_error', (err) => console.warn('[MovementA] Socket error:', err.message));
+      socket.on('connect_error', (err) => logger.error('MovementA', `socket error: ${err.message}`));
     };
 
-    connect().catch(console.error);
+    connect().catch((err) => logger.error('MovementA', 'socket connect failed', err));
 
     return () => {
       clearInterval(turnTimerRef.current);
@@ -351,7 +498,7 @@ export default function MovementAScreen({
         body: JSON.stringify(body),
       });
     } catch (err) {
-      console.warn('[MovementA] Submit error:', err.message);
+      logger.error('MovementA', 'word submit failed', err);
     } finally {
       setSubmitting(false);
     }
@@ -619,6 +766,7 @@ export default function MovementAScreen({
       );
 
       if (promptMode === 'sketch') {
+        const slideSize = Math.min(windowWidth - 64, 220); // cap so slides stay compact
         return (
           <View style={styles.phaseContainer}>
             <Text style={styles.deliberationTitle}>DISCUSS</Text>
@@ -626,26 +774,11 @@ export default function MovementAScreen({
               One of these drawings may not belong. Talk it over.
             </Text>
 
-            <View style={styles.sketchGallery}>
-              {allSketches.map((entry, i) => {
-                const isMe = String(entry.userId) === String(currentUserId);
-                return (
-                  <View key={i} style={[styles.sketchGalleryItem, isMe && styles.wordItemMe]}>
-                    <Text style={styles.wordItemAuthor}>
-                      {isMe ? 'You' : entry.username}
-                    </Text>
-                    <View style={styles.sketchThumbnailWrapper}>
-                      <SketchThumbnail
-                        sketchData={entry.sketchData}
-                        size={160}
-                        strokeColor={colors.text.primary}
-                        strokeWidth={2}
-                      />
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
+            <SketchCarousel
+              sketches={allSketches}
+              currentUserId={currentUserId}
+              slideSize={slideSize}
+            />
 
             {timerRow}
           </View>
@@ -1149,30 +1282,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.text.primary,
     letterSpacing: 1,
-  },
-
-  // Sketch gallery (deliberation in sketch mode)
-  sketchGallery: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    justifyContent: 'center',
-  },
-  sketchGalleryItem: {
-    backgroundColor: colors.background.void,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    gap: 8,
-  },
-  sketchThumbnailWrapper: {
-    width: 160,
-    height: 160,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 
   // Deliberation
