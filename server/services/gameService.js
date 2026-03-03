@@ -843,10 +843,18 @@ async function cleanupGameData(gameId) {
   votingService.clearVotingTimer(key);
   // Clear in-memory turn state for this game (roundModeCache + groupTurnState)
   turnService.clearGameState(key);
-  // Delete DB rows (rounds cascades → movements → movement_a_submissions + movement_c_votes)
-  await pool.query('DELETE FROM rounds WHERE game_id = $1', [key]);
-  await pool.query('DELETE FROM game_groups WHERE game_id = $1', [key]);
-  await pool.query('DELETE FROM sus_events WHERE game_id = $1', [key]);
+  // Delete DB rows using a dedicated client with a longer timeout so that
+  // cascading deletes on large games don't hit the global 30s statement_timeout.
+  const client = await pool.connect();
+  try {
+    await client.query('SET statement_timeout = 120000'); // 2 min for cleanup
+    // rounds cascades → movements → movement_a_submissions + movement_c_votes + movement_c_votes
+    await client.query('DELETE FROM rounds WHERE game_id = $1', [key]);
+    await client.query('DELETE FROM game_groups WHERE game_id = $1', [key]);
+    await client.query('DELETE FROM sus_events WHERE game_id = $1', [key]);
+  } finally {
+    client.release();
+  }
 }
 
 // ---------------------------------------------------------------------------
