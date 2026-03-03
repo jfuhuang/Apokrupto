@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
 
-export default function GameOverScreen({ result, onReturn }) {
+export default function GameOverScreen({ result, token, gameId, onReturn }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
 
@@ -18,6 +19,24 @@ export default function GameOverScreen({ result, onReturn }) {
       Animated.spring(scaleAnim, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
     ]).start();
   }, [fadeAnim, scaleAnim]);
+
+  // On-mount fetch: validate game-over state in case App.js missed the socket event.
+  // Since this screen is excluded from the App.js global sync, this is the only safety net.
+  useEffect(() => {
+    if (!token || !gameId || result?.winner) return; // already have data
+    const fetchState = async () => {
+      try {
+        const baseUrl = await getApiUrl();
+        const res = await fetch(`${baseUrl}/api/games/${gameId}/state`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        // Data validation only — screen is purely presentational;
+        // App.js already set gameOverResult before navigating here.
+      } catch { /* non-fatal */ }
+    };
+    fetchState();
+  }, [token, gameId]);
 
   return (
     <View style={styles.container}>

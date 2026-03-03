@@ -278,6 +278,33 @@ export default function MovementAScreen({
     };
   }, [gameId, groupId, lobbyId, token, currentUserId]);
 
+  // ── 3s safety-net poll: exit if GM advanced past Movement A while disconnected ──
+  const safetyExitedRef = useRef(false);
+  useEffect(() => {
+    if (!token || !gameId) return;
+    safetyExitedRef.current = false;
+    const poll = async () => {
+      if (safetyExitedRef.current) return;
+      try {
+        const baseUrl = await getApiUrl();
+        const res = await fetch(`${baseUrl}/api/games/${gameId}/state`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.currentMovement && data.currentMovement !== 'A') {
+          if (safetyExitedRef.current) return;
+          safetyExitedRef.current = true;
+          clearInterval(turnTimerRef.current);
+          clearInterval(deliberationTimerRef.current);
+          if (onMovementComplete) onMovementComplete();
+        }
+      } catch { /* non-fatal */ }
+    };
+    const id = setInterval(poll, 3000);
+    return () => clearInterval(id);
+  }, [token, gameId]);
+
   const handleSubmit = async (word) => {
     if (submitting) return;
 

@@ -3,6 +3,8 @@ import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
@@ -40,6 +42,7 @@ export default function RoundHubScreen({
   const [liveTeamPoints, setLiveTeamPoints] = useState(teamPoints || { phos: 0, skotia: 0 });
   const [activeMovement, setActiveMovement] = useState(null);
   const [completedMovements, setCompletedMovements] = useState(new Set());
+  const [refreshing, setRefreshing] = useState(false);
 
   const socketRef = useRef(null);
 
@@ -169,6 +172,34 @@ export default function RoundHubScreen({
   const teamColor = currentTeam === 'skotia' ? colors.primary.neonRed : colors.primary.electricBlue;
   const groupLabel = groupNumber != null ? `GROUP ${groupNumber}` : 'YOUR GROUP';
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const baseUrl = await getApiUrl();
+      const res = await fetch(`${baseUrl}/api/games/${gameId}/state`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.teamPoints) setLiveTeamPoints(data.teamPoints);
+      if (data.groupMembers) setLiveGroupMembers(data.groupMembers);
+      if (data.completedMovements?.length) setCompletedMovements(new Set(data.completedMovements));
+      if (data.currentMovement && onMovementReady) {
+        onMovementReady(
+          data.currentMovement,
+          data.groupId || null,
+          data.groupMembers || null,
+          data.groupIndex ?? null,
+          { movementBEndsAt: data.movementBEndsAt },
+        );
+      }
+    } catch (err) {
+      console.warn('[RoundHub] Refresh error:', err.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -230,12 +261,26 @@ export default function RoundHubScreen({
           </View>
         </View>
 
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary.electricBlue}
+              colors={[colors.primary.electricBlue]}
+            />
+          }
+        >
+
         {/* Status message */}
         <View style={styles.statusBox}>
           <Text style={styles.statusText} numberOfLines={2}>{statusMessage}</Text>
         </View>
 
-        {/* Group section — fills remaining space */}
+        {/* Group section */}
         <View style={styles.groupSection}>
           <View style={styles.groupHeader}>
             <Text style={styles.groupLabel}>{groupLabel}</Text>
@@ -283,6 +328,8 @@ export default function RoundHubScreen({
             )}
           </View>
         </View>
+
+        </ScrollView>
 
       </SafeAreaView>
     </View>

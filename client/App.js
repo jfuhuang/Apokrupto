@@ -192,7 +192,7 @@ export default function App() {
   }); // intentionally no deps
 
   useEffect(() => {
-    const id = setInterval(() => { syncCallbackRef.current?.(); }, 10_000);
+    const id = setInterval(() => { syncCallbackRef.current?.(); }, 3_000);
     return () => clearInterval(id);
   }, []);
 
@@ -525,6 +525,8 @@ export default function App() {
         return (
           <GameOverScreen
             result={gameOverResult}
+            token={token}
+            gameId={gameId}
             onReturn={() => {
               resetGameState();
               setCurrentScreen('lobbyList');

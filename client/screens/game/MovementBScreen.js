@@ -5,6 +5,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
+  ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
@@ -33,6 +35,8 @@ export default function MovementBScreen({
   const endsAtRef = useRef(null);
   const socketRef = useRef(null);
   const timerBarAnim = useRef(new Animated.Value(1)).current;
+  const safetyExitedRef = useRef(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const startCountdown = useCallback((endsAt) => {
     if (!endsAt) return;
@@ -109,6 +113,54 @@ export default function MovementBScreen({
     };
   }, [token, lobbyId]);
 
+  // ── 3s safety-net poll: exit if movement advanced or sync timer ────────────
+  useEffect(() => {
+    if (!token || !gameId) return;
+    safetyExitedRef.current = false;
+    const poll = async () => {
+      if (safetyExitedRef.current) return;
+      try {
+        const baseUrl = await getApiUrl();
+        const res = await fetch(`${baseUrl}/api/games/${gameId}/state`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        // Sync timer if it wasn't set (movementBInfo socket missed)
+        if (data.movementBEndsAt && !endsAtRef.current) {
+          startCountdown(data.movementBEndsAt);
+        }
+        if (data.currentMovement && data.currentMovement !== 'B') {
+          if (safetyExitedRef.current) return;
+          safetyExitedRef.current = true;
+          if (onMovementComplete) onMovementComplete();
+        }
+      } catch { /* non-fatal */ }
+    };
+    const id = setInterval(poll, 3000);
+    return () => clearInterval(id);
+  }, [token, gameId]);
+
+  // ── Pull-to-refresh ────────────────────────────────────────────
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const baseUrl = await getApiUrl();
+      const res = await fetch(`${baseUrl}/api/games/${gameId}/state`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.movementBEndsAt && !endsAtRef.current) {
+        startCountdown(data.movementBEndsAt);
+      }
+    } catch (err) {
+      console.warn('[MovementB] Refresh error:', err.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   // ── Helpers ─────────────────────────────────────────────────────────────
   const teamColor =
     currentTeam === 'skotia' ? colors.primary.neonRed : colors.primary.electricBlue;
@@ -164,6 +216,20 @@ export default function MovementBScreen({
             +{sessionPoints}
           </Text>
         </View>
+
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary.electricBlue}
+              colors={[colors.primary.electricBlue]}
+            />
+          }
+        >
 
         {/* ── Sus penalty banner ── */}
         {isSus && (
@@ -227,6 +293,9 @@ export default function MovementBScreen({
             <Text style={styles.sessionPtsNote}>This round: +{sessionPoints} pts</Text>
           )}
         </View>
+
+        </ScrollView>
+
       </SafeAreaView>
     </View>
   );

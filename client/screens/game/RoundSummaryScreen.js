@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
@@ -22,6 +22,7 @@ export default function RoundSummaryScreen({
 }) {
   const socketRef = useRef(null);
   const gameOverFiredRef = useRef(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Helper: fire onGameOver exactly once
   const fireGameOver = (result) => {
@@ -94,6 +95,28 @@ export default function RoundSummaryScreen({
     };
   }, [token, gameId]);
 
+  // ── Pull-to-refresh ──────────────────────────────────────────────────────
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const { ok, data } = await fetchPlayerGameState(token, gameId);
+      if (ok && data?.gameStatus === 'completed') {
+        fireGameOver({
+          winner:      data.winner ?? null,
+          condition:   data.winCondition ?? null,
+          phosPoints:  data.teamPoints?.phos ?? 0,
+          skotiaPoints: data.teamPoints?.skotia ?? 0,
+        });
+      } else if (ok && data?.currentMovement) {
+        // A new round started — the roundSetup socket event will handle navigation
+      }
+    } catch (err) {
+      console.warn('[RoundSummary] Refresh error:', err.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const susApplied = summary?.susApplied ?? 0;
   const clearedApplied = summary?.clearedApplied ?? 0;
   const phosPoints = summary?.phosPoints ?? 0;
@@ -108,6 +131,14 @@ export default function RoundSummaryScreen({
           contentContainerStyle={styles.body}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary.electricBlue}
+              colors={[colors.primary.electricBlue]}
+            />
+          }
         >
           <Text style={styles.roundLabel}>ROUND {roundNumber} OF {totalRounds}</Text>
           <Text style={styles.title}>ROUND COMPLETE</Text>
