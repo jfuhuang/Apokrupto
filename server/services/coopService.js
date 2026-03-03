@@ -147,6 +147,7 @@ function advanceTask(sessionId) {
   session.currentTask = task;
   session.holdState = null;
   session.tapState = null;
+  session.simonState = null;
   return task;
 }
 

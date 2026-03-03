@@ -16,6 +16,7 @@ import DeceptionTask from '../tasks/coop/DeceptionTask';
 import SecretBallotTask from '../tasks/coop/SecretBallotTask';
 import CoopTapTask from '../tasks/coop/CoopTapTask';
 import CoopHoldTask from '../tasks/coop/CoopHoldTask';
+import SimonSaysTask from '../tasks/coop/SimonSaysTask';
 
 export default function CoopRushScreen({
   token,
@@ -38,6 +39,7 @@ export default function CoopRushScreen({
   const sessionPointsRef = useRef(0);
   const [secondsLeft, setSecondsLeft] = useState(null);
   const [showResult, setShowResult] = useState(false);
+  const [simonPatterns, setSimonPatterns] = useState(null);
   const endsAtRef = useRef(null);
   const sessionEndedRef = useRef(false);
   const timerBarAnim = useRef(new Animated.Value(1)).current;
@@ -109,11 +111,17 @@ export default function CoopRushScreen({
         setTaskUpdate(update);
       });
 
+      socket.on('coopSimonPatterns', ({ sessionId: sid, phosPattern, skotiaPattern }) => {
+        if (sid !== sessionId) return;
+        setSimonPatterns({ phosPattern, skotiaPattern });
+      });
+
       socket.on('coopNextTask', ({ sessionId: sid, task, sessionPoints: pts }) => {
         if (sid !== sessionId) return;
         // Switch to the new task immediately, show overlay on top
         setCurrentTask(task);
         setTaskUpdate(null);
+        setSimonPatterns(null);
         setSessionPoints(pts);
         sessionPointsRef.current = pts;
         setShowResult(true);
@@ -207,6 +215,8 @@ export default function CoopRushScreen({
         return <CoopTapTask {...taskProps} />;
       case 'coop_hold':
         return <CoopHoldTask {...taskProps} />;
+      case 'simon_says':
+        return <SimonSaysTask {...taskProps} simonPatterns={simonPatterns} />;
       default:
         return (
           <View style={styles.unknownTask}>

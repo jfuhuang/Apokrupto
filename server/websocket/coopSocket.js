@@ -77,6 +77,17 @@ function scheduleNextTask(io, sessionId, delayMs) {
           task: sanitizeTask(task),
           sessionPoints: totalPts,
         });
+        // For simon_says: send patterns to Player B only (keeps patterns off Player A's device)
+        if (task.taskType === 'simon_says' && task._server) {
+          const playerBSockets = findSocketsForUser(io, session.playerB.userId);
+          for (const s of playerBSockets) {
+            s.emit('coopSimonPatterns', {
+              sessionId,
+              phosPattern: task._server.phosPattern,
+              skotiaPattern: task._server.skotiaPattern,
+            });
+          }
+        }
       }
     } catch (err) {
       console.error('[Coop] scheduleNextTask error:', err.message);
@@ -164,6 +175,14 @@ function registerCoopHandlers(socket) {
             partner: { userId: session.playerA.userId, username: session.playerA.username },
             task: sanitizeTask(task),
           });
+          // For simon_says: also send patterns to Player B only
+          if (task.taskType === 'simon_says' && task._server) {
+            s.emit('coopSimonPatterns', {
+              sessionId: session.id,
+              phosPattern: task._server.phosPattern,
+              skotiaPattern: task._server.skotiaPattern,
+            });
+          }
         }
       }
 
@@ -289,162 +308,369 @@ function registerCoopHandlers(socket) {
 
       // ── coop_tap + tap ────────────────────────────────────────────
       else if (task.taskType === 'coop_tap' && action === 'tap') {
-        if (!session.tapState) {
-          session.tapState = { A: 0, B: 0 };
+        // Ignore taps after this task is already resolved (race condition guard)
+        if (session.resolvedTaskId === task.taskId) {
+          if (callback) callback({ ok: true });
+        } else {
+          if (!session.tapState) {
+            session.tapState = { A: 0, B: 0 };
+          }
+          session.tapState[role] += 1;
+          const totalTaps = session.tapState.A + session.tapState.B;
+          const target = task.config.targetTaps;
+
+          if (totalTaps >= target) {
+            session.resolvedTaskId = task.taskId;
+            const basePoints = COOP_BASE_POINTS.coop_tap * COOP_MULTIPLIER;
+            // Award to each player's team separately
+            const playerATeam = await getPlayerTeam(session.gameId, session.playerA.userId);
+            const playerBTeam = await getPlayerTeam(session.gameId, session.playerB.userId);
+            const awardedA = await awardCoopPoints(session.gameId, playerATeam, basePoints, session, 'A');
+            const awardedB = await awardCoopPoints(session.gameId, playerBTeam, basePoints, session, 'B');
+            coopService.updateSessionPoints(sessionId, 'A', awardedA);
+            coopService.updateSessionPoints(sessionId, 'B', awardedB);
+
+            if (io) {
+              io.to(room).emit('coopTaskUpdate', {
+                sessionId,
+                phase: 'resolved',
+                success: true,
+                tapsA: session.tapState.A,
+                tapsB: session.tapState.B,
+                totalTaps,
+                pointsAwarded: awardedA + awardedB,
+              });
+              scheduleNextTask(io, sessionId, 1500);
+            }
+          } else if (io) {
+            io.to(room).emit('coopTaskUpdate', {
+              sessionId,
+              phase: 'inProgress',
+              tapsA: session.tapState.A,
+              tapsB: session.tapState.B,
+              totalTaps,
+              targetTaps: target,
+            });
+          }
+          if (callback) callback({ ok: true });
         }
-        session.tapState[role] += 1;
-        const totalTaps = session.tapState.A + session.tapState.B;
-        const target = task.config.targetTaps;
+      }
 
-        if (totalTaps >= target) {
-          const basePoints = COOP_BASE_POINTS.coop_tap * COOP_MULTIPLIER;
-          // Award to each player's team separately
-          const playerATeam = await getPlayerTeam(session.gameId, session.playerA.userId);
-          const playerBTeam = await getPlayerTeam(session.gameId, session.playerB.userId);
-          const awardedA = await awardCoopPoints(session.gameId, playerATeam, basePoints, session, 'A');
-          const awardedB = await awardCoopPoints(session.gameId, playerBTeam, basePoints, session, 'B');
-          coopService.updateSessionPoints(sessionId, 'A', awardedA);
-          coopService.updateSessionPoints(sessionId, 'B', awardedB);
-
+      // ── coop_tap + tapTimeout ─────────────────────────────────────
+      else if (task.taskType === 'coop_tap' && action === 'tapTimeout') {
+        if (session.resolvedTaskId === task.taskId) {
+          if (callback) callback({ ok: true });
+        } else {
+          session.resolvedTaskId = task.taskId;
           if (io) {
             io.to(room).emit('coopTaskUpdate', {
               sessionId,
               phase: 'resolved',
-              tapsA: session.tapState.A,
-              tapsB: session.tapState.B,
-              totalTaps,
-              pointsAwarded: awardedA + awardedB,
+              success: false,
+              tapsA: session.tapState?.A ?? 0,
+              tapsB: session.tapState?.B ?? 0,
+              totalTaps: (session.tapState?.A ?? 0) + (session.tapState?.B ?? 0),
+              pointsAwarded: 0,
             });
             scheduleNextTask(io, sessionId, 1500);
           }
-        } else if (io) {
-          io.to(room).emit('coopTaskUpdate', {
-            sessionId,
-            phase: 'inProgress',
-            tapsA: session.tapState.A,
-            tapsB: session.tapState.B,
-            totalTaps,
-            targetTaps: target,
-          });
+          if (callback) callback({ ok: true });
         }
-        if (callback) callback({ ok: true });
       }
 
       // ── coop_hold + holdStart ─────────────────────────────────────
       else if (task.taskType === 'coop_hold' && action === 'holdStart') {
-        if (!session.holdState) {
-          session.holdState = { A: false, B: false, elapsed: 0, bothStartedAt: null };
-        }
-        session.holdState[role] = true;
+        if (session.resolvedTaskId === task.taskId) {
+          if (callback) callback({ ok: true });
+        } else {
+          if (!session.holdState) {
+            session.holdState = { A: false, B: false, elapsed: 0, bothStartedAt: null };
+          }
+          session.holdState[role] = true;
 
-        // If both are now holding, start/resume the timer
-        if (session.holdState.A && session.holdState.B && !session.holdState.bothStartedAt) {
-          session.holdState.bothStartedAt = Date.now();
-        }
+          // If both are now holding, start/resume the timer
+          if (session.holdState.A && session.holdState.B && !session.holdState.bothStartedAt) {
+            session.holdState.bothStartedAt = Date.now();
+          }
 
-        if (io) {
-          io.to(room).emit('coopTaskUpdate', {
-            sessionId,
-            phase: 'inProgress',
-            holdA: session.holdState.A,
-            holdB: session.holdState.B,
-            elapsed: session.holdState.elapsed,
-          });
+          if (io) {
+            io.to(room).emit('coopTaskUpdate', {
+              sessionId,
+              phase: 'inProgress',
+              holdA: session.holdState.A,
+              holdB: session.holdState.B,
+              elapsed: session.holdState.elapsed,
+            });
+          }
+          if (callback) callback({ ok: true });
         }
-        if (callback) callback({ ok: true });
       }
 
       // ── coop_hold + holdEnd ───────────────────────────────────────
       else if (task.taskType === 'coop_hold' && action === 'holdEnd') {
-        if (!session.holdState) {
-          session.holdState = { A: false, B: false, elapsed: 0, bothStartedAt: null };
-        }
+        if (session.resolvedTaskId === task.taskId) {
+          if (callback) callback({ ok: true });
+        } else {
+          if (!session.holdState) {
+            session.holdState = { A: false, B: false, elapsed: 0, bothStartedAt: null };
+          }
 
-        // Accumulate elapsed time if both were holding
-        if (session.holdState.bothStartedAt) {
-          session.holdState.elapsed += Date.now() - session.holdState.bothStartedAt;
-          session.holdState.bothStartedAt = null;
-        }
-        session.holdState[role] = false;
+          // Accumulate elapsed time if both were holding
+          if (session.holdState.bothStartedAt) {
+            session.holdState.elapsed += Date.now() - session.holdState.bothStartedAt;
+            session.holdState.bothStartedAt = null;
+          }
+          session.holdState[role] = false;
 
-        const target = task.config.targetMs;
-        if (session.holdState.elapsed >= target) {
-          const basePoints = COOP_BASE_POINTS.coop_hold * COOP_MULTIPLIER;
-          const playerATeam = await getPlayerTeam(session.gameId, session.playerA.userId);
-          const playerBTeam = await getPlayerTeam(session.gameId, session.playerB.userId);
-          const awardedA = await awardCoopPoints(session.gameId, playerATeam, basePoints, session, 'A');
-          const awardedB = await awardCoopPoints(session.gameId, playerBTeam, basePoints, session, 'B');
-          coopService.updateSessionPoints(sessionId, 'A', awardedA);
-          coopService.updateSessionPoints(sessionId, 'B', awardedB);
+          const target = task.config.targetMs;
+          if (session.holdState.elapsed >= target) {
+            session.resolvedTaskId = task.taskId;
+            const basePoints = COOP_BASE_POINTS.coop_hold * COOP_MULTIPLIER;
+            const playerATeam = await getPlayerTeam(session.gameId, session.playerA.userId);
+            const playerBTeam = await getPlayerTeam(session.gameId, session.playerB.userId);
+            const awardedA = await awardCoopPoints(session.gameId, playerATeam, basePoints, session, 'A');
+            const awardedB = await awardCoopPoints(session.gameId, playerBTeam, basePoints, session, 'B');
+            coopService.updateSessionPoints(sessionId, 'A', awardedA);
+            coopService.updateSessionPoints(sessionId, 'B', awardedB);
 
-          if (io) {
+            if (io) {
+              io.to(room).emit('coopTaskUpdate', {
+                sessionId,
+                phase: 'resolved',
+                success: true,
+                elapsed: session.holdState.elapsed,
+                pointsAwarded: awardedA + awardedB,
+              });
+              scheduleNextTask(io, sessionId, 1500);
+            }
+          } else if (io) {
             io.to(room).emit('coopTaskUpdate', {
               sessionId,
-              phase: 'resolved',
-              success: true,
+              phase: 'inProgress',
+              holdA: session.holdState.A,
+              holdB: session.holdState.B,
               elapsed: session.holdState.elapsed,
-              pointsAwarded: awardedA + awardedB,
             });
-            scheduleNextTask(io, sessionId, 1500);
           }
-        } else if (io) {
-          io.to(room).emit('coopTaskUpdate', {
-            sessionId,
-            phase: 'inProgress',
-            holdA: session.holdState.A,
-            holdB: session.holdState.B,
-            elapsed: session.holdState.elapsed,
-          });
+          if (callback) callback({ ok: true });
         }
-        if (callback) callback({ ok: true });
       }
 
       // ── coop_hold + holdCheck (periodic check if both still holding) ──
       else if (task.taskType === 'coop_hold' && action === 'holdCheck') {
-        if (!session.holdState) {
+        if (session.resolvedTaskId === task.taskId) {
           if (callback) callback({ ok: true });
-          return;
-        }
-
-        let currentElapsed = session.holdState.elapsed;
-        if (session.holdState.bothStartedAt) {
-          currentElapsed += Date.now() - session.holdState.bothStartedAt;
-        }
-
-        const target = task.config.targetMs;
-        if (currentElapsed >= target) {
-          // Finalize
+        } else if (!session.holdState) {
+          if (callback) callback({ ok: true });
+        } else {
+          let currentElapsed = session.holdState.elapsed;
           if (session.holdState.bothStartedAt) {
-            session.holdState.elapsed = currentElapsed;
-            session.holdState.bothStartedAt = null;
+            currentElapsed += Date.now() - session.holdState.bothStartedAt;
           }
 
-          const basePoints = COOP_BASE_POINTS.coop_hold * COOP_MULTIPLIER;
-          const playerATeam = await getPlayerTeam(session.gameId, session.playerA.userId);
-          const playerBTeam = await getPlayerTeam(session.gameId, session.playerB.userId);
-          const awardedA = await awardCoopPoints(session.gameId, playerATeam, basePoints, session, 'A');
-          const awardedB = await awardCoopPoints(session.gameId, playerBTeam, basePoints, session, 'B');
-          coopService.updateSessionPoints(sessionId, 'A', awardedA);
-          coopService.updateSessionPoints(sessionId, 'B', awardedB);
+          const target = task.config.targetMs;
+          if (currentElapsed >= target) {
+            // Finalize
+            if (session.holdState.bothStartedAt) {
+              session.holdState.elapsed = currentElapsed;
+              session.holdState.bothStartedAt = null;
+            }
+            session.resolvedTaskId = task.taskId;
 
+            const basePoints = COOP_BASE_POINTS.coop_hold * COOP_MULTIPLIER;
+            const playerATeam = await getPlayerTeam(session.gameId, session.playerA.userId);
+            const playerBTeam = await getPlayerTeam(session.gameId, session.playerB.userId);
+            const awardedA = await awardCoopPoints(session.gameId, playerATeam, basePoints, session, 'A');
+            const awardedB = await awardCoopPoints(session.gameId, playerBTeam, basePoints, session, 'B');
+            coopService.updateSessionPoints(sessionId, 'A', awardedA);
+            coopService.updateSessionPoints(sessionId, 'B', awardedB);
+
+            if (io) {
+              io.to(room).emit('coopTaskUpdate', {
+                sessionId,
+                phase: 'resolved',
+                success: true,
+                elapsed: session.holdState.elapsed,
+                pointsAwarded: awardedA + awardedB,
+              });
+              scheduleNextTask(io, sessionId, 1500);
+            }
+          } else if (io) {
+            io.to(room).emit('coopTaskUpdate', {
+              sessionId,
+              phase: 'inProgress',
+              holdA: session.holdState.A,
+              holdB: session.holdState.B,
+              elapsed: currentElapsed,
+            });
+          }
+          if (callback) callback({ ok: true });
+        }
+      }
+
+      // ── coop_hold + holdTimeout ───────────────────────────────────
+      else if (task.taskType === 'coop_hold' && action === 'holdTimeout') {
+        if (session.resolvedTaskId === task.taskId) {
+          if (callback) callback({ ok: true });
+        } else {
+          session.resolvedTaskId = task.taskId;
+          // Stop any in-progress elapsed accumulation
+          if (session.holdState?.bothStartedAt) {
+            session.holdState.elapsed += Date.now() - session.holdState.bothStartedAt;
+            session.holdState.bothStartedAt = null;
+          }
           if (io) {
             io.to(room).emit('coopTaskUpdate', {
               sessionId,
               phase: 'resolved',
-              success: true,
-              elapsed: session.holdState.elapsed,
-              pointsAwarded: awardedA + awardedB,
+              success: false,
+              elapsed: session.holdState?.elapsed ?? 0,
+              pointsAwarded: 0,
             });
             scheduleNextTask(io, sessionId, 1500);
           }
-        } else if (io) {
+          if (callback) callback({ ok: true });
+        }
+      }
+
+      // ── simon_says + selectPattern (Player B chooses which team's pattern to give) ────
+      else if (task.taskType === 'simon_says' && action === 'selectPattern') {
+        if (role !== 'B') throw new Error('Only Player B can select the pattern');
+        const team = data?.team;
+        if (team !== 'phos' && team !== 'skotia') throw new Error('Invalid team: must be phos or skotia');
+
+        // Store choice — reset any prior input from Player A
+        if (!session.simonState) session.simonState = {};
+        session.simonState.chosenTeam = team;
+        session.simonState.inputSequence = [];
+        session.simonState.resolved = false;
+
+        const pattern = team === 'phos' ? task._server.phosPattern : task._server.skotiaPattern;
+        console.log(`[Coop] simon_says selectPattern game=${session.gameId} team=${team}`);
+
+        if (io) {
+          // Tell Player B the locked pattern so they can run the flash animation
+          const playerBSockets = findSocketsForUser(io, session.playerB.userId);
+          for (const s of playerBSockets) {
+            s.emit('coopTaskUpdate', {
+              sessionId,
+              phase: 'patternLocked',
+              pattern,
+              team,
+            });
+          }
+          // Tell Player A to start inputting (no pattern revealed)
+          const playerASockets = findSocketsForUser(io, session.playerA.userId);
+          for (const s of playerASockets) {
+            s.emit('coopTaskUpdate', {
+              sessionId,
+              phase: 'inputReady',
+              sequenceLength: task.config.sequenceLength,
+            });
+          }
+        }
+        if (callback) callback({ ok: true });
+      }
+
+      // ── simon_says + tapColor (Player A taps a color) ────────────────────────
+      else if (task.taskType === 'simon_says' && action === 'tapColor') {
+        if (role !== 'A') throw new Error('Only Player A can tap colors');
+        if (!session.simonState || session.simonState.resolved) {
+          // Pattern not selected yet or already resolved — ignore quietly
+          if (callback) callback({ ok: true });
+          return;
+        }
+
+        const color = data?.color;
+        if (!task.config.colors.includes(color)) throw new Error(`Invalid color: ${color}`);
+
+        if (!session.simonState.inputSequence) session.simonState.inputSequence = [];
+        session.simonState.inputSequence.push(color);
+        const seq = session.simonState.inputSequence;
+
+        if (io) {
+          const playerASockets = findSocketsForUser(io, session.playerA.userId);
+          for (const s of playerASockets) {
+            s.emit('coopTaskUpdate', {
+              sessionId,
+              phase: 'inputProgress',
+              inputSequence: [...seq],
+              sequenceLength: task.config.sequenceLength,
+            });
+          }
+        }
+        if (callback) callback({ ok: true });
+      }
+
+      // ── simon_says + clearInput (Player A clears their tapped sequence) ─────
+      else if (task.taskType === 'simon_says' && action === 'clearInput') {
+        if (role !== 'A') throw new Error('Only Player A can clear input');
+        if (!session.simonState || session.simonState.resolved) {
+          if (callback) callback({ ok: true });
+          return;
+        }
+
+        session.simonState.inputSequence = [];
+
+        if (io) {
+          const playerASockets = findSocketsForUser(io, session.playerA.userId);
+          for (const s of playerASockets) {
+            s.emit('coopTaskUpdate', {
+              sessionId,
+              phase: 'inputProgress',
+              inputSequence: [],
+              sequenceLength: task.config.sequenceLength,
+            });
+          }
+        }
+        if (callback) callback({ ok: true });
+      }
+
+      // ── simon_says + submitSequence (Player A submits their full sequence) ──
+      else if (task.taskType === 'simon_says' && action === 'submitSequence') {
+        if (role !== 'A') throw new Error('Only Player A can submit');
+        if (!session.simonState || session.simonState.resolved) {
+          if (callback) callback({ ok: true });
+          return;
+        }
+
+        const seq = session.simonState.inputSequence || [];
+        const seqLen = task.config.sequenceLength;
+        if (seq.length !== seqLen) throw new Error(`Sequence must be ${seqLen} colors, got ${seq.length}`);
+
+        session.simonState.resolved = true;
+
+        const phosMatch   = JSON.stringify(seq) === JSON.stringify(task._server.phosPattern);
+        const skotiaMatch = JSON.stringify(seq) === JSON.stringify(task._server.skotiaPattern);
+
+        let benefitTeam = null;
+        let awarded = 0;
+
+        if (phosMatch)        benefitTeam = 'phos';
+        else if (skotiaMatch) benefitTeam = 'skotia';
+
+        if (benefitTeam) {
+          const base = COOP_BASE_POINTS.simon_says * COOP_MULTIPLIER;
+          awarded = await awardCoopPoints(session.gameId, benefitTeam, base, session, 'A');
+          coopService.updateSessionPoints(sessionId, 'A', awarded);
+        }
+
+        const success = !!benefitTeam;
+        console.log(`[Coop] simon_says resolved game=${session.gameId} success=${success} team=${benefitTeam} pts=${awarded}`);
+
+        if (io) {
           io.to(room).emit('coopTaskUpdate', {
             sessionId,
-            phase: 'inProgress',
-            holdA: session.holdState.A,
-            holdB: session.holdState.B,
-            elapsed: currentElapsed,
+            phase: 'resolved',
+            success,
+            inputSequence: seq,
+            phosPattern:   task._server.phosPattern,
+            skotiaPattern: task._server.skotiaPattern,
+            benefitTeam,
+            chosenTeam: session.simonState.chosenTeam,
+            pointsAwarded: awarded,
           });
+          scheduleNextTask(io, sessionId, 2500);
         }
         if (callback) callback({ ok: true });
       }

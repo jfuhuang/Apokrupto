@@ -1,32 +1,46 @@
 const crypto = require('crypto');
 
 const COOP_MULTIPLIER = 1;
-const COOP_TASK_TYPES = ['deception', 'secret_ballot', 'coop_tap', 'coop_hold'];
-const COOP_BASE_POINTS = { deception: 3, secret_ballot: 0, coop_tap: 2, coop_hold: 3 };
+const COOP_TASK_TYPES = ['deception', 'secret_ballot', 'coop_tap', 'coop_hold', 'simon_says'];
+const COOP_BASE_POINTS = { deception: 3, secret_ballot: 0, coop_tap: 2, coop_hold: 3, simon_says: 4 };
 
 const THEME_POOLS = {
-  'Greek Letters': [
-    [{ label: 'ALPHA', display: 'α' }, { label: 'OMEGA', display: 'Ω' }],
-    [{ label: 'PHI', display: 'φ' }, { label: 'PSI', display: 'ψ' }],
-    [{ label: 'LAMBDA', display: 'λ' }, { label: 'SIGMA', display: 'σ' }],
+  // Classic "Who's on First" names that double as real words
+  "Who's on First": [
+    [{ label: 'WHO',          display: 'Who'         }, { label: 'WHAT',        display: 'What'       }],
+    [{ label: 'WHY',          display: 'Why'         }, { label: 'BECAUSE',     display: 'Because'    }],
+    [{ label: 'TODAY',        display: 'Today'       }, { label: 'TOMORROW',    display: 'Tomorrow'   }],
+    [{ label: "I DON'T KNOW", display: "I Don't\nKnow" }, { label: 'NOBODY',  display: 'Nobody'     }],
+    [{ label: 'NATURALLY',    display: 'Naturally'   }, { label: 'CERTAINLY',   display: 'Certainly'  }],
   ],
-  'Hebrew Letters': [
-    [{ label: 'ALEPH', display: 'א' }, { label: 'BET', display: 'ב' }],
-    [{ label: 'SHIN', display: 'ש' }, { label: 'MEM', display: 'מ' }],
-    [{ label: 'GIMEL', display: 'ג' }, { label: 'DALET', display: 'ד' }],
+  // Homophones — identical sound, different spelling
+  'Homophones': [
+    [{ label: 'WRITE', display: 'Write'  }, { label: 'RIGHT',  display: 'Right'  }],
+    [{ label: 'KNOT',  display: 'Knot'   }, { label: 'NOT',    display: 'Not'    }],
+    [{ label: 'WON',   display: 'Won'    }, { label: 'ONE',    display: 'One'    }],
+    [{ label: 'SON',   display: 'Son'    }, { label: 'SUN',    display: 'Sun'    }],
+    [{ label: 'KNIGHT',display: 'Knight' }, { label: 'NIGHT',  display: 'Night'  }],
+    [{ label: 'TWO',   display: 'Two'    }, { label: 'TOO',    display: 'Too'    }],
+    [{ label: 'HEAR',  display: 'Hear'   }, { label: 'HERE',   display: 'Here'   }],
+    [{ label: 'THERE', display: 'There'  }, { label: 'THEIR',  display: 'Their'  }],
+    [{ label: 'BARE',  display: 'Bare'   }, { label: 'BEAR',   display: 'Bear'   }],
+    [{ label: 'FLOUR', display: 'Flour'  }, { label: 'FLOWER', display: 'Flower' }],
   ],
-  'Colors': [
-    [{ label: 'RED', display: '🔴' }, { label: 'BLUE', display: '🔵' }],
-    [{ label: 'GOLD', display: '🟡' }, { label: 'SILVER', display: '⚪' }],
-    [{ label: 'GREEN', display: '🟢' }, { label: 'PURPLE', display: '🟣' }],
+  // Directional / command words that get confusing as instructions
+  'Confusing Commands': [
+    [{ label: 'LEFT',  display: 'Left'  }, { label: 'RIGHT', display: 'Right' }],
+    [{ label: 'UP',    display: 'Up'    }, { label: 'DOWN',  display: 'Down'  }],
+    [{ label: 'STOP',  display: 'Stop'  }, { label: 'GO',    display: 'Go'    }],
+    [{ label: 'PASS',  display: 'Pass'  }, { label: 'SKIP',  display: 'Skip'  }],
+    [{ label: 'BEGIN', display: 'Begin' }, { label: 'END',   display: 'End'   }],
   ],
-  'Shapes': [
-    [{ label: 'CIRCLE', display: '●' }, { label: 'TRIANGLE', display: '▲' }],
-    [{ label: 'SQUARE', display: '■' }, { label: 'DIAMOND', display: '◆' }],
-  ],
-  'Numbers': [
-    [{ label: 'ODD', display: '1' }, { label: 'EVEN', display: '2' }],
-    [{ label: 'PRIME', display: '7' }, { label: 'COMPOSITE', display: '8' }],
+  // Meta / self-referential words
+  'This or That': [
+    [{ label: 'THIS',    display: 'This'    }, { label: 'THAT',    display: 'That'    }],
+    [{ label: 'YES',     display: 'Yes'     }, { label: 'NO',      display: 'No'      }],
+    [{ label: 'IT',      display: 'It'      }, { label: 'WHAT',    display: 'What'    }],
+    [{ label: 'CORRECT', display: 'Correct' }, { label: 'WRONG',   display: 'Wrong'   }],
+    [{ label: 'FIRST',   display: 'First'   }, { label: 'SECOND',  display: 'Second'  }],
   ],
 };
 
@@ -61,7 +75,7 @@ function generateDeception() {
   const theme = pick(themeNames);
   const pair = pick(THEME_POOLS[theme]);
   const phosOptionIndex = Math.random() < 0.5 ? 0 : 1;
-  const side = phosOptionIndex === 0 ? 'LEFT' : 'RIGHT';
+  const targetWord = pair[phosOptionIndex].label;
 
   return {
     taskId: `deception_${crypto.randomUUID()}`,
@@ -71,8 +85,8 @@ function generateDeception() {
       theme,
       optionA: pair[0],
       optionB: pair[1],
-      phosMessage: `For Phos, select the ${side} one`,
-      skotiaMessage: `For Skotia, select the ${side} one`,
+      phosMessage: `Tell your partner to tap: ${targetWord}`,
+      skotiaMessage: `Tell your partner to tap: ${targetWord}`,
     },
     _server: { phosOptionIndex },
   };
@@ -119,6 +133,40 @@ function generateCoopHold() {
   };
 }
 
+const SIMON_COLORS = ['red', 'yellow', 'green', 'blue'];
+
+function _randomSeq(len) {
+  const seq = [];
+  for (let i = 0; i < len; i++) {
+    seq.push(SIMON_COLORS[Math.floor(Math.random() * SIMON_COLORS.length)]);
+  }
+  return seq;
+}
+
+function generateSimonSays() {
+  const len = 4;
+  const phosPattern = _randomSeq(len);
+  let skotiaPattern = _randomSeq(len);
+  // Ensure the two patterns differ (retry up to 20 times)
+  let tries = 0;
+  while (JSON.stringify(phosPattern) === JSON.stringify(skotiaPattern) && tries++ < 20) {
+    skotiaPattern = _randomSeq(len);
+  }
+  return {
+    taskId: `simon_says_${crypto.randomUUID()}`,
+    taskType: 'simon_says',
+    timeLimit: 60,
+    config: {
+      colors: SIMON_COLORS,
+      sequenceLength: len,
+    },
+    _server: {
+      phosPattern,
+      skotiaPattern,
+    },
+  };
+}
+
 function generateCoopTask() {
   const type = pick(COOP_TASK_TYPES);
   switch (type) {
@@ -126,6 +174,7 @@ function generateCoopTask() {
     case 'secret_ballot': return generateSecretBallot();
     case 'coop_tap':      return generateCoopTap();
     case 'coop_hold':     return generateCoopHold();
+    case 'simon_says':    return generateSimonSays();
     default:              return generateCoopTap();
   }
 }

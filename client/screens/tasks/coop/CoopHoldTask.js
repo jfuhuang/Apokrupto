@@ -11,10 +11,11 @@ import { fonts } from '../../../theme/typography';
 
 export default function CoopHoldTask({ task, role, currentTeam, onAction, update }) {
   const [holding, setHolding] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(task.config?.timeLimit || 20);
+  const [timeLeft, setTimeLeft] = useState(task.timeLimit || 20);
   const [localElapsedMs, setLocalElapsedMs] = useState(0);
   const youRingAnim = useRef(new Animated.Value(0)).current;
   const partnerRingAnim = useRef(new Animated.Value(0)).current;
+  const timeoutFiredRef = useRef(false);
 
   const teamColor =
     currentTeam === 'skotia' ? colors.primary.neonRed : colors.primary.electricBlue;
@@ -81,6 +82,14 @@ export default function CoopHoldTask({ task, role, currentTeam, onAction, update
     }, 1000);
     return () => clearInterval(id);
   }, [update?.phase]);
+
+  // Fire holdTimeout when timer hits 0
+  useEffect(() => {
+    if (timeLeft === 0 && !timeoutFiredRef.current && update?.phase !== 'resolved') {
+      timeoutFiredRef.current = true;
+      onAction('holdTimeout', {});
+    }
+  }, [timeLeft, update?.phase, onAction]);
 
   const handlePressIn = useCallback(() => {
     if (update?.phase === 'resolved') return;

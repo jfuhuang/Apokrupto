@@ -65,7 +65,7 @@ export default function DeceptionTask({ task, role, currentTeam, onAction, updat
 
     return (
       <View style={styles.container}>
-        <Text style={styles.instruction}>Choose an option. Your partner will advise you.</Text>
+        <Text style={styles.instruction}>Tap the word your partner says — but listen carefully.</Text>
         <View style={styles.optionRow}>
           <TouchableOpacity
             style={[styles.optionCard, { borderColor: teamColor }]}
@@ -97,7 +97,7 @@ export default function DeceptionTask({ task, role, currentTeam, onAction, updat
   return (
     <View style={styles.container}>
       <Text style={[styles.themeTitle, { color: teamColor }]}>{task.config.theme}</Text>
-      <Text style={styles.instruction}>Tell your partner which option to select. Speak wisely.</Text>
+      <Text style={styles.instruction}>Say the word out loud. Your partner has to figure out which one you mean.</Text>
 
       <View style={[styles.infoBlock, { borderColor: colors.primary.electricBlue }]}>
         <Text style={[styles.infoLabel, { color: colors.primary.electricBlue }]}>ΦΩΣ</Text>

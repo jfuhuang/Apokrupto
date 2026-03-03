@@ -11,8 +11,9 @@ import { fonts } from '../../../theme/typography';
 
 export default function CoopTapTask({ task, role, currentTeam, onAction, update }) {
   const [localTaps, setLocalTaps] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(task.config?.timeLimit || 15);
+  const [timeLeft, setTimeLeft] = useState(task.timeLimit || 15);
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const timeoutFiredRef = useRef(false);
 
   const teamColor =
     currentTeam === 'skotia' ? colors.primary.neonRed : colors.primary.electricBlue;
@@ -33,6 +34,14 @@ export default function CoopTapTask({ task, role, currentTeam, onAction, update 
     }, 1000);
     return () => clearInterval(id);
   }, [update?.phase]);
+
+  // Fire tapTimeout when timer hits 0
+  useEffect(() => {
+    if (timeLeft === 0 && !timeoutFiredRef.current && update?.phase !== 'resolved') {
+      timeoutFiredRef.current = true;
+      onAction('tapTimeout', {});
+    }
+  }, [timeLeft, update?.phase, onAction]);
 
   const handleTap = useCallback(() => {
     if (update?.phase === 'resolved') return;
