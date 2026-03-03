@@ -645,6 +645,9 @@
         </div>
         <div id="login-error"></div>
         <button id="btn-login" class="primary">Sign In</button>
+        <div style="text-align:center;margin-top:16px">
+          <button id="btn-show-register" style="border:none;background:none;color:var(--muted);font-size:0.78rem;cursor:pointer;text-decoration:underline;text-transform:none;letter-spacing:0;padding:0">Create account</button>
+        </div>
       </div>
     </div>
 
@@ -725,6 +728,30 @@
       <div class="modal-actions">
         <button id="btn-modal-cancel">Cancel</button>
         <button class="primary" id="btn-modal-create">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modal: Create Account ── -->
+  <div class="modal-overlay" id="modal-register">
+    <div class="modal">
+      <h3>Create Account</h3>
+      <div class="field">
+        <label>Username</label>
+        <input id="reg-username" type="text" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input id="reg-password" type="password" autocomplete="new-password" />
+      </div>
+      <div class="field">
+        <label>Confirm Password</label>
+        <input id="reg-confirm" type="password" autocomplete="new-password" />
+      </div>
+      <div id="reg-error" style="color:var(--red);font-size:.8rem;min-height:1.2em;margin-bottom:4px"></div>
+      <div class="modal-actions">
+        <button id="btn-reg-cancel">Cancel</button>
+        <button class="primary" id="btn-reg-submit">Create</button>
       </div>
     </div>
   </div>
@@ -836,6 +863,45 @@
       clearSession();
       setHeaderUser(null);
       showScreen('login');
+    });
+
+    // ── Register ───────────────────────────────────────────────────────────────
+    function openRegisterModal() {
+      document.getElementById('reg-username').value = '';
+      document.getElementById('reg-password').value = '';
+      document.getElementById('reg-confirm').value = '';
+      document.getElementById('reg-error').textContent = '';
+      document.getElementById('modal-register').classList.add('open');
+      document.getElementById('reg-username').focus();
+    }
+    function closeRegisterModal() {
+      document.getElementById('modal-register').classList.remove('open');
+    }
+    document.getElementById('btn-show-register').addEventListener('click', openRegisterModal);
+    document.getElementById('btn-reg-cancel').addEventListener('click', closeRegisterModal);
+    document.getElementById('modal-register').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeRegisterModal();
+    });
+    document.getElementById('btn-reg-submit').addEventListener('click', async () => {
+      const username = document.getElementById('reg-username').value.trim();
+      const password = document.getElementById('reg-password').value;
+      const confirm = document.getElementById('reg-confirm').value;
+      const errEl = document.getElementById('reg-error');
+      errEl.textContent = '';
+      if (!username || !password) { errEl.textContent = 'Username and password are required.'; return; }
+      if (password !== confirm) { errEl.textContent = 'Passwords do not match.'; return; }
+      try {
+        await apiFetch('/api/users/register', {
+          method: 'POST',
+          body: JSON.stringify({ username, password }),
+        });
+        closeRegisterModal();
+        showToast(`Account "${username}" created`, 'success');
+        document.getElementById('login-username').value = username;
+        document.getElementById('login-password').focus();
+      } catch (err) {
+        errEl.textContent = err.message;
+      }
     });
 
     // ── Lobby List ─────────────────────────────────────────────────────────────
