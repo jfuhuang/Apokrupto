@@ -7,6 +7,7 @@ import {
   Animated,
 } from 'react-native';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 function DecreeCard({ decree, onPress, disabled }) {
@@ -64,21 +65,21 @@ export default function SecretBallotTask({ task, role, currentTeam, onAction, up
   // Resolved state
   if (update?.phase === 'resolved') {
     return (
-      <View style={styles.container}>
+      <TaskContainer>
         <Text style={styles.resolvedTitle}>DECREE ENACTED</Text>
         <View style={styles.mysteryCard}>
           <Text style={styles.mysteryPoints}>+??</Text>
           <Text style={styles.mysterySubtext}>Points awarded in secret</Text>
         </View>
-      </View>
+      </TaskContainer>
     );
   }
 
   // Player A — initial phase: show 3 decrees to discard one
-  if (role === 'A' && !update) {
+  if (role === 'A' && !update && !discarded) {
     const decrees = task.config?.decrees || [];
     return (
-      <View style={styles.container}>
+      <TaskContainer>
         <Text style={styles.instruction}>
           Discard one decree. The remaining two will be passed to your partner.
         </Text>
@@ -93,37 +94,37 @@ export default function SecretBallotTask({ task, role, currentTeam, onAction, up
             </Animated.View>
           ))}
         </View>
-      </View>
+      </TaskContainer>
     );
   }
 
   // Player A — waitingForB
   if (role === 'A' && update?.phase === 'waitingForB') {
     return (
-      <View style={styles.container}>
+      <TaskContainer>
         <Text style={styles.waitingText}>Your partner is deliberating</Text>
         <AnimatedDots />
-      </View>
+      </TaskContainer>
     );
   }
 
   // Player A — already discarded but no update yet
   if (role === 'A' && discarded) {
     return (
-      <View style={styles.container}>
+      <TaskContainer>
         <Text style={styles.waitingText}>Passed to partner. Waiting</Text>
         <AnimatedDots />
-      </View>
+      </TaskContainer>
     );
   }
 
   // Player B — waiting for A to discard
   if (role === 'B' && !update) {
     return (
-      <View style={styles.container}>
+      <TaskContainer>
         <Text style={styles.waitingText}>Your partner is reviewing decrees</Text>
         <AnimatedDots />
-      </View>
+      </TaskContainer>
     );
   }
 
@@ -131,7 +132,7 @@ export default function SecretBallotTask({ task, role, currentTeam, onAction, up
   if (role === 'B' && update?.phase === 'playerB') {
     const remaining = update.remainingDecrees || [];
     return (
-      <View style={styles.container}>
+      <TaskContainer>
         <Text style={styles.instruction}>
           Enact one decree. The other will be discarded. Your partner won't know which you chose.
         </Text>
@@ -148,26 +149,19 @@ export default function SecretBallotTask({ task, role, currentTeam, onAction, up
         {enacted && (
           <Text style={styles.waitingSubtle}>Waiting for result...</Text>
         )}
-      </View>
+      </TaskContainer>
     );
   }
 
   // Fallback
   return (
-    <View style={styles.container}>
+    <TaskContainer>
       <Text style={styles.waitingText}>Loading ballot...</Text>
-    </View>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-  },
   instruction: {
     fontFamily: fonts.ui.regular,
     fontSize: 14,

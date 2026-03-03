@@ -283,26 +283,27 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
           <Text style={styles.resolvedZero}>0 points — no pattern matched</Text>
         )}
 
-        {/* Pattern reveal */}
-        <View style={styles.revealBox}>
-          <View style={styles.revealTeam}>
-            <Text style={[styles.revealTeamLabel, { color: colors.primary.electricBlue }]}>ΦΩΣ</Text>
-            <PatternDots pattern={phosPattern} />
+        {/* Pattern reveal — only shown to Player B */}
+        {role === 'B' && (
+          <View style={styles.revealBox}>
+            <View style={styles.revealTeam}>
+              <Text style={[styles.revealTeamLabel, { color: colors.primary.electricBlue }]}>ΦΩΣ</Text>
+              <PatternDots pattern={phosPattern} />
+            </View>
+            <View style={styles.revealDivider} />
+            <View style={styles.revealTeam}>
+              <Text style={[styles.revealTeamLabel, { color: colors.primary.neonRed }]}>ΣΚΟΤΊΑ</Text>
+              <PatternDots pattern={skotiaPattern} />
+            </View>
           </View>
-          <View style={styles.revealDivider} />
-          <View style={styles.revealTeam}>
-            <Text style={[styles.revealTeamLabel, { color: colors.primary.neonRed }]}>ΣΚΟΤΊΑ</Text>
-            <PatternDots pattern={skotiaPattern} />
-          </View>
-        </View>
+        )}
 
-        <Text style={styles.youTappedLabel}>You tapped:</Text>
-        <PatternDots pattern={inputSequence} />
-
-        {role === 'A' && chosenTeam && (
-          <Text style={styles.chosenTeamNote}>
-            Partner chose {chosenTeam === 'phos' ? 'ΦΩΣ' : 'ΣΚΟΤΊΑ'} pattern
-          </Text>
+        {/* Input reveal — only shown to Player A */}
+        {role === 'A' && (
+          <>
+            <Text style={styles.youTappedLabel}>You tapped:</Text>
+            <PatternDots pattern={inputSequence} />
+          </>
         )}
       </ScrollView>
     );

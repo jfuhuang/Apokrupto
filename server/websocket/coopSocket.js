@@ -97,8 +97,10 @@ function scheduleNextTask(io, sessionId, delayMs) {
 
 function registerCoopHandlers(socket) {
   // socket.userId and socket.username are set by lobbySocket auth middleware
+  console.log(`[Coop] registerCoopHandlers socket:${socket.id} user:${socket.userId} username:${socket.username}`);
 
   socket.on('coopInvite', async ({ gameId, targetUserId }, callback) => {
+    console.log(`[Coop] coopInvite from user:${socket.userId} targeting:${targetUserId} game:${gameId}`);
     try {
       const { invite, cancelledInvite } = coopService.createInvite(gameId, socket.userId, socket.username, targetUserId);
       const io = ioModule.getIO();
@@ -122,7 +124,9 @@ function registerCoopHandlers(socket) {
       }
       if (callback) callback({ ok: true, inviteId: invite.id });
     } catch (err) {
-      console.error('[Coop] coopInvite error:', err.message);
+      const inSession = !!coopService.getSessionByPlayer(socket.userId);
+      const pendingInvites = coopService.getInvitesForPlayer(socket.userId);
+      console.error('[Coop] coopInvite error:', err.message, '| inSession:', inSession, '| pendingInvitesTargetingThem:', pendingInvites.length);
       if (callback) callback({ error: err.message });
     }
   });

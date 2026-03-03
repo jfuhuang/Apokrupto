@@ -75,7 +75,9 @@ function generateDeception() {
   const theme = pick(themeNames);
   const pair = pick(THEME_POOLS[theme]);
   const phosOptionIndex = Math.random() < 0.5 ? 0 : 1;
-  const targetWord = pair[phosOptionIndex].label;
+  const skotiaOptionIndex = 1 - phosOptionIndex;
+  const phosWord = pair[phosOptionIndex].label;
+  const skotiaWord = pair[skotiaOptionIndex].label;
 
   return {
     taskId: `deception_${crypto.randomUUID()}`,
@@ -85,8 +87,8 @@ function generateDeception() {
       theme,
       optionA: pair[0],
       optionB: pair[1],
-      phosMessage: `Tell your partner to tap: ${targetWord}`,
-      skotiaMessage: `Tell your partner to tap: ${targetWord}`,
+      phosMessage: `Tell your partner to tap: ${phosWord}`,
+      skotiaMessage: `Tell your partner to tap: ${skotiaWord}`,
     },
     _server: { phosOptionIndex },
   };
