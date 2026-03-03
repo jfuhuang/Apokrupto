@@ -24,6 +24,7 @@ export default function MovementBScreen({
   isSus,
   onMovementComplete,
   onEnterRush,
+  onEnterCoop,
 }) {
   const [sessionPoints, setSessionPoints] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(null);
@@ -187,17 +188,14 @@ export default function MovementBScreen({
             </View>
           </TouchableOpacity>
 
-          <View style={[styles.modeCard, styles.modeCardDisabled]}>
-            <View style={styles.comingSoonBadge}>
-              <Text style={styles.comingSoonText}>COMING SOON</Text>
-            </View>
+          <TouchableOpacity style={styles.modeCard} onPress={onEnterCoop} activeOpacity={0.8}>
             <Text style={styles.modeCardIcon}>🤝</Text>
-            <Text style={[styles.modeCardTitle, { color: colors.text.tertiary }]}>CO-OP</Text>
+            <Text style={styles.modeCardTitle}>CO-OP</Text>
             <Text style={styles.modeCardDesc}>Complete group challenges with your team</Text>
-            <View style={[styles.modeCardBtn, styles.modeCardBtnDisabled]}>
-              <Text style={[styles.modeCardBtnText, { color: colors.text.disabled }]}>LOCKED</Text>
+            <View style={styles.modeCardBtn}>
+              <Text style={styles.modeCardBtnText}>FIND PARTNER</Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
           {sessionPoints > 0 && (
             <Text style={styles.sessionPtsNote}>This round: +{sessionPoints} pts</Text>
