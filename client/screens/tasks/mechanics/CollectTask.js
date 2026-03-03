@@ -18,6 +18,9 @@ const MARGIN = 20;
 const PAULS_DECOYS = ['👡', '🪔', '🍞', '🫙', '🪙', '🐟', '🍇', '🌾', '🏺', '🧵', '🔑', '🪵'];
 const PAULS_REAL_ICONS = ['🧥', '📜', '📚'];
 
+const WOLF_EMOJI  = '🐺';
+const SHEEP_EMOJI = '🐑';
+
 const ITEM_VISUALS = {
   pauls_belongings: {
     color:   '#FFA63D',
@@ -40,6 +43,11 @@ const ITEM_VISUALS = {
     color:   '#00FF9F',
     hint:    'Divide the loaves and fish!',
     shape:   'oval',
+  },
+  wolves_in_sheeps_clothing: {
+    color:   '#FF3366',
+    hint:    'Tap every wolf hiding among the sheep!',
+    shape:   'emoji',
   },
 };
 
@@ -68,6 +76,7 @@ function getItemDimensions(shape) {
     case 'card':  return { w: 64, h: 72 };
     case 'stone': return { w: 65, h: 45 };
     case 'manna': return { w: 56, h: 56 };
+    case 'emoji': return { w: 54, h: 54 };
     default:      return { w: 70, h: 70 };
   }
 }
@@ -164,13 +173,17 @@ export default function CollectTask(props) {
 // ── Inner component (has measured dimensions) ───────────────────────────────
 
 function CollectTaskInner({ config, onSuccess, onFail, taskId, areaW, areaH }) {
-  const { items } = config;
+  const { items = [] } = config;
   const visual  = ITEM_VISUALS[taskId] || {};
   const shape   = visual.shape || 'circle';
   const color   = visual.color || colors.primary.electricBlue;
   const isManna = taskId === 'manna_wilderness';
   const isWaldo = taskId === 'pauls_belongings';
+  const isWolfSheep = taskId === 'wolves_in_sheeps_clothing';
   const hint    = visual.hint || 'Tap all items before time runs out!';
+
+  const wolfCount = isWolfSheep ? (config.wolves || 4) : 0;
+  const sheepCount = isWolfSheep ? (config.sheep || 16) : 0;
 
   // ── Collected tracking ──────────────────────────────────────────────────
 
@@ -200,6 +213,30 @@ function CollectTaskInner({ config, onSuccess, onFail, taskId, areaW, areaH }) {
   const flashAnims = useRef(
     isWaldo
       ? Object.fromEntries((waldoItems || []).map((it) => [it.key, new Animated.Value(0)]))
+      : {}
+  ).current;
+
+  // ── Wolf/sheep "find the wolf" mode ────────────────────────────────────
+
+  const [wolfSheepItems] = useState(() => {
+    if (!isWolfSheep) return null;
+    const wolves = Array.from({ length: wolfCount }, (_, i) => ({
+      key: `wolf-${i}`, isWolf: true, wolfIdx: i,
+    }));
+    const sheep = Array.from({ length: sheepCount }, (_, i) => ({
+      key: `sheep-${i}`, isWolf: false, wolfIdx: null,
+    }));
+    return shuffle([...wolves, ...sheep]);
+  });
+
+  const [wolfSheepPositions] = useState(() => {
+    if (!isWolfSheep || !wolfSheepItems) return null;
+    return generatePositions(wolfSheepItems.length, 'emoji', areaW, areaH);
+  });
+
+  const wolfFlashAnims = useRef(
+    isWolfSheep
+      ? Object.fromEntries((wolfSheepItems || []).map((it) => [it.key, new Animated.Value(0)]))
       : {}
   ).current;
 
@@ -280,6 +317,29 @@ function CollectTaskInner({ config, onSuccess, onFail, taskId, areaW, areaH }) {
     collectedRef.current = next;
     setCollected(next);
     if (next.size === items.length) {
+      doneRef.current = true;
+      onSuccess();
+    }
+  };
+
+  const handleWolfTap = (item) => {
+    if (doneRef.current) return;
+    if (!item.isWolf) {
+      // Wrong tap — flash the sheep red briefly
+      const anim = wolfFlashAnims[item.key];
+      if (anim) {
+        Animated.sequence([
+          Animated.timing(anim, { toValue: 1, duration: 80,  useNativeDriver: false }),
+          Animated.timing(anim, { toValue: 0, duration: 300, useNativeDriver: false }),
+        ]).start();
+      }
+      return;
+    }
+    if (collected.has(item.wolfIdx)) return;
+    const next = new Set([...collected, item.wolfIdx]);
+    collectedRef.current = next;
+    setCollected(next);
+    if (next.size === wolfCount) {
       doneRef.current = true;
       onSuccess();
     }
@@ -388,6 +448,51 @@ function CollectTaskInner({ config, onSuccess, onFail, taskId, areaW, areaH }) {
                 disabled={done}
               >
                 <Text style={styles.waldoIcon}>{done ? '✓' : item.icon}</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          );
+        })}
+      </>
+    );
+  }
+
+  // ── Wolf/sheep render ───────────────────────────────────────────────────
+
+  if (isWolfSheep && wolfSheepItems && wolfSheepPositions) {
+    return (
+      <>
+        <Text style={styles.hint}>{hint}</Text>
+        <Text style={[styles.progress, { color }]}>
+          Found: {collected.size} / {wolfCount} 🐺
+        </Text>
+
+        {wolfSheepItems.map((item, idx) => {
+          const pos  = wolfSheepPositions[idx];
+          const done = item.isWolf && collected.has(item.wolfIdx);
+          const flashAnim = wolfFlashAnims[item.key];
+          const bgColor = flashAnim
+            ? flashAnim.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.05)', 'rgba(255,51,102,0.28)'] })
+            : 'rgba(255,255,255,0.05)';
+
+          return (
+            <Animated.View
+              key={item.key}
+              style={[
+                styles.wolfSheepItem,
+                { position: 'absolute', left: pos.x, top: pos.y, backgroundColor: bgColor },
+                done && styles.wolfSheepDone,
+              ]}
+              pointerEvents={done ? 'none' : 'box-none'}
+            >
+              <TouchableOpacity
+                style={styles.wolfSheepInner}
+                onPress={() => handleWolfTap(item)}
+                activeOpacity={0.7}
+                disabled={done}
+              >
+                <Text style={styles.wolfSheepEmoji}>
+                  {done ? '✓' : (item.isWolf ? WOLF_EMOJI : SHEEP_EMOJI)}
+                </Text>
               </TouchableOpacity>
             </Animated.View>
           );
@@ -612,5 +717,25 @@ const styles = StyleSheet.create({
     fontSize:   9,
     textAlign:  'center',
     marginTop:  2,
+  },
+  wolfSheepItem: {
+    width:        54,
+    height:       54,
+    borderRadius: 10,
+    borderWidth:  1,
+    borderColor:  'rgba(255,255,255,0.1)',
+    overflow:     'hidden',
+  },
+  wolfSheepDone: {
+    borderColor:     colors.accent.neonGreen,
+    backgroundColor: 'rgba(0,255,159,0.12)',
+  },
+  wolfSheepInner: {
+    flex:           1,
+    justifyContent: 'center',
+    alignItems:     'center',
+  },
+  wolfSheepEmoji: {
+    fontSize: 30,
   },
 });

@@ -28,7 +28,6 @@ const RESULT_DISPLAY_MS = 1500;
 const BOTTOM_INSET = Platform.OS === 'android' ? 32 : 0;
 
 export default function TaskScreen({ task, role, isAlive, token, lobbyId, onComplete, onCancel, onCustomSubmit }) {
-  console.log('[TaskScreen] MOUNT — task.id:', task?.id, 'task.mechanic:', task?.mechanic, 'task.config:', JSON.stringify(task?.config));
   const [result, setResult] = useState(null); // null | { success, pointsEarned }
   const handledRef = useRef(false);
 
@@ -85,8 +84,6 @@ export default function TaskScreen({ task, role, isAlive, token, lobbyId, onComp
       taskId: task.id,
     };
 
-    console.log('[TaskScreen] renderMechanic — mechanic:', task.mechanic, 'taskId:', task.id, 'config:', JSON.stringify(task.config), 'MECHANIC.PATIENCE:', MECHANIC.PATIENCE, 'match:', task.mechanic === MECHANIC.PATIENCE);
-
     switch (task.mechanic) {
       case MECHANIC.SCRIPTURE_MEMORY:
         return <ScriptureMemoryTask {...props} />;
@@ -128,7 +125,6 @@ export default function TaskScreen({ task, role, isAlive, token, lobbyId, onComp
         onTimeUp={handleTimeUp}
       />
       <View style={styles.body}>
-        <Text style={{ color: 'lime', fontSize: 10 }}>[DEBUG TaskScreen] mechanic={task.mechanic} id={task.id}</Text>
         {renderMechanic()}
       </View>
 

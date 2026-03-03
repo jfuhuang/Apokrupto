@@ -99,10 +99,7 @@ const TASK_CONFIG = {
 
 // ── Main component ──────────────────────────────────────────────────────────
 
-export default function PatienceTask({ config, onSuccess, onFail, taskId }) {
-  console.log('[PatienceTask] RENDER — taskId:', taskId, 'config:', JSON.stringify(config));
-  const { duration } = config;
-  console.log('[PatienceTask] duration:', duration);
+export default function PatienceTask({ config, onSuccess, onFail, taskId })  const { duration } = config;
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [progress, setProgress] = useState(0);
   const [completed, setCompleted] = useState(false);
@@ -119,30 +116,21 @@ export default function PatienceTask({ config, onSuccess, onFail, taskId }) {
   }, []);
 
   const taskCfg = TASK_CONFIG[taskId] || TASK_CONFIG.still_waters;
-  console.log('[PatienceTask] taskCfg found:', !!taskCfg, 'for taskId:', taskId, 'keys:', Object.keys(TASK_CONFIG));
   const { ringColor, label, failMsg, Temptation } = taskCfg;
-  console.log('[PatienceTask] ringColor:', ringColor, 'label:', label, 'Temptation:', typeof Temptation);
 
   // Auto-fill ring over duration using requestAnimationFrame
   // (Animated.createAnimatedComponent doesn't work reliably with react-native-svg)
   useEffect(() => {
-    console.log('[PatienceTask] rAF effect mounted, duration:', duration);
     startTimeRef.current = Date.now();
     let frameId;
-    let logCount = 0;
     const tick = () => {
       if (doneRef.current) return;
       const elapsed = (Date.now() - startTimeRef.current) / 1000;
       const p = Math.min(elapsed / duration, 1);
-      if (logCount < 5 || p >= 1) {
-        console.log('[PatienceTask] tick — elapsed:', elapsed.toFixed(2), 'progress:', p.toFixed(3));
-        logCount++;
-      }
       setProgress(p);
       if (p >= 1) {
         doneRef.current = true;
         setCompleted(true);
-        console.log('[PatienceTask] COMPLETED — calling onSuccess');
         onSuccess();
       } else {
         frameId = requestAnimationFrame(tick);
@@ -179,19 +167,12 @@ export default function PatienceTask({ config, onSuccess, onFail, taskId }) {
     ? colors.state.error
     : ringColor;
 
-  console.log('[PatienceTask] RENDERING — progress:', progress.toFixed(3), 'completed:', completed, 'failed:', failed, 'dashOffset:', dashOffset.toFixed(1), 'SIZE:', SIZE, 'R:', R, 'CIRC:', CIRC.toFixed(1));
-
   return (
     <View
       style={styles.container}
       onStartShouldSetResponder={() => !doneRef.current && readyRef.current}
       onResponderGrant={handleTouch}
     >
-      {/* DEBUG: visible marker to confirm component renders */}
-      <Text style={{ color: 'yellow', fontSize: 10, textAlign: 'center' }}>
-        [DEBUG] PatienceTask mounted | taskId={taskId} | progress={progress.toFixed(2)} | dur={duration} | color={currentColor}
-      </Text>
-
       <Text style={styles.instruction}>
         {completed
           ? 'Well done!'
@@ -200,8 +181,6 @@ export default function PatienceTask({ config, onSuccess, onFail, taskId }) {
           : label}
       </Text>
       <View style={styles.ringWrapper}>
-        {/* DEBUG: background color to see if ringWrapper has size */}
-        <View style={{ position: 'absolute', width: SIZE, height: SIZE, backgroundColor: 'rgba(255,0,0,0.15)' }} />
         <Svg width={SIZE} height={SIZE}>
           {/* Background track */}
           <Circle

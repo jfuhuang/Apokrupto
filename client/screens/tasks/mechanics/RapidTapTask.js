@@ -15,10 +15,10 @@ const { width: W } = Dimensions.get('window');
 
 // ── SVG tap button components ─────────────────────────────────────────────
 
-function BasketButton({ done }) {
+function BasketButton({ done, size }) {
   const c = done ? colors.accent.neonGreen : '#FFA63D';
   return (
-    <Svg width={180} height={180} viewBox="0 0 180 180">
+    <Svg width={size} height={size} viewBox="0 0 180 180">
       {/* Basket body — woven */}
       <Path d="M40 80 Q30 130 35 160 L145 160 Q150 130 140 80Z" fill={c} opacity="0.85" />
       {/* Weave lines horizontal */}
@@ -43,7 +43,7 @@ function BasketButton({ done }) {
   );
 }
 
-function WallButton({ taps, targetTaps, done }) {
+function WallButton({ taps, targetTaps, done, size }) {
   const pct   = Math.min(taps / targetTaps, 1);
   const stage = Math.floor(pct * 4); // 0–3
   const c     = done ? colors.accent.neonGreen : colors.primary.electricBlue;
@@ -53,7 +53,7 @@ function WallButton({ taps, targetTaps, done }) {
   const fallingOpacity = stage >= 3 ? 0.9 : 0;
 
   return (
-    <Svg width={180} height={180} viewBox="0 0 180 180">
+    <Svg width={size} height={size} viewBox="0 0 180 180">
       {/* Brick rows */}
       {[0, 1, 2, 3, 4].map((row) => {
         const y    = 20 + row * 32;
@@ -119,10 +119,10 @@ function WallButton({ taps, targetTaps, done }) {
   );
 }
 
-function RockButton({ done }) {
+function RockButton({ done, size }) {
   const c = done ? colors.accent.neonGreen : '#8B9CB0';
   return (
-    <Svg width={180} height={180} viewBox="0 0 180 180">
+    <Svg width={size} height={size} viewBox="0 0 180 180">
       <Path d="M35 150 Q20 110 30 70 Q40 35 70 25 Q100 15 130 30 Q160 45 162 80 Q164 120 148 150Z" fill={c} />
       <Path d="M40 150 Q28 112 38 74 Q47 38 73 28 Q99 18 127 32 Q155 48 157 82 Q158 118 144 150Z" fill="#9AACC0" />
       {/* Crack */}
@@ -137,10 +137,10 @@ function RockButton({ done }) {
   );
 }
 
-function BucketButton({ done }) {
+function BucketButton({ done, size }) {
   const c = done ? colors.accent.neonGreen : colors.primary.electricBlue;
   return (
-    <Svg width={180} height={180} viewBox="0 0 180 180">
+    <Svg width={size} height={size} viewBox="0 0 180 180">
       {/* Handle */}
       <Path d="M50 60 Q90 20 130 60" stroke={c} strokeWidth="8" fill="none" strokeLinecap="round" />
       {/* Bucket body */}
@@ -262,9 +262,13 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit, tas
   const { targetTaps } = config;
   const [taps, setTaps] = useState(0);
   const [done, setDone] = useState(false);
+  const [containerH, setContainerH] = useState(null);
   const fillAnim  = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const particles = useParticles(taskId, taps);
+
+  // Overhead: paddingVertical(16) + counter+mb(~68) + barTrack(18) + pct+mt(~22) + button marginTop(8) = ~132
+  const btnSize = containerH ? Math.min(180, Math.max(80, containerH - 132)) : 160;
 
   const handleTap = () => {
     if (done) return;
@@ -293,7 +297,7 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit, tas
   // Per-task button
   const renderButton = () => {
     const wrapped = (children) => (
-      <Animated.View style={{ transform: [{ scale: scaleAnim }], marginTop: 16 }}>
+      <Animated.View style={{ transform: [{ scale: scaleAnim }], marginTop: 8 }}>
         <TouchableOpacity onPress={handleTap} activeOpacity={0.8} disabled={done}>
           {children}
         </TouchableOpacity>
@@ -302,18 +306,18 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit, tas
 
     switch (taskId) {
       case 'feeding_five_thousand':
-        return wrapped(<BasketButton done={done} />);
+        return wrapped(<BasketButton done={done} size={btnSize} />);
       case 'walls_of_jericho':
-        return wrapped(<WallButton taps={taps} targetTaps={targetTaps} done={done} />);
+        return wrapped(<WallButton taps={taps} targetTaps={targetTaps} done={done} size={btnSize} />);
       case 'water_from_rock':
-        return wrapped(<RockButton done={done} />);
+        return wrapped(<RockButton done={done} size={btnSize} />);
       case 'jonah_storm':
-        return wrapped(<BucketButton done={done} />);
+        return wrapped(<BucketButton done={done} size={btnSize} />);
       default:
         return (
-          <Animated.View style={{ transform: [{ scale: scaleAnim }], marginTop: 32 }}>
+          <Animated.View style={{ transform: [{ scale: scaleAnim }], marginTop: 8 }}>
             <TouchableOpacity
-              style={[styles.tapBtn, done && styles.tapBtnDone]}
+              style={[styles.tapBtn, { width: btnSize, height: btnSize, borderRadius: btnSize / 2 }, done && styles.tapBtnDone]}
               onPress={handleTap}
               activeOpacity={0.8}
               disabled={done}
@@ -326,7 +330,7 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit, tas
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onLayout={e => setContainerH(e.nativeEvent.layout.height)}>
       {/* Wave background for jonah_storm */}
       {taskId === 'jonah_storm' && <WaveBackground taps={taps} targetTaps={targetTaps} />}
 
@@ -372,7 +376,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    paddingHorizontal: 32,
+    paddingVertical: 8,
   },
   counter: {
     fontFamily: fonts.accent.bold,

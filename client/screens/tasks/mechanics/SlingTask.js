@@ -7,18 +7,22 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import Svg, { Path, Circle, Rect, Ellipse, Line, G, Polygon } from 'react-native-svg';
+import Svg, { Path, Circle, Rect, Ellipse, Line, Polygon } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
 const { width: W, height: H } = Dimensions.get('window');
-const STONE_SIZE   = 36;
-const TARGET_W     = 80;
-const TARGET_H     = 140;
-const TARGET_X     = W / 2 - TARGET_W / 2;
-const TARGET_Y     = 55;
-const STONE_START_X = W / 2 - STONE_SIZE / 2;
-const STONE_START_Y = H * 0.55;
+const STONE_SIZE = 36;
+const ORBIT_R    = 90;           // initial distance from Goliath center to stone
+const ARC_R      = 110;          // radius of the visual orbit guide ring
+const GX         = W / 2;        // Goliath center X (view-relative)
+const GY         = H * 0.38;     // Goliath center Y (view-relative)
+const TARGET_W   = 80;
+const TARGET_H   = 140;
+
+// Stone starts to the right of Goliath
+const STONE_START_X = GX + ORBIT_R - STONE_SIZE / 2;
+const STONE_START_Y = GY - STONE_SIZE / 2;
 
 // ── Goliath SVG silhouette ───────────────────────────────────────────────
 
@@ -86,132 +90,143 @@ function StoneSvg() {
   );
 }
 
-export default function SlingTask({ config, onSuccess, onFail }) {
-  const { attempts, minVelocity } = config;
-  const [attemptsLeft, setAttemptsLeft] = useState(attempts);
-  const [message,      setMessage]      = useState('');
-  const [done,         setDone]         = useState(false);
-  const [hit,          setHit]          = useState(false);
-  const [isDragging,   setIsDragging]   = useState(false);
+// ── Progress arc path ─────────────────────────────────────────────────────
 
-  const attemptsLeftRef = useRef(attempts);
-  const doneRef         = useRef(false);
-  const stonePosRef     = useRef({ x: STONE_START_X, y: STONE_START_Y });
+function buildArcPath(cx, cy, r, progress) {
+  if (progress <= 0) return null;
+  if (progress >= 1) {
+    // Full circle — drawn as two semicircles since SVG can't arc 360°
+    return `M ${cx + r} ${cy} A ${r} ${r} 0 1 1 ${cx - r} ${cy} A ${r} ${r} 0 1 1 ${cx + r} ${cy}`;
+  }
+  const startAngle = 0; // starts at the 3 o'clock position (where stone begins)
+  const endAngle   = 2 * Math.PI * progress;
+  const x1 = cx + r * Math.cos(startAngle);
+  const y1 = cy + r * Math.sin(startAngle);
+  const x2 = cx + r * Math.cos(endAngle);
+  const y2 = cy + r * Math.sin(endAngle);
+  const largeArc = progress > 0.5 ? 1 : 0;
+  return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
+}
 
-  const pan      = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-  const lastPos  = useRef({ x: STONE_START_X, y: STONE_START_Y });
-  const prevPos  = useRef({ x: STONE_START_X, y: STONE_START_Y });
+// ── Main component ────────────────────────────────────────────────────────
 
-  // Current stone center for arc hint
-  const [arcStone, setArcStone] = useState({ x: STONE_START_X, y: STONE_START_Y });
+export default function SlingTask({ config, onSuccess }) {
+  const { circles } = config;
+
+  const [progress, setProgress] = useState(0);
+  const [hit,      setHit]      = useState(false);
+  const [done,     setDone]     = useState(false);
+
+  // Cumulative stone displacement across multiple touch gestures
+  const cumulDxRef    = useRef(0);
+  const cumulDyRef    = useRef(0);
+  // Angle tracking
+  const prevAngleRef  = useRef(Math.atan2(0, ORBIT_R)); // = 0 (pointing right)
+  const totalAngleRef = useRef(0);
+  const doneRef       = useRef(false);
+
+  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => !doneRef.current,
+
       onPanResponderGrant: () => {
-        setIsDragging(true);
-        setArcStone({ x: STONE_START_X, y: STONE_START_Y });
+        // Anchor pan offset to current accumulated stone position
+        pan.setOffset({ x: cumulDxRef.current, y: cumulDyRef.current });
+        pan.setValue({ x: 0, y: 0 });
+        // Re-seed the previous angle from the stone's current resting position
+        const relX = ORBIT_R + cumulDxRef.current;
+        const relY = cumulDyRef.current;
+        prevAngleRef.current = Math.atan2(relY, relX);
       },
+
       onPanResponderMove: (_, g) => {
-        prevPos.current  = { ...lastPos.current };
-        lastPos.current  = { x: STONE_START_X + g.dx, y: STONE_START_Y + g.dy };
-        stonePosRef.current = lastPos.current;
+        if (doneRef.current) return;
+
         pan.setValue({ x: g.dx, y: g.dy });
-        setArcStone({ x: STONE_START_X + g.dx + STONE_SIZE / 2, y: STONE_START_Y + g.dy + STONE_SIZE / 2 });
+
+        // Stone center relative to Goliath
+        const relX = ORBIT_R + cumulDxRef.current + g.dx;
+        const relY = cumulDyRef.current + g.dy;
+
+        // Skip angle update if stone is too close to center (prevents atan2 instability)
+        if (Math.sqrt(relX * relX + relY * relY) < 15) return;
+
+        const currentAngle = Math.atan2(relY, relX);
+        let delta = currentAngle - prevAngleRef.current;
+        // Normalise delta to (-π, π] to handle wrap-around
+        if (delta >  Math.PI) delta -= 2 * Math.PI;
+        if (delta < -Math.PI) delta += 2 * Math.PI;
+        totalAngleRef.current += delta;
+        prevAngleRef.current = currentAngle;
+
+        const newProgress = Math.min(
+          Math.abs(totalAngleRef.current) / (2 * Math.PI * circles),
+          1,
+        );
+        setProgress(newProgress);
+
+        if (newProgress >= 1) {
+          doneRef.current = true;
+          setHit(true);
+          setDone(true);
+          onSuccess();
+        }
       },
+
       onPanResponderRelease: (_, g) => {
-        setIsDragging(false);
-        const vx = lastPos.current.x - prevPos.current.x;
-        const vy = lastPos.current.y - prevPos.current.y;
-        const velocity = Math.sqrt(vx * vx + vy * vy) * 60;
-
-        const flyX = g.dx + vx * 15;
-        const flyY = g.dy + vy * 15;
-
-        Animated.timing(pan, {
-          toValue:  { x: flyX, y: flyY },
-          duration: 400,
-          useNativeDriver: false,
-        }).start(() => {
-          const finalX  = STONE_START_X + flyX + STONE_SIZE / 2;
-          const finalY  = STONE_START_Y + flyY + STONE_SIZE / 2;
-          const tcx     = TARGET_X + TARGET_W / 2;
-          const tcy     = TARGET_Y + TARGET_H / 2;
-          const dist    = Math.sqrt((finalX - tcx) ** 2 + (finalY - tcy) ** 2);
-          const wasHit  = dist < TARGET_W * 0.9 && velocity >= minVelocity;
-
-          if (wasHit) {
-            doneRef.current = true;
-            setHit(true);
-            setDone(true);
-            setMessage('Direct hit! Goliath falls!');
-            onSuccess();
-          } else {
-            const remaining = attemptsLeftRef.current - 1;
-            attemptsLeftRef.current = remaining;
-            setAttemptsLeft(remaining);
-            if (velocity < minVelocity) {
-              setMessage('Too slow! Swipe faster.');
-            } else {
-              setMessage('Missed! Aim higher.');
-            }
-            setTimeout(() => {
-              pan.setValue({ x: 0, y: 0 });
-              setArcStone({ x: STONE_START_X, y: STONE_START_Y });
-              if (remaining <= 0) {
-                doneRef.current = true;
-                setDone(true);
-                onFail();
-              }
-            }, 500);
-          }
-        });
+        // Commit current gesture displacement into cumulative offset
+        cumulDxRef.current += g.dx;
+        cumulDyRef.current += g.dy;
+        pan.flattenOffset();
       },
     })
   ).current;
 
-  // Target center for arc
-  const tcx = TARGET_X + TARGET_W / 2;
-  const tcy = TARGET_Y + TARGET_H / 2;
+  const arcD             = buildArcPath(GX, GY, ARC_R, progress);
+  const completedCircles = Math.floor(progress * circles);
 
   return (
     <View style={styles.container}>
       <Text style={styles.hint}>
-        {done ? message : 'Swipe the stone upward at Goliath!'}
+        {done ? 'Goliath falls!' : 'Circle the stone around Goliath!'}
       </Text>
       {!done && (
-        <Text style={styles.attempts}>Attempts left: {attemptsLeft}</Text>
-      )}
-      {message !== '' && !done && (
-        <Text style={styles.message}>{message}</Text>
+        <Text style={styles.counter}>{completedCircles} / {circles} circles</Text>
       )}
 
-      {/* Goliath silhouette at target position */}
-      <View style={{ position: 'absolute', left: TARGET_X, top: TARGET_Y }}>
+      {/* Orbit guide ring + progress arc */}
+      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Circle
+          cx={GX}
+          cy={GY}
+          r={ARC_R}
+          stroke={colors.text.tertiary}
+          strokeWidth={1}
+          strokeDasharray="8,6"
+          fill="none"
+          opacity={0.3}
+        />
+        {arcD ? (
+          <Path
+            d={arcD}
+            stroke={colors.primary.electricBlue}
+            strokeWidth={3}
+            fill="none"
+            strokeLinecap="round"
+          />
+        ) : null}
+      </Svg>
+
+      {/* Goliath */}
+      <View style={{ position: 'absolute', left: GX - TARGET_W / 2, top: GY - TARGET_H / 2 }}>
         <GoliathSvg hit={hit} />
       </View>
 
-      {/* Trajectory arc hint (shown while dragging) */}
-      {isDragging && (
-        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Path
-            d={`M ${arcStone.x} ${arcStone.y} Q ${W / 2} ${H * 0.15} ${tcx} ${tcy}`}
-            stroke="#00D4FF"
-            strokeWidth={1.5}
-            strokeDasharray="8,6"
-            fill="none"
-            opacity={0.4}
-          />
-        </Svg>
-      )}
-
-      {/* Stone */}
+      {/* Stone — follows the finger */}
       <Animated.View
-        style={[
-          styles.stone,
-          { left: STONE_START_X, top: STONE_START_Y },
-          pan.getLayout(),
-        ]}
+        style={[styles.stone, { left: STONE_START_X, top: STONE_START_Y }, pan.getLayout()]}
         {...panResponder.panHandlers}
       >
         <StoneSvg />
@@ -232,19 +247,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
-  attempts: {
+  counter: {
     fontFamily: fonts.accent.bold,
-    fontSize: 16,
+    fontSize: 20,
     color: colors.primary.electricBlue,
     textAlign: 'center',
-    marginTop: 4,
-  },
-  message: {
-    fontFamily: fonts.ui.semiBold,
-    fontSize: 14,
-    color: colors.accent.amber,
-    textAlign: 'center',
-    marginTop: 4,
+    marginTop: 6,
   },
   stone: {
     position: 'absolute',

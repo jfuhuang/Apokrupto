@@ -460,7 +460,7 @@ TEST_PLAYER_COUNT=50
 
 ---
 
-## TASK 6 — Clean Up Sprites
+## ✅ TASK 6 — Clean Up Sprites *(COMPLETE)*
 
 > This is a standalone polish task with no dependencies.
 
@@ -487,7 +487,6 @@ All sprites should follow these rules:
 - Accent/fire: use the module-level `FIRE` constant (`'#FFA63D'`)
 - No other hard-coded color hex values (except `'none'` for `fill`/`stroke`)
 - Stroke width: prefer `1.5` or `2` — avoid values below `1` or above `3`
-
 Audit each sprite and fix any that use raw hex values instead of the above constants.
 
 ### 6C — Readability cleanup
@@ -507,12 +506,12 @@ const SpriteComponent = SPRITES[spriteKey] || SPRITES['_fallback'];
 ```
 
 **Acceptance criteria:**
-- [ ] No sprite keys exist in `SPRITES` that are not used by any task in `tasks.js` (or they are
+- [x] No sprite keys exist in `SPRITES` that are not used by any task in `tasks.js` (or they are
       explicitly marked with a `// unused` comment explaining why they are kept)
-- [ ] No sprite uses a hard-coded color hex value other than `BG`, `FIRE`, or `'none'`
-- [ ] Every sprite has a one-line description comment
-- [ ] A `_fallback` sprite exists and is used when an unknown key is requested
-- [ ] All shapes render within the `0 0 32 32` viewBox
+- [x] No sprite uses a hard-coded color hex value other than `BG`, `FIRE`, or `'none'`
+- [x] Every sprite has a one-line description comment
+- [x] A `_fallback` sprite exists and is used when an unknown key is requested
+- [x] All shapes render within the `0 0 32 32` viewBox
 
 ---
 
@@ -766,7 +765,7 @@ them or relocate them to `BailWaterTask.js` for internal use there.
 
 ---
 
-## TASK 8 — AI-Generated Professional SVG Sprites
+## ✅ TASK 8 — AI-Generated Professional SVG Sprites *(COMPLETE)*
 
 > Standalone polish task. No game logic dependencies. Can be done after Task 6.
 
@@ -834,10 +833,10 @@ A sprite passes review if:
 - It renders without errors in the React Native SVG context
 
 **Acceptance criteria:**
-- [ ] Every sprite in `SPRITES` has been regenerated (or reviewed and accepted) via AI tooling
-- [ ] All output adheres to the `0 0 32 32` viewBox and color-constant constraints from Task 6B
-- [ ] No sprite still contains programmer-drawn placeholder geometry unless explicitly accepted
-- [ ] A brief note in the sprite's comment indicates it was AI-generated (e.g. `// AI-generated`)
+- [x] Every sprite in `SPRITES` has been regenerated (or reviewed and accepted) via AI tooling
+- [x] All output adheres to the `0 0 32 32` viewBox and color-constant constraints from Task 6B
+- [x] No sprite still contains programmer-drawn placeholder geometry unless explicitly accepted
+- [x] A brief note in the sprite's comment indicates it was AI-generated (e.g. `// AI-generated`)
 
 ---
 

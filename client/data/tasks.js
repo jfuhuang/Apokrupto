@@ -503,18 +503,16 @@ export const TASKS = [
   {
     id: 'david_and_goliath',
     title: 'David & Goliath',
-    synopsis: 'Sling a stone at Goliath! Trace a circular arc and release at the right moment.',
+    synopsis: 'Wind up the sling! Circle the stone around Goliath to build momentum.',
     reference: '1 Samuel 17:49',
     mechanic: MECHANIC.SLING,
     taskType: TASK_TYPE.FREE_ROAM,
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 60, dead: 36 },
     difficulty: 'medium',
-    timeLimit: 30,
+    timeLimit: 8,
     config: {
-      attempts: 3,
-      targetRadius: 60,
-      minVelocity: 300,
+      circles: 2,
     },
   },
   {
@@ -527,9 +525,25 @@ export const TASKS = [
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 120, dead: 72 },
     difficulty: 'easy',
-    timeLimit: 20,
+    timeLimit: 8,
     config: {
       items: ['Cloak', 'Parchments', 'Books'],
+    },
+  },
+  {
+    id: 'wolves_in_sheeps_clothing',
+    title: "Wolves in Sheep's Clothing",
+    synopsis: "False prophets lurk among the flock. Tap every wolf hiding among the sheep!",
+    reference: 'Matthew 7:15',
+    mechanic: MECHANIC.COLLECT,
+    taskType: TASK_TYPE.STATION,
+    category: TASK_CATEGORY.CHALLENGES,
+    points: { alive: 150, dead: 90 },
+    difficulty: 'medium',
+    timeLimit: 8,
+    config: {
+      wolves: 4,
+      sheep: 16,
     },
   },
   {
@@ -542,7 +556,7 @@ export const TASKS = [
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 100, dead: 60 },
     difficulty: 'easy',
-    timeLimit: 30,
+    timeLimit: 8,
     config: {
       snapTolerance: 60,
     },
@@ -559,7 +573,7 @@ export const TASKS = [
     difficulty: 'hard',
     timeLimit: 0,
     config: {
-      waveDuration: 25000,
+      waveDuration: 8000,
       maxMisses: 3,
     },
   },
@@ -573,9 +587,9 @@ export const TASKS = [
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 50, dead: 30 },
     difficulty: 'easy',
-    timeLimit: 10,
+    timeLimit: 8,
     config: {
-      targetTaps: 30,
+      targetTaps: 20,
     },
   },
   {
@@ -588,7 +602,7 @@ export const TASKS = [
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 110, dead: 66 },
     difficulty: 'easy',
-    timeLimit: 15,
+    timeLimit: 8,
     config: {
       items: ['Manna piece', 'Manna piece', 'Manna piece'],
     },
@@ -603,9 +617,9 @@ export const TASKS = [
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 130, dead: 78 },
     difficulty: 'medium',
-    timeLimit: 12,
+    timeLimit: 8,
     config: {
-      targetTaps: 50,
+      targetTaps: 25,
     },
   },
   {
@@ -618,7 +632,7 @@ export const TASKS = [
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 120, dead: 72 },
     difficulty: 'medium',
-    timeLimit: 30,
+    timeLimit: 8,
     config: {
       snapTolerance: 50,
     },
@@ -663,7 +677,7 @@ export const TASKS = [
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 140, dead: 84 },
     difficulty: 'hard',
-    timeLimit: 45,
+    timeLimit: 8,
     config: {
       snapTolerance: 40,
     },
@@ -695,7 +709,7 @@ export const TASKS = [
     difficulty: 'hard',
     timeLimit: 0,
     config: {
-      waveDuration: 20000,
+      waveDuration: 8000,
       maxMisses: 3,
     },
   },
@@ -709,9 +723,9 @@ export const TASKS = [
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 60, dead: 36 },
     difficulty: 'medium',
-    timeLimit: 10,
+    timeLimit: 8,
     config: {
-      targetTaps: 40,
+      targetTaps: 25,
     },
   },
   {
@@ -726,7 +740,7 @@ export const TASKS = [
     difficulty: 'hard',
     timeLimit: 0,
     config: {
-      duration: 10,
+      duration: 7,
     },
   },
   {
@@ -741,7 +755,7 @@ export const TASKS = [
     difficulty: 'hard',
     timeLimit: 0,
     config: {
-      waveDuration: 22000,
+      waveDuration: 8000,
       maxMisses: 3,
     },
   },
@@ -755,7 +769,7 @@ export const TASKS = [
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 100, dead: 60 },
     difficulty: 'medium',
-    timeLimit: 18,
+    timeLimit: 8,
     config: {
       items: ['Stone', 'Stone', 'Stone', 'Stone', 'Stone', 'Stone', 'Stone', 'Stone', 'Stone', 'Stone', 'Stone', 'Stone'],
     },
@@ -817,9 +831,9 @@ export const TASKS = [
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 130, dead: 78 },
     difficulty: 'medium',
-    timeLimit: 60,
+    timeLimit: 8,
     config: {
-      brickCount: 6,
+      brickCount: 8,
       snapTolerance: 55,
     },
   },
@@ -833,9 +847,9 @@ export const TASKS = [
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 150, dead: 90 },
     difficulty: 'hard',
-    timeLimit: 75,
+    timeLimit: 8,
     config: {
-      brickCount: 8,
+      brickCount: 12,
       snapTolerance: 45,
     },
   },

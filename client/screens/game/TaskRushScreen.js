@@ -24,8 +24,10 @@ import GuardTask from '../tasks/mechanics/GuardTask';
 import RapidTapTask from '../tasks/mechanics/RapidTapTask';
 import HoldTask from '../tasks/mechanics/HoldTask';
 import TraceTask from '../tasks/mechanics/TraceTask';
+import PatienceTask from '../tasks/mechanics/PatienceTask';
+import BuildTask from '../tasks/mechanics/BuildTask';
 
-const RUSH_RESULT_MS = 800;
+const RUSH_RESULT_MS = 350;
 const CHALLENGE_TASKS = TASKS.filter((t) => t.category === TASK_CATEGORY.CHALLENGES);
 
 function shuffled(arr) {
@@ -231,6 +233,8 @@ export default function TaskRushScreen({
       case MECHANIC.RAPID_TAP:  return <RapidTapTask {...props} />;
       case MECHANIC.HOLD:       return <HoldTask {...props} />;
       case MECHANIC.TRACE:      return <TraceTask {...props} />;
+      case MECHANIC.PATIENCE:   return <PatienceTask {...props} />;
+      case MECHANIC.BUILD:      return <BuildTask {...props} />;
       default:                  return null;
     }
   };

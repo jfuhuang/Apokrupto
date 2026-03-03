@@ -17,10 +17,22 @@ const BRICK_COLORS = [
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function computeSlotPositions(count, areaW, areaH) {
+// Compute the largest brick size that fits both width and height zones.
+// Source bricks (2 rows) must not extend below areaH.
+function computeBrickSize(count, areaW, areaH) {
   const cols = Math.ceil(count / 2);
-  const bW   = (areaW - 2 * WALL_MARGIN - (cols - 1) * MORTAR) / cols;
-  const bH   = Math.round(bW / 2.2);
+  // Width-driven size
+  const bWFromW = (areaW - 2 * WALL_MARGIN - (cols - 1) * MORTAR) / cols;
+  const bHFromW = bWFromW / 2.2;
+  // Height-driven size: SOURCE_TOP*areaH + 2*bH + MORTAR + 12 <= areaH
+  const bHFromH = ((1 - SOURCE_TOP) * areaH - MORTAR - 12) / 2;
+  const bH = Math.floor(Math.min(bHFromW, bHFromH));
+  const bW = Math.floor(bH * 2.2);
+  return { bW, bH };
+}
+
+function computeSlotPositions(count, areaW, areaH, bW, bH) {
+  const cols = Math.ceil(count / 2);
   const topY = areaH * WALL_TOP;
 
   return Array.from({ length: count }, (_, i) => {
@@ -72,12 +84,14 @@ function BuildTaskInner({ config, onSuccess, taskId, areaW, areaH }) {
   const [dragTop, setDragTop]         = useState(-1); // index currently being dragged
 
   // Compute positions once
-  const slots = useMemo(
-    () => computeSlotPositions(brickCount, areaW, areaH),
+  const { bW, bH } = useMemo(
+    () => computeBrickSize(brickCount, areaW, areaH),
     [brickCount, areaW, areaH],
   );
-  const bW = slots[0].w;
-  const bH = slots[0].h;
+  const slots = useMemo(
+    () => computeSlotPositions(brickCount, areaW, areaH, bW, bH),
+    [brickCount, areaW, areaH, bW, bH],
+  );
   const sources = useMemo(
     () => computeSourcePositions(brickCount, areaW, areaH, bW, bH),
     [brickCount, areaW, areaH, bW, bH],
