@@ -380,7 +380,7 @@ function ScriptureBlankTaskInner({ config, onSuccess, onFail, areaW, areaH }) {
         );
       })}
 
-      {/* ── Draggable tiles ── */
+      {/* ── Draggable tiles ── */}
       {renderOrder.map(i => {
         const isPlaced = placedSlots[i] !== null;
         return (

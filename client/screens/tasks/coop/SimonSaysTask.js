@@ -490,7 +490,10 @@ SimonSaysTask.propTypes = {
 
 // ── Styles ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({\n\n  // ── Player B pick view ──────────────────────────────────────────\n  bPickTitle: {
+const styles = StyleSheet.create({
+
+  // ── Player B pick view ──────────────────────────────────────────
+  bPickTitle: {
     fontFamily: fonts.display.bold,
     fontSize: 22,
     letterSpacing: 4,
