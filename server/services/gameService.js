@@ -24,7 +24,7 @@ const VOTING_DURATION_MS = votingService.VOTING_DURATION_MS;
 const _movementBAssignments = new Map(); // gameId → Map<userId, taskId>
 const _movementBTimers       = new Map(); // gameId → timeoutId
 const _movementBEndTimes     = new Map(); // gameId → endsAt (epoch ms)
-const MOVEMENT_B_DURATION_MS = 300_000;  // 5 minutes
+const MOVEMENT_B_DURATION_MS = 180_000;  // 3 minutes
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -81,25 +81,47 @@ function shuffle(arr) {
   return a;
 }
 
+/**
+ * Compute how many groups (and thus how many Skotia) to create for n players.
+ * Targets group size ~5 but guarantees a minimum of 4 per group.
+ * Returns the number of groups, which equals the number of Skotia players needed.
+ */
+function computeGroupCount(n) {
+  let k = Math.ceil(n / 5); // start with smallest number of groups targeting size 5
+  // Reduce group count until every group has at least 4 members
+  while (k > 1 && Math.floor(n / k) < 4) k--;
+  return Math.max(1, k);
+}
+
 function assignTeams(userIds) {
   const shuffled = shuffle(userIds);
-  const skotiaCount = Math.floor(shuffled.length / 5);
+  // One Skotia per group so every group has 1 hidden player
+  const skotiaCount = computeGroupCount(shuffled.length);
   return {
     skotia: shuffled.slice(0, skotiaCount),
     phos:   shuffled.slice(skotiaCount),
   };
 }
 
-// Builds groups: 1 Skotia + 4 Phos each, returns array of group records.
-// Inserts game_groups + game_group_members rows using the provided client.
+// Builds groups: 1 Skotia + N Phos each (N may vary to ensure every player is placed).
+// Groups will always have at least 4 members. Inserts game_groups + game_group_members.
 async function _assignGroups(client, gameId, roundNumber, phosIds, skotiaIds) {
   const phos   = shuffle([...phosIds]);
   const skotia = shuffle([...skotiaIds]);
-  const groups = [];
+  const numGroups = skotia.length; // always 1 Skotia per group
 
-  for (let i = 0; i < skotia.length; i++) {
-    const phosSlice = phos.slice(i * 4, (i + 1) * 4);
-    const members   = [skotia[i], ...phosSlice];
+  // Distribute all Phos evenly: first (phos.length % numGroups) groups get one extra
+  const base  = Math.floor(phos.length / numGroups);
+  const extra = phos.length % numGroups;
+
+  const groups = [];
+  let phosIdx = 0;
+
+  for (let i = 0; i < numGroups; i++) {
+    const phosCount = base + (i < extra ? 1 : 0);
+    const phosSlice = phos.slice(phosIdx, phosIdx + phosCount);
+    phosIdx += phosCount;
+    const members = [skotia[i], ...phosSlice];
 
     const groupRes = await client.query(
       'INSERT INTO game_groups (game_id, round_number, group_index) VALUES ($1, $2, $3) RETURNING id',
@@ -772,7 +794,7 @@ async function _resolveVoting(client, gameId, roundNumber) {
     );
   }
 
-  // Skotia survival bonus: +100 per undetected Skotia
+  // Skotia survival bonus: per undetected Skotia (POINTS.SKOTIA_SURVIVAL_PER_PLAYER)
   const survivalRes = await client.query(
     `SELECT COUNT(*) AS count FROM game_players
      WHERE game_id = $1 AND team = 'skotia' AND is_marked = false`,
