@@ -23,10 +23,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
 } from 'react-native';
 import PropTypes from 'prop-types';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 // ── Colour constants ────────────────────────────────────────────────────────
@@ -272,7 +272,7 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
                                   colors.text.muted;
 
     return (
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <TaskContainer style={{ padding: 20 }}>
         <Text style={[styles.resolvedTitle, { color: success ? winColor : colors.state.error }]}>
           {success ? '✓  CORRECT!' : '✕  NO MATCH'}
         </Text>
@@ -305,7 +305,7 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
             <PatternDots pattern={inputSequence} />
           </>
         )}
-      </ScrollView>
+      </TaskContainer>
     );
   }
 
@@ -314,10 +314,10 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
     // B selected a team, waiting for server to send patternLocked
     if (selectedTeam && !lockedPattern) {
       return (
-        <View style={styles.container}>
+        <TaskContainer>
           <Text style={styles.waitTitle}>Pattern locked in...</Text>
           <Text style={styles.waitSub}>Tell your partner the order verbally!</Text>
-        </View>
+        </TaskContainer>
       );
     }
 
@@ -328,7 +328,7 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
       const currentFlash = lockedPattern[animStep] ?? null;
 
       return (
-        <View style={styles.container}>
+        <TaskContainer>
           <Text style={[styles.bPatternTitle, { color: teamColor }]}>{teamLabel} PATTERN</Text>
           <Text style={styles.instruction}>Tell your partner to tap in this order:</Text>
 
@@ -345,24 +345,24 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
           <ColorGrid highlighted={currentFlash} />
 
           <Text style={styles.waitSub}>Waiting for Player A to input...</Text>
-        </View>
+        </TaskContainer>
       );
     }
 
     // B hasn't selected yet → show both pattern cards
     if (!simonPatterns) {
       return (
-        <View style={styles.container}>
+        <TaskContainer>
           <Text style={styles.waitTitle}>SIMON SAYS</Text>
           <Text style={styles.waitSub}>Preparing patterns…</Text>
-        </View>
+        </TaskContainer>
       );
     }
 
     const { phosPattern, skotiaPattern } = simonPatterns;
 
     return (
-      <ScrollView contentContainerStyle={styles.bPickContainer} showsVerticalScrollIndicator={false}>
+      <TaskContainer style={{ paddingBottom: 32, gap: 14 }}>
         <Text style={styles.bPickTitle}>SIMON SAYS</Text>
         <Text style={styles.bPickSub}>
           You are the Reader. Choose which pattern to give your partner.{'\n'}
@@ -381,7 +381,7 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
           onSelect={handleSelectTeam}
           disabled={!!selectedTeam}
         />
-      </ScrollView>
+      </TaskContainer>
     );
   }
 
@@ -390,17 +390,17 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
     // Submitted, waiting for result
     if (submitted) {
       return (
-        <View style={styles.container}>
+        <TaskContainer>
           <Text style={styles.waitTitle}>Checking…</Text>
           <PatternDots pattern={inputSeq} />
-        </View>
+        </TaskContainer>
       );
     }
 
     // Waiting for Player B to lock in a pattern
     if (!inputReady) {
       return (
-        <View style={styles.container}>
+        <TaskContainer>
           <Text style={styles.aTitle}>SIMON SAYS</Text>
           <Text style={styles.aWaitSub}>
             Your partner is choosing a pattern to tell you.
@@ -409,7 +409,7 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
             Listen carefully — they will read you the order!
           </Text>
           <ColorGrid />
-        </View>
+        </TaskContainer>
       );
     }
 
@@ -417,7 +417,7 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
     const isComplete = inputSeq.length === seqLen;
 
     return (
-      <View style={styles.container}>
+      <TaskContainer>
         <Text style={styles.aTitle}>SIMON SAYS</Text>
         <Text style={styles.aInstruction}>
           Tap the colours in the order your partner says
@@ -470,7 +470,7 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
             <Text style={styles.submitBtnText}>SUBMIT</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </TaskContainer>
     );
   }
 
@@ -490,23 +490,7 @@ SimonSaysTask.propTypes = {
 
 // ── Styles ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-  },
-
-  // ── Player B pick view ──────────────────────────────────────────
-  bPickContainer: {
-    padding: 16,
-    paddingBottom: 32,
-    alignItems: 'center',
-    gap: 14,
-  },
-  bPickTitle: {
+const styles = StyleSheet.create({\n\n  // ── Player B pick view ──────────────────────────────────────────\n  bPickTitle: {
     fontFamily: fonts.display.bold,
     fontSize: 22,
     letterSpacing: 4,

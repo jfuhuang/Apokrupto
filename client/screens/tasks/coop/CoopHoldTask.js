@@ -7,6 +7,7 @@ import {
   Animated,
 } from 'react-native';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 export default function CoopHoldTask({ task, role, currentTeam, onAction, update }) {
@@ -107,14 +108,14 @@ export default function CoopHoldTask({ task, role, currentTeam, onAction, update
   if (update?.phase === 'resolved') {
     const success = update.success;
     return (
-      <View style={styles.container}>
+      <TaskContainer>
         <Text style={[styles.resultTitle, { color: success ? colors.state.success : colors.primary.neonRed }]}>
           {success ? 'SYNCHRONIZED!' : 'OUT OF SYNC!'}
         </Text>
         <Text style={[styles.resultPoints, { color: success ? colors.state.success : colors.text.tertiary }]}>
           +{update.pointsAwarded ?? 0}
         </Text>
-      </View>
+      </TaskContainer>
     );
   }
 
@@ -129,7 +130,7 @@ export default function CoopHoldTask({ task, role, currentTeam, onAction, update
   });
 
   return (
-    <View style={styles.container}>
+    <TaskContainer style={{ gap: 14 }}>
       <Text style={[styles.timer, timeLeft <= 5 && { color: colors.primary.neonRed }]}>
         {timeLeft}s
       </Text>
@@ -189,18 +190,11 @@ export default function CoopHoldTask({ task, role, currentTeam, onAction, update
           {holding ? 'HOLDING...' : 'HOLD HERE'}
         </Text>
       </Pressable>
-    </View>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 14,
-  },
   timer: {
     fontFamily: fonts.accent.bold,
     fontSize: 28,
