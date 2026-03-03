@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
@@ -33,9 +34,11 @@ export default function VotingScreen({
   const [susResults, setSusResults] = useState([]); // [{ playerId, username, action }]
   const [submitting, setSubmitting] = useState(false);
   const [votingSecondsLeft, setVotingSecondsLeft] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const socketRef = useRef(null);
   const votingTimerRef = useRef(null);
+  const safetyExitedRef = useRef(false);
 
   const others = (groupMembers || []).filter((m) => String(m.id) !== String(currentUserId));
 
@@ -116,6 +119,58 @@ export default function VotingScreen({
       }
     };
   }, [gameId, groupId, lobbyId, token]);
+
+  // ── 3s safety-net poll: detect movement advance or game over ──────────────
+  useEffect(() => {
+    if (!token || !gameId) return;
+    safetyExitedRef.current = false;
+    const poll = async () => {
+      if (safetyExitedRef.current) return;
+      try {
+        const baseUrl = await getApiUrl();
+        const res = await fetch(`${baseUrl}/api/games/${gameId}/state`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.gameStatus === 'completed') {
+          if (safetyExitedRef.current) return;
+          safetyExitedRef.current = true;
+          if (onGameOver) onGameOver({ winner: data.winner, condition: data.winCondition, phosPoints: data.teamPoints?.phos ?? 0, skotiaPoints: data.teamPoints?.skotia ?? 0 });
+        } else if (data.currentMovement && data.currentMovement !== 'C') {
+          if (safetyExitedRef.current) return;
+          safetyExitedRef.current = true;
+          if (data.currentMovement === 'B' && onMovementReady) {
+            onMovementReady('B', null, null, null, { movementBEndsAt: data.movementBEndsAt });
+          }
+        }
+      } catch { /* non-fatal */ }
+    };
+    const id = setInterval(poll, 3000);
+    return () => clearInterval(id);
+  }, [token, gameId]);
+
+  // ── Pull-to-refresh ───────────────────────────────────────────────────────
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const baseUrl = await getApiUrl();
+      const res = await fetch(`${baseUrl}/api/games/${gameId}/state`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      // Re-sync voting timer if the votingReady socket was missed (using deliberationEndsAt
+      // as a proxy isn't available here, so we just confirm we're still in movement C)
+      if (data.currentMovement !== 'C' && data.gameStatus !== 'completed') {
+        // state has moved on — let safety poll handle the transition
+      }
+    } catch (err) {
+      console.warn('[Voting] Refresh error:', err.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Tap cycles: unset → phos (blue) → skotia (red) → phos → ...
   const toggleVote = (playerId) => {
@@ -250,6 +305,14 @@ export default function VotingScreen({
             <ScrollView
               contentContainerStyle={styles.cardGrid}
               showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  tintColor={colors.primary.electricBlue}
+                  colors={[colors.primary.electricBlue]}
+                />
+              }
             >
               {others.map(renderVoteCard)}
             </ScrollView>
