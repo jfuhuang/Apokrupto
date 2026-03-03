@@ -8,7 +8,14 @@ const jsonHeaders = { 'Content-Type': 'application/json' };
 async function request(path, options = {}) {
   const baseUrl = await getApiUrl();
   const url = `${baseUrl}${path}`;
-  const res = await fetch(url, options);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+  let res;
+  try {
+    res = await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
   let data;
   try {
     data = await res.json();

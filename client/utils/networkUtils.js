@@ -49,7 +49,15 @@ export const getApiUrl = async () => {
         return `http://${networkIp}:${port}`;
       }
     } else if (Platform.OS === 'ios') {
-      return `http://localhost:${port}`;
+      // Physical iPhone (Expo Go) - use dynamic IP detection
+      // (localhost only works for the Xcode Simulator, not real devices)
+      const isSimulator = !Constants.isDevice;
+      if (isSimulator) {
+        return `http://localhost:${port}`;
+      } else {
+        const networkIp = await getNetworkIp();
+        return `http://${networkIp}:${port}`;
+      }
     }
   }
   
