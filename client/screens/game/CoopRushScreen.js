@@ -11,12 +11,15 @@ import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
+import { useGame } from '../../context/GameContext';
 import { COOP_TASK_LABELS, COOP_TASK_ICONS } from '../../data/coopTasks';
+import { MOVEMENT_B_DURATION_MS } from '../../constants/timings';
 import DeceptionTask from '../tasks/coop/DeceptionTask';
 import SecretBallotTask from '../tasks/coop/SecretBallotTask';
 import CoopTapTask from '../tasks/coop/CoopTapTask';
 import CoopHoldTask from '../tasks/coop/CoopHoldTask';
 import SimonSaysTask from '../tasks/coop/SimonSaysTask';
+import TaskLayoutWrapper from '../../components/TaskLayoutWrapper';
 
 export default function CoopRushScreen({
   token,
@@ -32,6 +35,8 @@ export default function CoopRushScreen({
   initialTask,
   onSessionEnd,
 }) {
+  const { setSocketConnected } = useGame();
+
   const socketRef = useRef(null);
   const [currentTask, setCurrentTask] = useState(initialTask);
   const [taskUpdate, setTaskUpdate] = useState(null);
@@ -41,6 +46,7 @@ export default function CoopRushScreen({
   const [showResult, setShowResult] = useState(false);
   const [simonPatterns, setSimonPatterns] = useState(null);
   const endsAtRef = useRef(null);
+  const totalDurationRef = useRef(MOVEMENT_B_DURATION_MS);
   const sessionEndedRef = useRef(false);
   const timerBarAnim = useRef(new Animated.Value(1)).current;
   const resultFadeAnim = useRef(new Animated.Value(0)).current;
@@ -48,41 +54,36 @@ export default function CoopRushScreen({
   const teamColor =
     currentTeam === 'skotia' ? colors.primary.neonRed : colors.primary.electricBlue;
 
-  // Timer
+  // Timer — driven entirely by epoch timestamp so all devices stay in sync
   const startCountdown = useCallback((endsAt) => {
     if (!endsAt) return;
     endsAtRef.current = endsAt;
-    const totalMs = endsAt - Date.now();
-    if (totalMs <= 0) return;
-    setSecondsLeft(Math.ceil(totalMs / 1000));
-    timerBarAnim.setValue(totalMs / (5 * 60 * 1000));
-    Animated.timing(timerBarAnim, {
-      toValue: 0,
-      duration: totalMs,
-      useNativeDriver: false,
-    }).start();
-  }, [timerBarAnim]);
+    const remaining = endsAt - Date.now();
+    totalDurationRef.current = Math.max(remaining, MOVEMENT_B_DURATION_MS);
+    setSecondsLeft(Math.max(0, Math.ceil(remaining / 1000)));
+  }, []);
 
   useEffect(() => {
     if (movementBEndsAt) startCountdown(movementBEndsAt);
   }, [movementBEndsAt, startCountdown]);
 
+  // Single 250ms tick drives both the text counter and the progress bar
   useEffect(() => {
     if (secondsLeft === null) return;
-    if (secondsLeft <= 0) return;
     const id = setInterval(() => {
       const remaining = endsAtRef.current
-        ? Math.ceil((endsAtRef.current - Date.now()) / 1000)
+        ? Math.max(0, endsAtRef.current - Date.now())
         : 0;
-      const next = Math.max(0, remaining);
-      setSecondsLeft(next);
-      if (next <= 0 && !sessionEndedRef.current) {
+      const secs = Math.ceil(remaining / 1000);
+      setSecondsLeft(secs);
+      timerBarAnim.setValue(remaining / totalDurationRef.current);
+      if (remaining <= 0 && !sessionEndedRef.current) {
         sessionEndedRef.current = true;
         onSessionEnd({ reason: 'movementEnd', sessionPoints: sessionPointsRef.current, teamPoints: null });
       }
-    }, 1000);
+    }, 250);
     return () => clearInterval(id);
-  }, [secondsLeft !== null]);
+  }, [secondsLeft !== null, timerBarAnim]);
 
   // Socket connection
   useEffect(() => {
@@ -93,10 +94,12 @@ export default function CoopRushScreen({
         auth: { token },
         transports: ['polling', 'websocket'],
         reconnection: true,
+        forceNew: true,
       });
       socketRef.current = socket;
 
       socket.on('connect', () => {
+        setSocketConnected(true);
         socket.emit('joinRoom', { lobbyId });
         if (sessionId) {
           socket.emit('coopRejoin', { sessionId }, (res) => {
@@ -156,6 +159,7 @@ export default function CoopRushScreen({
 
     connect().catch(console.error);
     return () => {
+      setSocketConnected(false);
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -270,9 +274,9 @@ export default function CoopRushScreen({
         </Text>
 
         {/* Task area */}
-        <View style={styles.taskArea}>
+        <TaskLayoutWrapper noPadding>
           {renderTask()}
-        </View>
+        </TaskLayoutWrapper>
 
         {/* Result overlay */}
         {showResult && (
@@ -355,11 +359,6 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     textAlign: 'center',
     paddingVertical: 4,
-  },
-
-  // Task area
-  taskArea: {
-    flex: 1,
   },
 
   // Unknown task

@@ -7,6 +7,8 @@ import { fetchPlayerGameState } from '../../utils/api';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
 import SusIcon from '../../components/SusIcon';
+import { useGame } from '../../context/GameContext';
+import logger from '../../utils/logger';
 
 export default function RoundSummaryScreen({
   roundNumber,
@@ -20,6 +22,8 @@ export default function RoundSummaryScreen({
   onRoundSetup,
   onGameOver,
 }) {
+  const { setSocketConnected } = useGame();
+
   const socketRef = useRef(null);
   const gameOverFiredRef = useRef(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -45,6 +49,7 @@ export default function RoundSummaryScreen({
       socketRef.current = socket;
 
       socket.on('connect', () => {
+        setSocketConnected(true);
         socket.emit('joinRoom', { lobbyId });
       });
 
@@ -55,11 +60,13 @@ export default function RoundSummaryScreen({
 
       // Game ended (final round or supermajority hit after this summary)
       socket.on('gameOver', (result) => {
+        logger.game('RoundSummary', `gameOver — winner: ${result?.winner}`, result);
         fireGameOver(result);
       });
     };
-    connect().catch(console.error);
+    connect().catch((err) => logger.error('RoundSummary', 'socket connect failed', err));
     return () => {
+      setSocketConnected(false);
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -111,7 +118,7 @@ export default function RoundSummaryScreen({
         // A new round started — the roundSetup socket event will handle navigation
       }
     } catch (err) {
-      console.warn('[RoundSummary] Refresh error:', err.message);
+      logger.error('RoundSummary', 'pull-to-refresh failed', err);
     } finally {
       setRefreshing(false);
     }

@@ -13,11 +13,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
+import logger from '../../utils/logger';
 import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { fetchLobbyPlayers, fetchCurrentLobby, leaveLobby as apiLeaveLobby, addDummyPlayer, kickPlayer as apiKickPlayer } from '../../utils/api';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
+import { useGame } from '../../context/GameContext';
 
 // One color per player slot, assigned by join order (max 15 players)
 const PLAYER_COLORS = [
@@ -38,6 +40,8 @@ function parseJwt(token) {
 export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, onRoleAssigned, onGameStarted, onRejoinGame }) {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
+
+  const { setSocketConnected: setGlobalConnected } = useGame();
 
   const [players, setPlayers] = useState([]);
   const [lobbyInfo, setLobbyInfo] = useState(null);
@@ -70,7 +74,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
         onRejoinGame(data.lobby.team || null, data.lobby.isGm || false);
       }
     } catch (err) {
-      console.error('[LobbyScreen] rejoin error:', err);
+      logger.error('Lobby', 'rejoin failed', err);
     }
   };
 
@@ -106,7 +110,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
         }));
       });
     } catch (err) {
-      console.error('[LobbyScreen] Poll error:', err);
+      logger.poll('Lobby', `poll failed: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -129,14 +133,16 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
       socketRef.current = socket;
 
       socket.on('connect', () => {
-        console.log('[WS] Connected');
         setSocketConnected(true);
+        setGlobalConnected(true);
+        logger.socket('Lobby', 'connected');
         socket.emit('joinRoom', { lobbyId });
       });
 
       socket.on('disconnect', () => {
-        console.log('[WS] Disconnected');
         setSocketConnected(false);
+        setGlobalConnected(false);
+        logger.socket('Lobby', 'disconnected');
       });
 
       socket.on('lobbyUpdate', (state) => {
@@ -162,6 +168,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
       });
 
       socket.on('roleAssigned', ({ team, skotiaTeammates, isGm, groupId, groupNumber, groupMembers }) => {
+        logger.game('Lobby', `roleAssigned — team: ${team}, isGm: ${isGm}`);
         if (onRoleAssigned) onRoleAssigned(
           team,
           skotiaTeammates || [],
@@ -173,6 +180,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
       });
 
       socket.on('gameStarted', ({ gameId } = {}) => {
+        logger.game('Lobby', `gameStarted — gameId: ${gameId}`);
         if (onGameStarted) onGameStarted(gameId || null);
       });
 
@@ -183,16 +191,12 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
       });
 
       socket.on('connect_error', (err) => {
-        console.error('[WS] Connection error:', {
-          message: err.message,
-          data: err.data,
-          type: err.type,
-        });
+        logger.error('Lobby', `connection error: ${err.message}`, { data: err.data, type: err.type });
         setSocketConnected(false);
       });
 
       socket.on('error', (err) => {
-        console.error('[WS] Socket error:', err);
+        logger.error('Lobby', 'socket error', err);
         setSocketConnected(false);
       });
     };
@@ -201,13 +205,14 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
     fetchPlayers();
 
     connect().catch((err) => {
-      console.error('[LobbyScreen] Socket connection failed:', err);
+      logger.error('Lobby', 'socket connect failed', err);
     });
 
     // 10-second polling as the main authority for lobby membership
     pollRef.current = setInterval(fetchPlayers, 10000);
 
     return () => {
+      setGlobalConnected(false);
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -282,7 +287,7 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
       await SecureStore.deleteItemAsync('jwtToken');
       onLogout();
     } catch (err) {
-      console.error('Logout error:', err);
+      logger.error('Lobby', 'logout failed', err);
     }
   };
 

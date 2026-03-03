@@ -13,7 +13,9 @@ import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
 import { MOVEMENT_NAMES } from '../../constants/movementNames';
+import logger from '../../utils/logger';
 import SusIcon from '../../components/SusIcon';
+import { useGame } from '../../context/GameContext';
 
 export default function VotingScreen({
   token,
@@ -36,9 +38,11 @@ export default function VotingScreen({
   const [votingSecondsLeft, setVotingSecondsLeft] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  const { setSocketConnected } = useGame();
+
   const socketRef = useRef(null);
-  const votingTimerRef = useRef(null);
   const safetyExitedRef = useRef(false);
+  const votingTimerRef = useRef(null);
 
   const others = (groupMembers || []).filter((m) => String(m.id) !== String(currentUserId));
 
@@ -55,6 +59,8 @@ export default function VotingScreen({
       socketRef.current = socket;
 
       socket.on('connect', () => {
+        setSocketConnected(true);
+        logger.socket('Voting', 'connected');
         socket.emit('joinRoom', { lobbyId: groupId }); // group room for votingComplete
         if (lobbyId) socket.emit('joinRoom', { lobbyId }); // lobby room for movementComplete + votingReady
       });
@@ -73,6 +79,7 @@ export default function VotingScreen({
 
       // Per-group sus results — show preview; Challenges Stage (B) follows next
       socket.on('votingComplete', ({ susResults: results }) => {
+        logger.game('Voting', 'votingComplete received', results ?? []);
         setSusResults(results || []);
         setPhase('preview');
         clearInterval(votingTimerRef.current);
@@ -90,6 +97,7 @@ export default function VotingScreen({
       // Challenges Stage (B) is starting — navigate away from Voting screen
       // In the A→C→B order, B always follows C, so this drives the transition.
       socket.on('movementStart', ({ movement, movementBEndsAt }) => {
+        logger.game('Voting', `movementStart → ${movement}`);
         if (movement === 'B') {
           if (onMovementReady) onMovementReady('B', null, null, null, { movementBEndsAt });
         }
@@ -103,15 +111,17 @@ export default function VotingScreen({
 
       // Game ended directly (supermajority or edge case) — forward to App.js
       socket.on('gameOver', (result) => {
+        logger.game('Voting', `gameOver — winner: ${result?.winner}`, result);
         if (onGameOver) onGameOver(result);
       });
 
-      socket.on('connect_error', (err) => console.warn('[Voting] Socket error:', err.message));
+      socket.on('connect_error', (err) => logger.error('Voting', `socket error: ${err.message}`));
     };
 
-    connect().catch(console.error);
+    connect().catch((err) => logger.error('Voting', 'socket connect failed', err));
 
     return () => {
+      setSocketConnected(false);
       clearInterval(votingTimerRef.current);
       if (socketRef.current) {
         socketRef.current.disconnect();
@@ -166,7 +176,7 @@ export default function VotingScreen({
         // state has moved on — let safety poll handle the transition
       }
     } catch (err) {
-      console.warn('[Voting] Refresh error:', err.message);
+      logger.error('Voting', 'pull-to-refresh failed', err);
     } finally {
       setRefreshing(false);
     }
@@ -197,7 +207,7 @@ export default function VotingScreen({
         body: JSON.stringify({ votes: myVotes }),
       });
     } catch (err) {
-      console.warn('[Voting] Submit error:', err.message);
+      logger.error('Voting', 'vote submit failed', err);
       setPhase('voting');
     } finally {
       setSubmitting(false);

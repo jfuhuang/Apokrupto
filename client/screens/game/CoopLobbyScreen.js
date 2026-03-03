@@ -12,6 +12,7 @@ import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
+import { useGame } from '../../context/GameContext';
 
 function parseJwt(token) {
   try {
@@ -34,6 +35,7 @@ export default function CoopLobbyScreen({
   onBack,
 }) {
   const socketRef = useRef(null);
+  const [socketConnected, setSocketConnected] = useState(false);
   const [sentInvite, setSentInvite] = useState(null); // { inviteId, targetUserId }
   const [incomingInvite, setIncomingInvite] = useState(null); // { inviteId, fromUserId, fromUsername }
   const [secondsLeft, setSecondsLeft] = useState(null);
@@ -90,10 +92,12 @@ export default function CoopLobbyScreen({
         auth: { token },
         transports: ['polling', 'websocket'],
         reconnection: true,
+        forceNew: true,
       });
       socketRef.current = socket;
 
       socket.on('connect', () => {
+        setSocketConnected(true);
         socket.emit('joinRoom', { lobbyId });
       });
 
@@ -133,6 +137,7 @@ export default function CoopLobbyScreen({
 
     connect().catch(console.error);
     return () => {
+      setSocketConnected(false);
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -143,10 +148,23 @@ export default function CoopLobbyScreen({
   // Actions
   const handleInvite = useCallback((targetUserId) => {
     const socket = socketRef.current;
-    if (!socket) return;
+    console.log('[CoopLobby] handleInvite called', {
+      socketExists: !!socket,
+      socketConnected: socket?.connected,
+      socketId: socket?.id,
+      gameId,
+      targetUserId,
+    });
+    if (!socket) {
+      console.warn('[CoopLobby] handleInvite: socket is null, aborting');
+      return;
+    }
     socket.emit('coopInvite', { gameId, targetUserId }, (res) => {
+      console.log('[CoopLobby] coopInvite callback:', JSON.stringify(res));
       if (res?.ok) {
         setSentInvite({ inviteId: res.inviteId, targetUserId });
+      } else {
+        console.warn('[CoopLobby] coopInvite failed:', res?.error);
       }
     });
   }, [gameId]);
@@ -203,7 +221,7 @@ export default function CoopLobbyScreen({
             style={[styles.inviteBtn, { backgroundColor: teamColor }]}
             onPress={() => handleInvite(String(item.id))}
             activeOpacity={0.7}
-            disabled={!!sentInvite}
+            disabled={!!sentInvite || !socketConnected}
           >
             <Text style={styles.inviteBtnText}>INVITE</Text>
           </TouchableOpacity>

@@ -13,6 +13,8 @@ import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
 import { MOVEMENT_NAMES, MOVEMENT_LABELS_SHORT } from '../../constants/movementNames';
 import SusIcon from '../../components/SusIcon';
+import logger from '../../utils/logger';
+import { useGame } from '../../context/GameContext';
 
 // Display order matches the new A → C → B round sequence
 const MOVEMENT_SEQUENCE = ['A', 'C', 'B'];
@@ -36,8 +38,9 @@ export default function RoundHubScreen({
   onGameOver,
   onLobbyGone,
 }) {
+  const { setSocketConnected } = useGame();
+
   const [statusMessage, setStatusMessage] = useState('Waiting for Game Master...');
-  const [socketConnected, setSocketConnected] = useState(false);
   const [liveGroupMembers, setLiveGroupMembers] = useState(currentGroupMembers || []);
   const [liveTeamPoints, setLiveTeamPoints] = useState(teamPoints || { phos: 0, skotia: 0 });
   const [activeMovement, setActiveMovement] = useState(null);
@@ -69,10 +72,14 @@ export default function RoundHubScreen({
 
       socket.on('connect', () => {
         setSocketConnected(true);
+        logger.socket('RoundHub', 'connected');
         socket.emit('joinRoom', { lobbyId });
       });
 
-      socket.on('disconnect', () => setSocketConnected(false));
+      socket.on('disconnect', () => {
+        setSocketConnected(false);
+        logger.socket('RoundHub', 'disconnected');
+      });
 
       socket.on('gameStateUpdate', (state) => {
         if (!state) return;
@@ -86,6 +93,7 @@ export default function RoundHubScreen({
       });
 
       socket.on('movementStart', ({ movement, groupId, groupMembers, groupNumber: gn, movementBEndsAt }) => {
+        logger.game('RoundHub', `movementStart → ${movement}`);
         setActiveMovement(movement);
         setStatusMessage(`${MOVEMENT_NAMES[movement]} beginning...`);
         if (groupMembers) setLiveGroupMembers(groupMembers);
@@ -99,6 +107,7 @@ export default function RoundHubScreen({
       });
 
       socket.on('roundSummary', (summary) => {
+        logger.game('RoundHub', 'roundSummary received', summary);
         if (onRoundSummary) onRoundSummary(summary);
       });
 
@@ -116,6 +125,7 @@ export default function RoundHubScreen({
       });
 
       socket.on('gameOver', (result) => {
+        logger.game('RoundHub', `gameOver — winner: ${result?.winner} (${result?.condition})`, result);
         if (onGameOver) onGameOver(result);
       });
 
@@ -154,14 +164,15 @@ export default function RoundHubScreen({
           );
         }
       } catch (err) {
-        console.warn('[RoundHub] Could not fetch game state:', err.message);
+        logger.poll('RoundHub', `state fetch failed: ${err.message}`);
       }
     };
 
-    connect().catch(console.error);
+    connect().catch((err) => logger.error('RoundHub', 'socket connect failed', err));
     checkActiveMovement();
 
     return () => {
+      setSocketConnected(false);
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -194,7 +205,7 @@ export default function RoundHubScreen({
         );
       }
     } catch (err) {
-      console.warn('[RoundHub] Refresh error:', err.message);
+      logger.error('RoundHub', 'pull-to-refresh failed', err);
     } finally {
       setRefreshing(false);
     }
@@ -237,7 +248,6 @@ export default function RoundHubScreen({
           </View>
 
           <View style={styles.headerRight}>
-            <View style={[styles.connDot, socketConnected ? styles.connDotOn : styles.connDotOff]} />
             <Text style={[styles.teamBadge, { color: teamColor }]}>
               {currentTeam === 'skotia' ? 'ΣΚΟΤΊΑ' : 'ΦΩΣ'}
             </Text>
@@ -407,13 +417,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 7,
   },
-  connDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  connDotOn: { backgroundColor: colors.accent.neonGreen },
-  connDotOff: { backgroundColor: colors.text.disabled },
   teamBadge: {
     fontFamily: fonts.display.bold,
     fontSize: 10,

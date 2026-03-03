@@ -16,6 +16,7 @@ import { submitMovementBTask } from '../../utils/api';
 import RushResultOverlay from '../tasks/components/RushResultOverlay';
 import SusIcon from '../../components/SusIcon';
 import TaskSprite from '../../components/TaskSprite';
+import { useGame } from '../../context/GameContext';
 
 // Mechanic components
 import SlingTask from '../tasks/mechanics/SlingTask';
@@ -62,6 +63,7 @@ export default function TaskRushScreen({
   onMovementComplete,
 }) {
   const accentColor = currentTeam === 'skotia' ? colors.primary.neonRed : colors.primary.electricBlue;
+  const { setSocketConnected } = useGame();
 
   // Task queue
   const [rushQueue, setRushQueue] = useState(() => shuffled(CHALLENGE_TASKS));
@@ -133,6 +135,7 @@ export default function TaskRushScreen({
       socketRef.current = socket;
 
       socket.on('connect', () => {
+        setSocketConnected(true);
         socket.emit('joinRoom', { lobbyId });
       });
 
@@ -151,6 +154,7 @@ export default function TaskRushScreen({
 
     connect().catch(console.error);
     return () => {
+      setSocketConnected(false);
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -519,6 +523,5 @@ const styles = StyleSheet.create({
   // ── Mechanic area ───────────────────────────────────────────────────────
   mechanicArea: {
     flex: 1,
-    paddingBottom: 8,
   },
 });

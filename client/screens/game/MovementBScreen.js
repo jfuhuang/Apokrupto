@@ -11,10 +11,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
+import logger from '../../utils/logger';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
 import { MOVEMENT_NAMES } from '../../constants/movementNames';
+import { MOVEMENT_B_DURATION_MS } from '../../constants/timings';
 import SusIcon from '../../components/SusIcon';
+import { useGame } from '../../context/GameContext';
 
 export default function MovementBScreen({
   token,
@@ -28,6 +31,8 @@ export default function MovementBScreen({
   onEnterRush,
   onEnterCoop,
 }) {
+  const { setSocketConnected } = useGame();
+
   const [activeTab, setActiveTab] = useState('rush'); // 'rush' | 'coop'
   const [sessionPoints, setSessionPoints] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(null);
@@ -35,32 +40,32 @@ export default function MovementBScreen({
   const endsAtRef = useRef(null);
   const socketRef = useRef(null);
   const timerBarAnim = useRef(new Animated.Value(1)).current;
+  const totalDurationRef = useRef(MOVEMENT_B_DURATION_MS);
   const safetyExitedRef = useRef(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const startCountdown = useCallback((endsAt) => {
     if (!endsAt) return;
     endsAtRef.current = endsAt;
-    const totalMs = endsAt - Date.now();
-    if (totalMs <= 0) return;
-    setSecondsLeft(Math.ceil(totalMs / 1000));
-    timerBarAnim.setValue(totalMs / (5 * 60 * 1000));
-    Animated.timing(timerBarAnim, {
-      toValue: 0,
-      duration: totalMs,
-      useNativeDriver: false,
-    }).start();
-  }, [timerBarAnim]);
+    // Store total duration so the bar can be drawn proportionally
+    const remaining = endsAt - Date.now();
+    totalDurationRef.current = Math.max(remaining, MOVEMENT_B_DURATION_MS);
+    setSecondsLeft(Math.max(0, Math.ceil(remaining / 1000)));
+  }, []);
 
+  // Single tick that drives both the text counter and the progress bar
   useEffect(() => {
     if (secondsLeft === null) return;
-    if (secondsLeft <= 0) return;
     const id = setInterval(() => {
-      const remaining = endsAtRef.current ? Math.ceil((endsAtRef.current - Date.now()) / 1000) : 0;
-      setSecondsLeft(Math.max(0, remaining));
-    }, 1000);
+      const remaining = endsAtRef.current
+        ? Math.max(0, endsAtRef.current - Date.now())
+        : 0;
+      const secs = Math.ceil(remaining / 1000);
+      setSecondsLeft(secs);
+      timerBarAnim.setValue(remaining / totalDurationRef.current);
+    }, 250);
     return () => clearInterval(id);
-  }, [secondsLeft !== null]);
+  }, [secondsLeft !== null, timerBarAnim]);
 
   useEffect(() => {
     if (initialEndsAt && !endsAtRef.current) {
@@ -80,10 +85,12 @@ export default function MovementBScreen({
       socketRef.current = socket;
 
       socket.on('connect', () => {
+        setSocketConnected(true);
         socket.emit('joinRoom', { lobbyId });
       });
 
       socket.on('movementStart', ({ movement, movementBEndsAt }) => {
+        logger.game('MovementB', `movementStart → ${movement}`);
         if (movement === 'B' && movementBEndsAt) {
           startCountdown(movementBEndsAt);
         }
@@ -100,12 +107,13 @@ export default function MovementBScreen({
       });
 
       socket.on('connect_error', (err) =>
-        console.warn('[MovementB] Socket error:', err.message)
+        logger.error('MovementB', `socket error: ${err.message}`)
       );
     };
 
-    connect().catch(console.error);
+    connect().catch((err) => logger.error('MovementB', 'socket connect failed', err));
     return () => {
+      setSocketConnected(false);
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -155,7 +163,7 @@ export default function MovementBScreen({
         startCountdown(data.movementBEndsAt);
       }
     } catch (err) {
-      console.warn('[MovementB] Refresh error:', err.message);
+      logger.error('MovementB', 'pull-to-refresh failed', err);
     } finally {
       setRefreshing(false);
     }

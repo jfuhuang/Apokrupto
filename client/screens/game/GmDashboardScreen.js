@@ -13,13 +13,17 @@ import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
+import logger from '../../utils/logger';
 import { MOVEMENT_NAMES } from '../../constants/movementNames';
 import SusIcon from '../../components/SusIcon';
+import { useGame } from '../../context/GameContext';
 
 export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, onLobbyGone }) {
+  const { setSocketConnected: setGlobalConnected } = useGame();
+
   const [players, setPlayers] = useState([]);
   const [groups, setGroups] = useState([]);
-  const [gameState, setGameState] = useState(null); // { round, totalRounds, movement, status }
+  const [gameState, setGameState] = useState(null);
   const [teamPoints, setTeamPoints] = useState({ phos: 0, skotia: 0 });
   const [broadcastText, setBroadcastText] = useState('');
   const [socketConnected, setSocketConnected] = useState(false);
@@ -47,7 +51,7 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
       if (data.movATurnInfo) setMovAPhase(data.movATurnInfo);
       else if (data.gameState?.movement !== 'A') setMovAPhase(null);
     } catch (err) {
-      console.warn('[GM] Poll error:', err.message);
+      logger.poll('GM', `dashboard poll failed: ${err.message}`);
     }
   };
 
@@ -65,10 +69,16 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
 
       socket.on('connect', () => {
         setSocketConnected(true);
+        setGlobalConnected(true);
+        logger.socket('GM', 'connected');
         socket.emit('joinRoom', { lobbyId });
       });
 
-      socket.on('disconnect', () => setSocketConnected(false));
+      socket.on('disconnect', () => {
+        setSocketConnected(false);
+        setGlobalConnected(false);
+        logger.socket('GM', 'disconnected');
+      });
 
       socket.on('gameStateUpdate', (state) => {
         if (state.players) setPlayers(state.players);
@@ -81,6 +91,7 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
       });
 
       socket.on('movementStart', (data) => {
+        logger.game('GM', `movementStart → ${data.movement}`);
         // Clear the turn timer when a new movement starts
         if (data.movement !== 'A') setMovAPhase(null);
         fetchState();
@@ -97,6 +108,7 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
       });
 
       socket.on('gameOver', (result) => {
+        logger.game('GM', `gameOver — winner: ${result?.winner} (${result?.condition})`, result);
         if (onGameOver) onGameOver(result);
       });
 
@@ -108,10 +120,11 @@ export default function GmDashboardScreen({ token, gameId, lobbyId, onGameOver, 
     };
 
     fetchState();
-    connect().catch(console.error);
+    connect().catch((err) => logger.error('GM', 'socket connect failed', err));
     pollRef.current = setInterval(fetchState, 10000);
 
     return () => {
+      setGlobalConnected(false);
       clearInterval(pollRef.current);
       if (socketRef.current) {
         socketRef.current.disconnect();
