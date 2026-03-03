@@ -2,6 +2,7 @@ import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, PanResponder, Animated } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 // ── Layout constants ────────────────────────────────────────────────────────
@@ -252,7 +253,7 @@ export default function BuildTask({ config, onSuccess, onFail, taskId }) {
   }, [areaSize]);
 
   return (
-    <View style={styles.container} onLayout={handleLayout}>
+    <TaskContainer scrollable={false} centered={false} padded={false} onLayout={handleLayout}>
       {areaSize && (
         <BuildTaskInner
           config={config}
@@ -263,16 +264,13 @@ export default function BuildTask({ config, onSuccess, onFail, taskId }) {
           areaH={areaSize.h}
         />
       )}
-    </View>
+    </TaskContainer>
   );
 }
 
-// ── Styles ──────────────────────────────────────────────────────────────────
+// ── Styles ──────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   inner: {
     flex: 1,
   },

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import Svg, { Path, Circle, Rect, Ellipse, Line, G } from 'react-native-svg';
 import TaskSprite from '../../../components/TaskSprite';
+import TaskContainer from '../../../components/TaskContainer';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
@@ -263,7 +264,7 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit, tas
   };
 
   return (
-    <View style={styles.container} onLayout={e => setContainerH(e.nativeEvent.layout.height)}>
+    <TaskContainer scrollable={false} style={{ paddingHorizontal: 32, paddingVertical: 8 }} onLayout={e => setContainerH(e.nativeEvent.layout.height)}>
       <Text style={styles.counter}>{taps} / {targetTaps}</Text>
       <View style={styles.barTrack}>
         <Animated.View
@@ -297,18 +298,11 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit, tas
           {p.emoji}
         </Animated.Text>
       ))}
-    </View>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 8,
-  },
   counter: {
     fontFamily: fonts.accent.bold,
     fontSize: 42,

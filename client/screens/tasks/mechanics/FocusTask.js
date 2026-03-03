@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Rect } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 const ICON_SIZE = 60;
@@ -333,7 +334,7 @@ export default function FocusTask({ config, onSuccess, onFail, taskId }) {
   );
 
   return (
-    <View style={styles.container} onLayout={handleLayout}>
+    <TaskContainer scrollable={false} centered={false} padded={false} style={{ backgroundColor: colors.background.space }} onLayout={handleLayout}>
       {areaSize && (
         <FocusTaskInner
           config={config}
@@ -344,15 +345,11 @@ export default function FocusTask({ config, onSuccess, onFail, taskId }) {
           areaH={areaSize.h}
         />
       )}
-    </View>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.space,
-  },
 
   sinkingOverlay: {
     backgroundColor: '#001830',

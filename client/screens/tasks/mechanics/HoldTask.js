@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, PanResponder, Dimensions } from 'react-native';
 import Svg, { Circle, Path, Ellipse, Rect, Line, G } from 'react-native-svg';
 import TaskSprite from '../../../components/TaskSprite';
+import TaskContainer from '../../../components/TaskContainer';
 import { colors } from '../../../theme/colors';
 import { fonts } from '../../../theme/typography';
 
@@ -162,7 +163,7 @@ export default function HoldTask({ config, onSuccess, onFail, taskId }) {
   };
 
   return (
-    <View style={styles.container}>
+    <TaskContainer scrollable={false} style={{ padding: 32, gap: 24 }}>
       <Text style={styles.instruction}>
         {completed
           ? 'Done!'
@@ -204,18 +205,11 @@ export default function HoldTask({ config, onSuccess, onFail, taskId }) {
       <Text style={styles.subText}>
         {completed || failed ? '' : 'Press and hold without releasing'}
       </Text>
-    </View>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    gap: 24,
-  },
   instruction: {
     fontFamily: fonts.ui.semiBold,
     fontSize: 16,

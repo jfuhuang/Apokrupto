@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 import TaskSprite from '../../../components/TaskSprite';
 
@@ -58,7 +59,7 @@ export default function QuizTask({ config, onSuccess, onFail, taskId }) {
   const banner = QUIZ_BANNERS[taskId];
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <TaskContainer centered={false} style={{ padding: 20 }}>
       <View style={styles.progressRow}>
         {questions.map((_, i) => (
           <View
@@ -98,16 +99,11 @@ export default function QuizTask({ config, onSuccess, onFail, taskId }) {
           </TouchableOpacity>
         ))}
       </View>
-    </ScrollView>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    gap: 16,
-    flexGrow: 1,
-  },
   progressRow: {
     flexDirection: 'row',
     gap: 8,

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import Svg, { Path, Circle, Rect, Ellipse, Line, Polygon } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 const { width: W } = Dimensions.get('window');
@@ -162,8 +163,9 @@ export default function SlingTask({ config, onSuccess }) {
   const arcD = buildArcPath(GX, gY, ARC_R, progress);
 
   return (
-    <View
-      style={styles.container}
+    <TaskContainer
+      scrollable={false} centered={false} padded={false}
+      style={{ backgroundColor: colors.background.space }}
       onLayout={e => setLayout(e.nativeEvent.layout)}
       {...panResponder.panHandlers}
     >
@@ -208,15 +210,11 @@ export default function SlingTask({ config, onSuccess }) {
           </Animated.View>
         </View>
       )}
-    </View>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.space,
-  },
   hint: {
     fontFamily: fonts.ui.regular,
     fontSize: 14,

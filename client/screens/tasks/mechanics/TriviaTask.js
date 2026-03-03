@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
@@ -54,7 +55,7 @@ export default function TriviaTask({ config, onSuccess, onFail }) {
   }
 
   return (
-    <View style={styles.container}>
+    <TaskContainer style={{ paddingHorizontal: 20, paddingVertical: 6, gap: 4 }}>
       <View style={styles.questionBox}>
         <Text style={styles.question}>{question}</Text>
       </View>
@@ -79,19 +80,11 @@ export default function TriviaTask({ config, onSuccess, onFail }) {
       {!answered && (
         <Text style={styles.hint}>Tap the correct answer</Text>
       )}
-    </View>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 6,
-    gap: 4,
-  },
 
   questionBox: {
     width: '100%',

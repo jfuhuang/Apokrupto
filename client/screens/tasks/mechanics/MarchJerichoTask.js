@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 const { width: W } = Dimensions.get('window');
@@ -208,7 +209,7 @@ export default function MarchJerichoTask({ onSuccess }) {
   const arcD = buildArcPath(cx, cy, ORBIT_R, -Math.PI / 2, partialProgress);
 
   return (
-    <View style={styles.container} onLayout={handleLayout} {...panResponder.panHandlers}>
+    <TaskContainer scrollable={false} centered={false} padded={false} style={{ backgroundColor: colors.background.space }} onLayout={handleLayout} {...panResponder.panHandlers}>
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
 
         {/* Instruction */}
@@ -264,15 +265,11 @@ export default function MarchJerichoTask({ onSuccess }) {
         </Animated.View>
 
       </View>
-    </View>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.space,
-  },
   hint: {
     fontFamily: fonts.ui.regular,
     fontSize: 13,

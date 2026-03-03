@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import Svg, { Circle, Path, Ellipse, Line } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 const SIZE   = 130;
@@ -169,8 +170,9 @@ export default function PatienceTask({ config, onSuccess, onFail, taskId }) {
     : ringColor;
 
   return (
-    <View
-      style={styles.container}
+    <TaskContainer
+      scrollable={false}
+      style={{ paddingHorizontal: 24, paddingVertical: 12, gap: 10 }}
       onStartShouldSetResponder={() => !doneRef.current && readyRef.current}
       onResponderGrant={handleTouch}
     >
@@ -223,19 +225,11 @@ export default function PatienceTask({ config, onSuccess, onFail, taskId }) {
       {!completed && !failed && (
         <Text style={styles.warning}>ANY touch = instant fail</Text>
       )}
-    </View>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    gap: 10,
-  },
   instruction: {
     fontFamily: fonts.ui.semiBold,
     fontSize: 18,

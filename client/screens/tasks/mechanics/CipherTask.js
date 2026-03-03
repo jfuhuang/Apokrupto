@@ -5,11 +5,11 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { typography, fonts } from '../../../theme/typography';
 
 // Caesar cipher decode helper (used for validation)
@@ -63,7 +63,7 @@ export default function CipherTask({ config = {}, onSuccess, onFail, timeLeft })
 
   // ── Operator view ─────────────────────────────────────────────────────────
   const renderOperator = () => (
-    <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+    <TaskContainer centered={false} style={{ padding: 20, gap: 12 }} keyboardShouldPersistTaps="handled">
       <View style={styles.roleChip}>
         <Text style={styles.roleChipText}>OPERATOR</Text>
       </View>
@@ -102,12 +102,12 @@ export default function CipherTask({ config = {}, onSuccess, onFail, timeLeft })
       {timeLeft !== undefined && (
         <Text style={styles.timeLeft}>Time remaining: {timeLeft}s</Text>
       )}
-    </ScrollView>
+    </TaskContainer>
   );
 
   // ── Manual-holder view ────────────────────────────────────────────────────
   const renderManual = () => (
-    <ScrollView contentContainerStyle={styles.scroll}>
+    <TaskContainer centered={false} style={{ padding: 20, gap: 12 }}>
       <View style={[styles.roleChip, styles.roleChipManual]}>
         <Text style={styles.roleChipText}>MANUAL HOLDER</Text>
       </View>
@@ -142,7 +142,7 @@ export default function CipherTask({ config = {}, onSuccess, onFail, timeLeft })
       <Text style={styles.manualNote}>
         You cannot submit the answer — only the Operator can. Guide them verbally.
       </Text>
-    </ScrollView>
+    </TaskContainer>
   );
 
   // ── Result view ───────────────────────────────────────────────────────────
@@ -164,7 +164,7 @@ export default function CipherTask({ config = {}, onSuccess, onFail, timeLeft })
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.header}>
@@ -180,10 +180,6 @@ export default function CipherTask({ config = {}, onSuccess, onFail, timeLeft })
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.space,
-  },
   header: {
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -196,11 +192,6 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     color: colors.accent.ultraviolet,
     textAlign: 'center',
-  },
-  scroll: {
-    padding: 24,
-    gap: 18,
-    flexGrow: 1,
   },
   roleChip: {
     alignSelf: 'center',

@@ -10,6 +10,7 @@ import Svg, {
   Rect, Circle, Ellipse, Path, Polygon, Line, G,
 } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 const DRAG_SIZE   = 80;
@@ -290,7 +291,7 @@ export default function DragPlaceTask({ config, onSuccess, onFail, taskId }) {
   };
 
   return (
-    <View style={styles.container} onLayout={onLayout}>
+    <TaskContainer scrollable={false} centered={false} padded={false} style={{ backgroundColor: colors.background.space }} onLayout={onLayout}>
       <Text style={styles.hint}>
         {snapped ? hints.after : hints.before}
       </Text>
@@ -311,15 +312,11 @@ export default function DragPlaceTask({ config, onSuccess, onFail, taskId }) {
           </Animated.View>
         </>
       )}
-    </View>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.space,
-  },
   hint: {
     fontFamily: fonts.ui.regular,
     fontSize: 14,

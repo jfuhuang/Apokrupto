@@ -17,6 +17,7 @@ import Svg, {
   G,
 } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 const { width: W } = Dimensions.get('window');
@@ -322,9 +323,9 @@ export default function GuardTask(props) {
   }, [areaSize]);
 
   return (
-    <View style={styles.container} onLayout={handleLayout}>
+    <TaskContainer scrollable={false} centered={false} padded={false} style={{ backgroundColor: colors.background.space }} onLayout={handleLayout}>
       {areaSize && <GuardTaskInner {...props} areaW={areaSize.w} areaH={areaSize.h} />}
-    </View>
+    </TaskContainer>
   );
 }
 
@@ -454,10 +455,6 @@ function GuardTaskInner({ config, onSuccess, onFail, taskId, areaW, areaH }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.space,
-  },
   hint: {
     fontFamily: fonts.ui.regular,
     fontSize: 13,

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 const SLOT_W = 82;
@@ -428,7 +429,7 @@ export default function ScriptureBlankTask({ config, onSuccess, onFail, taskId }
   );
 
   return (
-    <View style={{ flex: 1 }} onLayout={handleLayout}>
+    <TaskContainer scrollable={false} centered={false} padded={false} onLayout={handleLayout}>
       {areaSize && (
         <ScriptureBlankTaskInner
           config={config}
@@ -439,7 +440,7 @@ export default function ScriptureBlankTask({ config, onSuccess, onFail, taskId }
           areaH={areaSize.h}
         />
       )}
-    </View>
+    </TaskContainer>
   );
 }
 

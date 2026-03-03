@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 import TaskSprite from '../../../components/TaskSprite';
 
@@ -97,7 +98,7 @@ export default function MatchPairTask({ config, onSuccess, onFail, taskId }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <TaskContainer centered={false} style={{ gap: 12 }}>
       <Text style={styles.hint}>Tap two tiles to match a term with its meaning</Text>
       <Text style={styles.progress}>
         {matched.size / 2} / {pairs.length} matched
@@ -127,16 +128,11 @@ export default function MatchPairTask({ config, onSuccess, onFail, taskId }) {
           );
         })}
       </View>
-    </ScrollView>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    gap: 12,
-    flexGrow: 1,
-  },
   hint: {
     fontFamily: fonts.ui.regular,
     fontSize: 13,

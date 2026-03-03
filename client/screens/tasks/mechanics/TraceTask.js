@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import Svg, { Circle, Ellipse, Polyline } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 const { width: W } = Dimensions.get('window');
@@ -203,8 +204,9 @@ export default function TraceTask({ config, onSuccess, onFail, taskId }) {
   const textAreaTop = layout ? layout.height * 0.78 : 0;
 
   return (
-    <View
-      style={styles.container}
+    <TaskContainer
+      scrollable={false} centered={false} padded={false}
+      style={{ backgroundColor: colors.background.space }}
       onLayout={e => setLayout(e.nativeEvent.layout)}
       {...panResponder.panHandlers}
     >
@@ -264,15 +266,11 @@ export default function TraceTask({ config, onSuccess, onFail, taskId }) {
           </View>
         </>
       )}
-    </View>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.space,
-  },
   centerArt: {
     position: 'absolute',
     width: 80,

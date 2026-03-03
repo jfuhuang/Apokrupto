@@ -10,6 +10,7 @@ import {
 import PropTypes from 'prop-types';
 import Svg, { Path, Ellipse } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
+import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 const { width: WINDOW_W } = Dimensions.get('window');
@@ -345,8 +346,9 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
   ];
 
   return (
-    <View
-      style={styles.container}
+    <TaskContainer
+      scrollable={false} centered={false} padded={false}
+      style={{ overflow: 'hidden' }}
       onLayout={(e) =>
         setContainerSize({
           width:  e.nativeEvent.layout.width,
@@ -442,7 +444,7 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
           {p.emoji}
         </Animated.Text>
       ))}
-    </View>
+    </TaskContainer>
   );
 }
 
@@ -458,10 +460,7 @@ BailWaterTask.propTypes = {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    overflow: 'hidden',
-  },
+
 
   // ── Gauge ───────────────────────────────────────────────────────────────
   gaugeTrack: {

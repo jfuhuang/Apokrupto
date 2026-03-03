@@ -27,6 +27,7 @@ export default function TaskContainer({
   padded = true,
   style,
   children,
+  ...rest
 }) {
   const contentStyle = [
     styles.base,
@@ -43,13 +44,14 @@ export default function TaskContainer({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         overScrollMode="never"
+        {...rest}
       >
         {children}
       </ScrollView>
     );
   }
 
-  return <View style={[styles.view, ...contentStyle]}>{children}</View>;
+  return <View style={[styles.view, ...contentStyle]} {...rest}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
