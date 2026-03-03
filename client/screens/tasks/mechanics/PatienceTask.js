@@ -99,7 +99,8 @@ const TASK_CONFIG = {
 
 // ── Main component ──────────────────────────────────────────────────────────
 
-export default function PatienceTask({ config, onSuccess, onFail, taskId })  const { duration } = config;
+export default function PatienceTask({ config, onSuccess, onFail, taskId }) {
+  const { duration } = config;
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [progress, setProgress] = useState(0);
   const [completed, setCompleted] = useState(false);
