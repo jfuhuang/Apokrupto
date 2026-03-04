@@ -130,7 +130,7 @@ export default function CoopHoldTask({ task, role, currentTeam, onAction, update
   });
 
   return (
-    <TaskContainer scrollable={false} style={{ justifyContent: 'space-between' }}>
+    <TaskContainer scrollable={false} centered={false} style={{ alignItems: 'center', gap: 12 }}>
       <Text style={[styles.timer, timeLeft <= 5 && { color: colors.primary.neonRed }]}>
         {timeLeft}s
       </Text>
@@ -182,7 +182,7 @@ export default function CoopHoldTask({ task, role, currentTeam, onAction, update
 
       {/* Hold area */}
       <Pressable
-        style={[styles.holdButton, holding && { borderColor: teamColor, backgroundColor: teamColor + '15' }]}
+        style={[styles.holdButton, { marginTop: 'auto' }, holding && { borderColor: teamColor, backgroundColor: teamColor + '15' }]}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
       >
@@ -217,9 +217,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   ring: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   },
   elapsed: {
     fontFamily: fonts.accent.bold,
-    fontSize: 22,
+    fontSize: 16,
     letterSpacing: 1,
   },
   progressTrack: {
