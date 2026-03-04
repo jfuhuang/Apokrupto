@@ -130,59 +130,62 @@ export default function CoopHoldTask({ task, role, currentTeam, onAction, update
   });
 
   return (
-    <TaskContainer scrollable={false} centered={false} style={{ alignItems: 'center', gap: 12 }}>
-      <Text style={[styles.timer, timeLeft <= 5 && { color: colors.primary.neonRed }]}>
-        {timeLeft}s
-      </Text>
+    <View style={styles.root}>
+      {/* Top content group */}
+      <View style={styles.topGroup}>
+        <Text style={[styles.timer, timeLeft <= 5 && { color: colors.primary.neonRed }]}>
+          {timeLeft}s
+        </Text>
 
-      <Text style={styles.instruction}>Both players must hold down at the same time</Text>
+        <Text style={styles.instruction}>Both players must hold down at the same time</Text>
 
-      {/* Ring indicators */}
-      <View style={styles.ringRow}>
-        <View style={styles.ringWrapper}>
-          <Animated.View
-            style={[
-              styles.ring,
-              {
-                borderColor: youBorderColor,
-                backgroundColor: holding ? teamColor + '20' : 'transparent',
-              },
-            ]}
-          >
-            <Text style={styles.ringEmoji}>{holding ? '✋' : '👋'}</Text>
-          </Animated.View>
-          <Text style={styles.ringLabel}>YOU</Text>
+        {/* Ring indicators */}
+        <View style={styles.ringRow}>
+          <View style={styles.ringWrapper}>
+            <Animated.View
+              style={[
+                styles.ring,
+                {
+                  borderColor: youBorderColor,
+                  backgroundColor: holding ? teamColor + '20' : 'transparent',
+                },
+              ]}
+            >
+              <Text style={styles.ringEmoji}>{holding ? '✋' : '👋'}</Text>
+            </Animated.View>
+            <Text style={styles.ringLabel}>YOU</Text>
+          </View>
+
+          <View style={styles.ringWrapper}>
+            <Animated.View
+              style={[
+                styles.ring,
+                {
+                  borderColor: partnerBorderColor,
+                  backgroundColor: partnerHolding ? teamColor + '20' : 'transparent',
+                },
+              ]}
+            >
+              <Text style={styles.ringEmoji}>{partnerHolding ? '✋' : '👋'}</Text>
+            </Animated.View>
+            <Text style={styles.ringLabel}>PARTNER</Text>
+          </View>
         </View>
 
-        <View style={styles.ringWrapper}>
-          <Animated.View
-            style={[
-              styles.ring,
-              {
-                borderColor: partnerBorderColor,
-                backgroundColor: partnerHolding ? teamColor + '20' : 'transparent',
-              },
-            ]}
-          >
-            <Text style={styles.ringEmoji}>{partnerHolding ? '✋' : '👋'}</Text>
-          </Animated.View>
-          <Text style={styles.ringLabel}>PARTNER</Text>
+        {/* Elapsed timer */}
+        <Text style={[styles.elapsed, { color: teamColor }]}>
+          {(elapsedMs / 1000).toFixed(1)}s / {(targetMs / 1000).toFixed(1)}s
+        </Text>
+
+        {/* Progress bar */}
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: teamColor }]} />
         </View>
       </View>
 
-      {/* Elapsed timer */}
-      <Text style={[styles.elapsed, { color: teamColor }]}>
-        {(elapsedMs / 1000).toFixed(1)}s / {(targetMs / 1000).toFixed(1)}s
-      </Text>
-
-      {/* Progress bar */}
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: teamColor }]} />
-      </View>
-
-      {/* Hold area */}
+      {/* Hold area — always visible at bottom */}
       <Pressable
-        style={[styles.holdButton, { marginTop: 'auto' }, holding && { borderColor: teamColor, backgroundColor: teamColor + '15' }]}
+        style={[styles.holdButton, holding && { borderColor: teamColor, backgroundColor: teamColor + '15' }]}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
       >
@@ -190,11 +193,20 @@ export default function CoopHoldTask({ task, role, currentTeam, onAction, update
           {holding ? 'HOLDING...' : 'HOLD HERE'}
         </Text>
       </Pressable>
-    </TaskContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    padding: 16,
+    justifyContent: 'space-between',
+  },
+  topGroup: {
+    alignItems: 'center',
+    gap: 12,
+  },
   timer: {
     fontFamily: fonts.accent.bold,
     fontSize: 28,
@@ -258,7 +270,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.void,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
   },
   holdLabel: {
     fontFamily: fonts.display.bold,
