@@ -206,6 +206,7 @@ export default function DragPlaceTask({ config, onSuccess, onFail, taskId }) {
   const { snapTolerance } = config;
   const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const [snapped, setSnapped] = useState(false);
+  const snappedRef = useRef(false);
   const [layout, setLayout] = useState(null);
   const layoutRef = useRef(null);
 
@@ -237,7 +238,7 @@ export default function DragPlaceTask({ config, onSuccess, onFail, taskId }) {
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !snapped,
+      onStartShouldSetPanResponder: () => !snappedRef.current,
       onPanResponderMove: Animated.event(
         [null, { dx: pan.x, dy: pan.y }],
         { useNativeDriver: false }
@@ -253,6 +254,7 @@ export default function DragPlaceTask({ config, onSuccess, onFail, taskId }) {
         if (dist <= snapTolerance) {
           const snapX = tx + TARGET_SIZE / 2 - DRAG_SIZE / 2;
           const snapY = ty + TARGET_SIZE / 2 - DRAG_SIZE / 2;
+          snappedRef.current = true;
           Animated.spring(pan, {
             toValue: { x: snapX - sx, y: snapY - sy },
             friction: 5,

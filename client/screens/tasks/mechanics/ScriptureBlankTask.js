@@ -202,12 +202,14 @@ function ScriptureBlankTaskInner({ config, onSuccess, onFail, areaW, areaH }) {
           });
 
           if (bestSlot >= 0 && bestDist <= SNAP_TOL) {
+            // Mark slot occupied immediately so concurrent drags can't also land here
+            occupiedRef.current.add(bestSlot);
+
             // evict any existing tile from that slot back to source
             const prevTileIdx = placedSlotsRef.current.findIndex(
               (s, ti) => s === bestSlot && ti !== tileIdx
             );
             if (prevTileIdx !== -1) {
-              occupiedRef.current.delete(bestSlot);
               const newPlaced = [...placedSlotsRef.current];
               newPlaced[prevTileIdx] = null;
               placedSlotsRef.current = newPlaced;
@@ -224,7 +226,6 @@ function ScriptureBlankTaskInner({ config, onSuccess, onFail, areaW, areaH }) {
               friction: 7,
               useNativeDriver: false,
             }).start(() => {
-              occupiedRef.current.add(bestSlot);
               const newPlaced = [...placedSlotsRef.current];
               newPlaced[tileIdx] = bestSlot;
               placedSlotsRef.current = newPlaced;
