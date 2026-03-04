@@ -19,7 +19,7 @@ import SecretBallotTask from '../tasks/coop/SecretBallotTask';
 import CoopTapTask from '../tasks/coop/CoopTapTask';
 import CoopHoldTask from '../tasks/coop/CoopHoldTask';
 import SimonSaysTask from '../tasks/coop/SimonSaysTask';
-import TaskLayoutWrapper from '../../components/TaskLayoutWrapper';
+import TaskContainer from '../../components/TaskContainer';
 
 export default function CoopRushScreen({
   token,
@@ -274,9 +274,9 @@ export default function CoopRushScreen({
         </Text>
 
         {/* Task area */}
-        <TaskLayoutWrapper noPadding>
+        <TaskContainer scrollable={false} padded={false} centered={false}>
           {renderTask()}
-        </TaskLayoutWrapper>
+        </TaskContainer>
 
         {/* Result overlay */}
         {showResult && (
