@@ -7,7 +7,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
+import Svg, { Path, Circle, Rect, Line, G, Polygon } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
 import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
@@ -15,8 +15,8 @@ import { fonts } from '../../../theme/typography';
 const { width: W } = Dimensions.get('window');
 
 const WALL_R        = 80;   // city wall visual radius
-const ORBIT_R       = 125;  // ring the player traces
-const TOLERANCE     = 55;   // px tolerance from orbit ring
+const ORBIT_R       = 100;  // ring the player traces (shrunk to stay on-screen)
+const TOLERANCE     = 50;   // px tolerance from orbit ring
 const LAPS_REQUIRED = 7;
 const TWO_PI        = Math.PI * 2;
 const MARCHER_W     = 24;
@@ -128,7 +128,7 @@ export default function MarchJerichoTask({ onSuccess }) {
     const { width, height } = e.nativeEvent.layout;
     layoutRef.current = { width, height };
     const cx = width / 2;
-    const cy = height * 0.45;
+    const cy = height * 0.55;
     setCenterXY({ cx, cy });
     marcherX.setValue(cx + ORBIT_R - MARCHER_W / 2);
     marcherY.setValue(cy           - MARCHER_H / 2);
@@ -141,17 +141,21 @@ export default function MarchJerichoTask({ onSuccess }) {
 
       onPanResponderGrant: (evt) => {
         if (doneRef.current) return;
-        const { locationX, locationY } = evt.nativeEvent;
         const { width, height } = layoutRef.current;
-        prevAngleRef.current = Math.atan2(locationY - height * 0.45, locationX - width / 2);
+        // Clamp to view bounds
+        const locationX = Math.max(0, Math.min(evt.nativeEvent.locationX, width));
+        const locationY = Math.max(0, Math.min(evt.nativeEvent.locationY, height));
+        prevAngleRef.current = Math.atan2(locationY - height * 0.55, locationX - width / 2);
       },
 
       onPanResponderMove: (evt) => {
         if (doneRef.current) return;
-        const { locationX, locationY } = evt.nativeEvent;
         const { width, height } = layoutRef.current;
+        // Clamp to view bounds to prevent jump-to-origin when finger leaves the view
+        const locationX = Math.max(0, Math.min(evt.nativeEvent.locationX, width));
+        const locationY = Math.max(0, Math.min(evt.nativeEvent.locationY, height));
         const cx = width / 2;
-        const cy = height * 0.45;
+        const cy = height * 0.55;
 
         const dx   = locationX - cx;
         const dy   = locationY - cy;
@@ -251,6 +255,16 @@ export default function MarchJerichoTask({ onSuccess }) {
               fill="none"
               strokeLinecap="round"
             />
+          )}
+          {/* Clockwise direction arrow at 12-o'clock */}
+          {!done && (
+            <G transform={`translate(${cx}, ${cy - ORBIT_R}) rotate(90)`}>
+              <Polygon
+                points="-6,-5 6,0 -6,5"
+                fill={colors.text.tertiary}
+                opacity={0.6}
+              />
+            </G>
           )}
         </Svg>
 
