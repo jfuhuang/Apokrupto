@@ -120,7 +120,7 @@ function generateCoopTap() {
     taskId: `coop_tap_${crypto.randomUUID()}`,
     taskType: 'coop_tap',
     timeLimit: 15,
-    config: { targetTaps: Math.floor(Math.random() * 31) + 50 }, // 50–80
+    config: { targetTaps: Math.floor(Math.random() * 21) + 50 }, // 50–70
     _server: {},
   };
 }

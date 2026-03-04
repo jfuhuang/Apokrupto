@@ -253,7 +253,6 @@ export default function CoopRushScreen({
             </View>
           </View>
           <View style={styles.hudRight}>
-            <Text style={[styles.hudPoints, { color: teamColor }]}>+{sessionPoints}</Text>
             <TouchableOpacity onPress={handleExit} activeOpacity={0.7}>
               <Text style={styles.exitText}>EXIT</Text>
             </TouchableOpacity>

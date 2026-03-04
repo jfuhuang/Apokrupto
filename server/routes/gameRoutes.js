@@ -1,9 +1,10 @@
-const express = require('express');
-const router  = express.Router();
-const auth    = require('../middleware/auth');
+const express  = require('express');
+const router   = express.Router();
+const auth     = require('../middleware/auth');
 const { GM_USERNAMES } = require('../utils/config');
-const db      = require('../db');
-const logger  = require('../utils/logger');
+const db       = require('../db');
+const logger   = require('../utils/logger');
+const prompts  = require('../data/prompts');
 const {
   POINTS,
   createGame,
@@ -378,16 +379,11 @@ router.get('/:gameId/movement-a/prompt', auth, async (req, res) => {
       }
     }
 
-    const promptRes = await db.query(
-      'SELECT phos_prompt, skotia_prompt, theme_label FROM prompts WHERE id = $1',
-      [turnState.promptId]
-    );
-    if (promptRes.rows.length === 0) {
-      console.warn(`[GET movement-a/prompt] 404 — promptId ${turnState.promptId} not found in prompts table (group ${groupId}, game ${gameId})`);
+    const prompt = prompts.find(p => p.id === turnState.promptId);
+    if (!prompt) {
+      console.warn(`[GET movement-a/prompt] 404 — promptId ${turnState.promptId} not found in prompts data (group ${groupId}, game ${gameId})`);
       return res.status(404).json({ error: 'Prompt not found' });
     }
-
-    const prompt = promptRes.rows[0];
     const promptText = team === 'skotia' ? prompt.skotia_prompt : prompt.phos_prompt;
 
     res.json({

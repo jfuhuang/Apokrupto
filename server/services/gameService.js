@@ -730,6 +730,8 @@ async function _resolveVoting(client, gameId, roundNumber) {
       [gameId, groupId]
     );
 
+    const groupSize   = membersRes.rows.length;
+    const susThreshold = Math.ceil(groupSize / 2); // e.g. 2 in a group of 4, 3 in a group of 5
     const groupActions = [];
 
     for (const member of membersRes.rows) {
@@ -743,13 +745,11 @@ async function _resolveVoting(client, gameId, roundNumber) {
       if (votesForTarget.length === 0) continue;
 
       const skotiaVotes = votesForTarget.filter((v) => v.vote === 'skotia').length;
-      const phosVotes   = votesForTarget.filter((v) => v.vote === 'phos').length;
-      const majority    = skotiaVotes > phosVotes ? 'skotia' : 'phos';
 
       let action     = null;
       let wasCorrect = false;
 
-      if (!isSus && majority === 'skotia') {
+      if (!isSus && skotiaVotes >= susThreshold) {
         action     = 'sus';
         wasCorrect = isSkotia;
         await client.query(
@@ -760,7 +760,7 @@ async function _resolveVoting(client, gameId, roundNumber) {
         if (wasCorrect) phosPointsEarned   += POINTS.CORRECT_SUS;
         else            skotiaPointsEarned += POINTS.FALSE_SUS;
 
-      } else if (isSus && majority === 'phos') {
+      } else if (isSus && skotiaVotes < susThreshold) {
         action     = 'clear';
         wasCorrect = !isSkotia;
         await client.query(

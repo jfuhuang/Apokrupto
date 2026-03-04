@@ -1,4 +1,5 @@
-const pool = require('../db');
+const pool    = require('../db');
+const prompts = require('../data/prompts');
 
 // ---------------------------------------------------------------------------
 // In-memory turn state for Movement A
@@ -526,14 +527,11 @@ async function _initTurnState(groups, gameId, lobbyId) {
     _roundModeCache.set(cacheKey, promptMode);
   }
 
-  const promptRes = await pool.query(
-    'SELECT id FROM prompts WHERE prompt_mode = $1 ORDER BY random() LIMIT $2',
-    [promptMode, groups.length]
-  );
+  const modePrompts = prompts.filter(p => p.prompt_mode === promptMode);
+  const shuffled    = shuffle([...modePrompts]);
 
   groups.forEach((group, i) => {
-    const promptId =
-      (promptRes.rows[i] || promptRes.rows[0])?.id ?? null;
+    const promptId = (shuffled[i] || shuffled[0])?.id ?? null;
 
     groupTurnState.set(String(group.groupId), {
       turnOrder:      shuffle([...group.memberIds]),
