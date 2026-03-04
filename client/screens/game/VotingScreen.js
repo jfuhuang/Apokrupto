@@ -182,29 +182,37 @@ export default function VotingScreen({
     }
   };
 
-  // Tap cycles: unset → phos (blue) → skotia (red) → phos → ...
+  // Tap toggles Skotia suspect on/off — unselected players are assumed Phos
   const toggleVote = (playerId) => {
     if (phase !== 'voting') return;
     setMyVotes((prev) => {
-      const current = prev[playerId];
-      if (current === undefined || current === 'skotia') return { ...prev, [playerId]: 'phos' };
-      return { ...prev, [playerId]: 'skotia' };
+      const next = { ...prev };
+      if (next[playerId] === 'skotia') {
+        delete next[playerId];
+      } else {
+        next[playerId] = 'skotia';
+      }
+      return next;
     });
   };
 
-  const allVoted = others.length > 0 && others.every((m) => myVotes[m.id] !== undefined);
-  const votedCount = others.filter((m) => myVotes[m.id] !== undefined).length;
+  const skotiaCount = others.filter((m) => myVotes[m.id] === 'skotia').length;
 
   const handleSubmit = async () => {
-    if (!allVoted || submitting) return;
+    if (submitting) return;
     setSubmitting(true);
     setPhase('waiting');
     try {
+      // Auto-fill 'phos' for anyone not marked as skotia
+      const fullVotes = {};
+      for (const m of others) {
+        fullVotes[m.id] = myVotes[m.id] === 'skotia' ? 'skotia' : 'phos';
+      }
       const baseUrl = await getApiUrl();
       await fetch(`${baseUrl}/api/games/${gameId}/movement-c/vote`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ votes: myVotes }),
+        body: JSON.stringify({ votes: fullVotes }),
       });
     } catch (err) {
       logger.error('Voting', 'vote submit failed', err);
@@ -217,18 +225,14 @@ export default function VotingScreen({
   // ── Member card ──────────────────────────────────────────────────────────
 
   const renderVoteCard = (member) => {
-    const vote = myVotes[member.id];
-    const isPhosVote = vote === 'phos';
-    const isSkotiaVote = vote === 'skotia';
-    const isVoted = vote !== undefined;
+    const isSuspect = myVotes[member.id] === 'skotia';
 
     return (
       <View key={member.id} style={styles.cardWrapper}>
         <TouchableOpacity
           style={[
             styles.memberCard,
-            isPhosVote && styles.memberCardPhos,
-            isSkotiaVote && styles.memberCardSkotia,
+            isSuspect && styles.memberCardSkotia,
           ]}
           onPress={() => toggleVote(member.id)}
           disabled={phase !== 'voting'}
@@ -237,8 +241,7 @@ export default function VotingScreen({
           <Text
             style={[
               styles.memberName,
-              isPhosVote && { color: colors.primary.electricBlue },
-              isSkotiaVote && { color: colors.primary.neonRed },
+              isSuspect && { color: colors.primary.neonRed },
             ]}
             numberOfLines={1}
           >
@@ -250,8 +253,10 @@ export default function VotingScreen({
               <Text style={styles.currentSusText}>SUS</Text>
             </View>
           )}
-          {!isVoted && (
-            <Text style={styles.tapHint}>tap to vote</Text>
+          {isSuspect ? (
+            <Text style={styles.suspectLabel}>ΣΚΟΤΊΑ</Text>
+          ) : (
+            <Text style={styles.tapHint}>tap if suspect</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -307,7 +312,7 @@ export default function VotingScreen({
             <View style={styles.instructionBox}>
               <Text style={styles.instructionText}>
                 {phase === 'voting'
-                  ? 'Tap once for ΦΩΣ (blue), tap again for ΣΚΟΤΊΑ (red).'
+                  ? 'Tap on players you suspect are ΣΚΟΤΊΑ. Anyone not selected is assumed ΦΩΣ.'
                   : 'Votes submitted. Waiting for your group...'}
               </Text>
             </View>
@@ -331,7 +336,9 @@ export default function VotingScreen({
               <View style={styles.footer}>
                 <View style={styles.footerLeft}>
                   <Text style={styles.footerCount}>
-                    {votedCount} / {others.length} voted
+                    {skotiaCount === 0
+                      ? 'No suspects selected'
+                      : `${skotiaCount} suspect${skotiaCount > 1 ? 's' : ''} selected`}
                   </Text>
                   {votingSecondsLeft !== null && (
                     <Text style={styles.footerTimer}>
@@ -340,12 +347,12 @@ export default function VotingScreen({
                   )}
                 </View>
                 <TouchableOpacity
-                  style={[styles.submitBtn, !allVoted && styles.submitBtnDisabled]}
+                  style={styles.submitBtn}
                   onPress={handleSubmit}
-                  disabled={!allVoted || submitting}
+                  disabled={submitting}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.submitBtnText, !allVoted && styles.submitBtnTextDisabled]}>
+                  <Text style={styles.submitBtnText}>
                     SUBMIT VOTES
                   </Text>
                 </TouchableOpacity>
@@ -427,10 +434,6 @@ const styles = StyleSheet.create({
     minHeight: 60,
     gap: 4,
   },
-  memberCardPhos: {
-    backgroundColor: 'rgba(0, 212, 255, 0.1)',
-    borderColor: colors.primary.electricBlue,
-  },
   memberCardSkotia: {
     backgroundColor: 'rgba(220, 20, 60, 0.1)',
     borderColor: colors.primary.neonRed,
@@ -463,6 +466,12 @@ const styles = StyleSheet.create({
     fontSize: 8,
     letterSpacing: 1,
     color: colors.text.disabled,
+  },
+  suspectLabel: {
+    fontFamily: fonts.display.bold,
+    fontSize: 9,
+    letterSpacing: 2,
+    color: colors.primary.neonRed,
   },
 
   // Footer
@@ -501,19 +510,11 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 5,
   },
-  submitBtnDisabled: {
-    backgroundColor: colors.background.panel,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
   submitBtnText: {
     fontFamily: fonts.display.bold,
     fontSize: 12,
     letterSpacing: 2,
     color: colors.background.space,
-  },
-  submitBtnTextDisabled: {
-    color: colors.text.disabled,
   },
 
   // Preview
