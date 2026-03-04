@@ -1089,7 +1089,7 @@ export const TASKS = [
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 5, dead: 3 },
     difficulty: 'medium',
-    timeLimit: 8,
+    timeLimit: 12,
     config: {
       brickCount: 8,
       snapTolerance: 55,
@@ -1105,7 +1105,7 @@ export const TASKS = [
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 6, dead: 4 },
     difficulty: 'hard',
-    timeLimit: 8,
+    timeLimit: 12,
     config: {
       brickCount: 12,
       snapTolerance: 45,
