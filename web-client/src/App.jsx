@@ -70,6 +70,7 @@ export default function App() {
     const socket = io(getSocketUrl(), {
       auth: { token },
       transports: ['polling', 'websocket'], // polling first for better ngrok compatibility
+      extraHeaders: { 'ngrok-skip-browser-warning': '69420' }, // skip ngrok interstitial
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
