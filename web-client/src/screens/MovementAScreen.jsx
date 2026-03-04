@@ -1,6 +1,35 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import AnimatedBackground from '../components/AnimatedBackground.jsx'
-import { fetchMovementAPrompt, submitMovementAWord, fetchGameState } from '../utils/api.js'
+import SketchCanvas from '../components/SketchCanvas.jsx'
+import { fetchMovementAPrompt, submitMovementAWord, submitMovementASketch, fetchGameState } from '../utils/api.js'
+
+function SketchThumbnail({ sketchData, size = 120, isMe }) {
+  const canvasRef = useRef(null)
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !sketchData?.strokes) return
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.strokeStyle = '#00D4FF'
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    sketchData.strokes.forEach(stroke => {
+      if (stroke.length < 2) return
+      ctx.beginPath()
+      ctx.moveTo(stroke[0][0], stroke[0][1])
+      stroke.slice(1).forEach(([x, y]) => ctx.lineTo(x, y))
+      ctx.stroke()
+    })
+  }, [sketchData])
+  return (
+    <canvas
+      ref={canvasRef}
+      width={400} height={400}
+      style={{ width: size, height: size, border: `2px solid ${isMe ? '#00D4FF' : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, background: '#1F2833' }}
+    />
+  )
+}
 
 export default function MovementAScreen({
   token,
@@ -14,9 +43,11 @@ export default function MovementAScreen({
 }) {
   const [prompt, setPrompt] = useState(null)
   const [themeLabel, setThemeLabel] = useState('')
+  const [promptMode, setPromptMode] = useState('word') // 'word' | 'sketch'
   const [word, setWord] = useState('')
   const [phase, setPhase] = useState('waiting') // 'waiting' | 'my_turn' | 'deliberation'
   const [words, setWords] = useState([])
+  const [sketches, setSketches] = useState([])
   const [currentPlayerId, setCurrentPlayerId] = useState(null)
   const [currentPlayerName, setCurrentPlayerName] = useState('')
   const [completedCount, setCompletedCount] = useState(0)
@@ -26,12 +57,14 @@ export default function MovementAScreen({
   const [error, setError] = useState('')
   const [submitMsg, setSubmitMsg] = useState('')
   const timerRef = useRef(null)
+  const sketchRef = useRef(null)
 
   const loadPrompt = useCallback(async () => {
     const res = await fetchMovementAPrompt(token, gameId)
     if (res.ok) {
       setPrompt(res.data.prompt)
       setThemeLabel(res.data.themeLabel || '')
+      setPromptMode(res.data.promptMode || 'word')
       setTotalCount(res.data.totalCount || 0)
       setCompletedCount(res.data.completedCount || 0)
     }
@@ -96,6 +129,7 @@ export default function MovementAScreen({
     function onDeliberationStart(data) {
       setPhase('deliberation')
       setWords(data.words || [])
+      setSketches(data.sketches || [])
       clearInterval(timerRef.current)
     }
 
@@ -117,17 +151,24 @@ export default function MovementAScreen({
   }, [socket, currentGroupId, lobbyId, currentUserId, currentGroupMembers, onMovementEnd])
 
   async function handleSubmit() {
-    if (!word.trim()) return
     setSubmitting(true)
     setError('')
-    const res = await submitMovementAWord(token, gameId, word.trim())
+    let res
+    if (promptMode === 'sketch') {
+      const sketchData = sketchRef.current?.getSketchData() || { strokes: [] }
+      res = await submitMovementASketch(token, gameId, sketchData)
+    } else {
+      if (!word.trim()) { setSubmitting(false); return }
+      res = await submitMovementAWord(token, gameId, word.trim())
+    }
     setSubmitting(false)
     if (!res.ok) {
-      setError(res.data?.error || 'Could not submit word.')
+      setError(res.data?.error || 'Could not submit.')
     } else {
-      setSubmitMsg('Word submitted! Waiting...')
+      setSubmitMsg(promptMode === 'sketch' ? 'Sketch submitted! Waiting...' : 'Word submitted! Waiting...')
       setPhase('waiting')
       setWord('')
+      sketchRef.current?.clear()
     }
   }
 
@@ -189,22 +230,39 @@ export default function MovementAScreen({
               <span style={styles.yourTurnLabel}>YOUR TURN</span>
               <span style={{ ...styles.timer, color: timerColor }}>{timeLeft}s</span>
             </div>
-            <input
-              style={styles.wordInput}
-              value={word}
-              onChange={(e) => setWord(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-              placeholder="Enter your word..."
-              autoFocus
-              maxLength={30}
-            />
+            {promptMode === 'sketch' ? (
+              <>
+                <SketchCanvas
+                  ref={sketchRef}
+                  strokeColor="#00D4FF"
+                  strokeWidth={3}
+                  style={{ width: '100%', height: 280, background: 'rgba(0,0,0,0.4)', borderRadius: 4, border: '1px solid rgba(0,212,255,0.4)' }}
+                />
+                <button
+                  style={{ ...styles.submitBtn, marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#ADB5BD', border: '1px solid rgba(255,255,255,0.15)', fontSize: 11 }}
+                  onClick={() => sketchRef.current?.clear()}
+                >
+                  CLEAR
+                </button>
+              </>
+            ) : (
+              <input
+                style={styles.wordInput}
+                value={word}
+                onChange={(e) => setWord(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                placeholder="Enter your word..."
+                autoFocus
+                maxLength={30}
+              />
+            )}
             {error && <p style={styles.error}>{error}</p>}
             <button
               style={styles.submitBtn}
               onClick={handleSubmit}
-              disabled={submitting || !word.trim() || timeLeft === 0}
+              disabled={submitting || (promptMode === 'word' && !word.trim()) || timeLeft === 0}
             >
-              {submitting ? 'SUBMITTING...' : 'SUBMIT WORD'}
+              {submitting ? 'SUBMITTING...' : promptMode === 'sketch' ? 'SUBMIT SKETCH' : 'SUBMIT WORD'}
             </button>
           </div>
         )}
@@ -214,11 +272,34 @@ export default function MovementAScreen({
           <div style={styles.deliberationCard}>
             <p style={styles.deliberationTitle}>DELIBERATION</p>
             <p style={styles.deliberationSub}>Discuss with your group — who is ΣΚΟΤΊΑ?</p>
-            <div style={styles.wordList}>
-              {words.map((w, i) => (
-                <div key={i} style={styles.wordChip}>{w}</div>
-              ))}
-            </div>
+            {sketches.length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 8, justifyContent: 'center' }}>
+                {sketches.map((s, i) => {
+                  let parsed = null
+                  try { parsed = typeof s.sketchData === 'string' ? JSON.parse(s.sketchData) : s.sketchData } catch (e) {
+                    console.warn('Failed to parse sketchData:', e)
+                  }
+                  return (
+                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      <SketchThumbnail
+                        sketchData={parsed}
+                        size={120}
+                        isMe={String(s.userId) === String(currentUserId)}
+                      />
+                      <span style={{ fontFamily: 'Exo 2, sans-serif', fontSize: 11, color: '#ADB5BD' }}>
+                        {s.username}{String(s.userId) === String(currentUserId) ? ' (you)' : ''}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div style={styles.wordList}>
+                {words.map((w, i) => (
+                  <div key={i} style={styles.wordChip}>{w}</div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

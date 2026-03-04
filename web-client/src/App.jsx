@@ -17,6 +17,7 @@ import GameOverScreen from './screens/GameOverScreen.jsx'
 import GmDashboardScreen from './screens/GmDashboardScreen.jsx'
 import { storage } from './utils/storage.js'
 import { fetchCurrentLobby } from './utils/api.js'
+import { getSocketUrl } from './utils/network.js'
 
 function decodeJwt(token) {
   try {
@@ -45,6 +46,7 @@ const INITIAL_STATE = {
   isGm: false,
   roundSummary: null,
   gameOverResult: null,
+  movementBEndsAt: null,
 }
 
 export default function App() {
@@ -62,7 +64,7 @@ export default function App() {
     if (socketRef.current) {
       socketRef.current.disconnect()
     }
-    const socket = io(window.location.origin, {
+    const socket = io(getSocketUrl(), {
       auth: { token },
       transports: ['websocket', 'polling'],
     })
@@ -225,6 +227,7 @@ export default function App() {
       if (data.teamPoints) patchState({ teamPoints: data.teamPoints })
       if (data.roundNumber) patchState({ currentRound: data.roundNumber })
       if (data.totalRounds) patchState({ totalRounds: data.totalRounds })
+      if (data.movementBEndsAt) patchState({ movementBEndsAt: data.movementBEndsAt })
     }
 
     socket.on('roundSummary', onRoundSummary)
@@ -343,6 +346,10 @@ export default function App() {
           <MovementBScreen
             token={state.token}
             gameId={state.gameId}
+            currentUserId={state.currentUserId}
+            currentTeam={state.currentTeam}
+            currentGroupMembers={state.currentGroupMembers}
+            movementBEndsAt={state.movementBEndsAt}
             socket={socketRef.current}
             onMovementEnd={handleMovementEnd}
           />

@@ -48,6 +48,9 @@ export const fetchMovementAPrompt = (t, gameId) =>
 export const submitMovementAWord = (t, gameId, word) =>
   req(`/api/games/${gameId}/movement-a/submit`, { method: 'POST', headers: { ...jsonH, ...authH(t) }, body: JSON.stringify({ word }) })
 
+export const submitMovementASketch = (t, gameId, sketchData) =>
+  req(`/api/games/${gameId}/movement-a/submit`, { method: 'POST', headers: { ...jsonH, ...authH(t) }, body: JSON.stringify({ sketchData: JSON.stringify(sketchData) }) })
+
 export const submitVotes = (t, gameId, votes) =>
   req(`/api/games/${gameId}/movement-c/vote`, { method: 'POST', headers: { ...jsonH, ...authH(t) }, body: JSON.stringify({ votes }) })
 

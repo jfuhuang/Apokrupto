@@ -5,15 +5,12 @@ import { register } from '../utils/api.js'
 export default function RegisterScreen({ onSuccess, onBack }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function handleRegister() {
     setError('')
-    if (!username.trim() || !password || !confirm) return setError('Please fill in all fields.')
-    if (password !== confirm) return setError('Passwords do not match.')
-    if (password.length < 6) return setError('Password must be at least 6 characters.')
+    if (!username.trim() || !password) return setError('Please fill in all fields.')
     setLoading(true)
     const res = await register(username.trim(), password)
     setLoading(false)
@@ -47,19 +44,8 @@ export default function RegisterScreen({ onSuccess, onBack }) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="min. 6 characters"
-              autoComplete="new-password"
-            />
-          </div>
-          <div style={styles.fieldGroup}>
-            <label style={styles.label}>CONFIRM PASSWORD</label>
-            <input
-              style={styles.input}
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
-              placeholder="repeat password"
+              placeholder="your_password"
               autoComplete="new-password"
             />
           </div>
