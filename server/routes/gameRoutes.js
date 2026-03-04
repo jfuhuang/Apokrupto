@@ -3,6 +3,7 @@ const router  = express.Router();
 const auth    = require('../middleware/auth');
 const { GM_USERNAMES } = require('../utils/config');
 const db      = require('../db');
+const logger  = require('../utils/logger');
 const {
   POINTS,
   createGame,
@@ -39,6 +40,7 @@ const { getTask } = require('../data/tasks');
 // ---------------------------------------------------------------------------
 router.post('/', auth, async (req, res) => {
   const { lobbyId, totalRounds } = req.body;
+  logger.info('game', `POST /games — user=${req.user.username} lobbyId=${lobbyId}`);
   if (!lobbyId) return res.status(400).json({ error: 'lobbyId is required' });
 
   try {
@@ -56,8 +58,10 @@ router.post('/', auth, async (req, res) => {
     }
 
     const gameId = await createGame(lobbyId, totalRounds || 4);
+    logger.info('game', `POST /games — created gameId=${gameId}`);
     res.status(201).json({ gameId });
   } catch (err) {
+    logger.error('game', `POST /games — ${err.message}`);
     console.error('[POST /games]', err.message);
     res.status(500).json({ error: err.message });
   }
@@ -70,6 +74,7 @@ router.post('/', auth, async (req, res) => {
 // ---------------------------------------------------------------------------
 router.post('/:gameId/start', auth, async (req, res) => {
   const { gameId } = req.params;
+  logger.info('game', `POST /games/${gameId}/start — user=${req.user.username}`);
 
   try {
     // Verify caller is the lobby host
@@ -130,6 +135,7 @@ router.post('/:gameId/start', auth, async (req, res) => {
 // ---------------------------------------------------------------------------
 router.post('/:gameId/advance', auth, async (req, res) => {
   const { gameId } = req.params;
+  logger.info('game', `POST /games/${gameId}/advance — user=${req.user.username}`);
 
   try {
     // Verify caller is the lobby host
@@ -152,6 +158,7 @@ router.post('/:gameId/advance', auth, async (req, res) => {
     clearAllGroupTimersForGame(gameId);   // cancel any pending turn/reveal timers
     const result = await advanceMovement(gameId);
     emitAdvanceEvents(getIO(), result);
+    logger.info('game', `POST /games/${gameId}/advance — step=${result.step}`);
 
     res.json({ ok: true, ...result });
   } catch (err) {
@@ -179,8 +186,10 @@ router.get('/:gameId/state', auth, async (req, res) => {
   try {
     const state = await getPlayerState(gameId, userId);
     if (!state) return res.status(404).json({ error: 'Player not found in this game' });
+    logger.info('game', `GET /games/${gameId}/state — user=${req.user.username} movement=${state.currentMovement || '?'}`);
     res.json({ ...state, deliberationEndsAt: getDeliberationEndsAt(gameId) });
   } catch (err) {
+    logger.error('game', `GET /games/${gameId}/state — ${err.message}`);
     console.error('[GET /games/:id/state]', err.message);
     res.status(500).json({ error: 'Server error' });
   }
@@ -192,6 +201,7 @@ router.get('/:gameId/state', auth, async (req, res) => {
 // ---------------------------------------------------------------------------
 router.get('/:gameId/gm-state', auth, async (req, res) => {
   const { gameId } = req.params;
+  logger.info('game', `GET /games/${gameId}/gm-state — user=${req.user.username}`);
   const empty = {
     players:   [],
     gameState: { round: null, totalRounds: null, movement: null, status: 'waiting' },
@@ -290,6 +300,7 @@ router.get('/:gameId/gm-state', auth, async (req, res) => {
 router.get('/:gameId/movement-a/prompt', auth, async (req, res) => {
   const { gameId } = req.params;
   const userId = req.user.sub;
+  logger.info('game', `GET /games/${gameId}/movement-a/prompt — user=${req.user.username}`);
 
   try {
     // Get player's team
@@ -514,6 +525,7 @@ router.post('/:gameId/movement-a/submit/word', auth, async (req, res) => {
   const { gameId } = req.params;
   const userId     = req.user.sub;
   const { word }   = req.body;
+  logger.info('game', `POST /games/${gameId}/movement-a/submit/word — user=${req.user.username} word="${(word||'').slice(0,20)}"`);
 
   if (!word || !word.trim()) {
     return res.status(400).json({ error: 'word is required' });
@@ -569,6 +581,7 @@ router.post('/:gameId/movement-a/submit/sketch', auth, async (req, res) => {
   const { gameId }    = req.params;
   const userId        = req.user.sub;
   const { sketchData } = req.body;
+  logger.info('game', `POST /games/${gameId}/movement-a/submit/sketch — user=${req.user.username} strokes=${sketchData?.strokes?.length || 0}`);
 
   if (!sketchData || typeof sketchData !== 'object') {
     return res.status(400).json({ error: 'sketchData is required' });
@@ -621,6 +634,7 @@ router.post('/:gameId/movement-c/vote', auth, async (req, res) => {
   const { gameId } = req.params;
   const userId     = req.user.sub;
   const { votes }  = req.body;
+  logger.info('game', `POST /games/${gameId}/movement-c/vote — user=${req.user.username} targets=${votes ? Object.keys(votes).length : 0}`);
 
   if (!votes || typeof votes !== 'object') {
     return res.status(400).json({ error: 'votes object is required' });
@@ -702,6 +716,7 @@ router.post('/:gameId/movement-b/complete', auth, async (req, res) => {
   const { gameId } = req.params;
   const userId     = req.user.sub;
   const { taskId, bonusPoints: rawBonus } = req.body;
+  logger.info('game', `POST /games/${gameId}/movement-b/complete — user=${req.user.username} taskId=${taskId}`);
 
   if (!taskId) return res.status(400).json({ error: 'taskId is required' });
 
@@ -785,6 +800,7 @@ router.post('/:gameId/movement-b/fail', auth, async (req, res) => {
   const { gameId } = req.params;
   const userId     = req.user.sub;
   const { taskId } = req.body;
+  logger.info('game', `POST /games/${gameId}/movement-b/fail — user=${req.user.username} taskId=${taskId}`);
 
   if (!taskId) return res.status(400).json({ error: 'taskId is required' });
 
@@ -855,6 +871,7 @@ router.post('/:gameId/movement-b/fail', auth, async (req, res) => {
 // ---------------------------------------------------------------------------
 router.post('/:gameId/broadcast', auth, async (req, res) => {
   const { message, lobbyId } = req.body;
+  logger.info('game', `POST /games/${req.params.gameId}/broadcast — user=${req.user.username}`);
   if (!message || typeof message !== 'string' || !message.trim()) {
     return res.status(400).json({ error: 'message is required' });
   }

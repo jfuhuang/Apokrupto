@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 const SALT_ROUNDS = 10;
@@ -15,6 +16,7 @@ if (!JWT_SECRET) {
 router.post('/register', async (req, res) => {
   try {
     const { username, password } = req.body;
+    logger.info('auth', `POST /register — username=${username || '?'}`);
 
     // Check if input fields are valid
     if (!username || !password) {
@@ -39,11 +41,13 @@ router.post('/register', async (req, res) => {
 
     // Return the username and JWT
     const token = jwt.sign({ sub: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+    logger.info('auth', `POST /register — created user=${user.username} id=${user.id}`);
     res.status(201).json({
       username: user.username,
       token
     });
   } catch (err) {
+    logger.error('auth', `POST /register — ${err.message}`);
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
@@ -52,6 +56,7 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
+    logger.info('auth', `POST /login — username=${username || '?'}`);
 
     // Check if input fields are valid
     if (!username || !password) {
@@ -76,11 +81,13 @@ router.post('/login', async (req, res) => {
 
     // Return JWT and username
     const token = jwt.sign({ sub: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+    logger.info('auth', `POST /login — ok user=${user.username}`);
     res.json({
       username: user.username,
       token
     });
   } catch (err) {
+    logger.error('auth', `POST /login — ${err.message}`);
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }

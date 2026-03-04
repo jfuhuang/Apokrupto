@@ -5,6 +5,7 @@ const { GM_USERNAMES, JWT_SECRET } = require('../utils/config');
 const ioModule = require('./io');
 const gameService = require('../services/gameService');
 const coopService = require('../services/coopService');
+const logger = require('../utils/logger');
 
 // In-memory map of lobbyId -> Set of connected userIds (as strings)
 const lobbyConnections = new Map();
@@ -271,6 +272,7 @@ function setupLobbySocket(httpServer) {
           return;
         }
 
+        logger.info('socket', `joinRoom lobby:${roomKey} — playerCount=${state?.players?.length}`);
         console.log(`[WS] Sending lobbyUpdate to lobby:${roomKey}`, {
           playerCount: state?.players?.length,
           roomKey,
@@ -279,6 +281,7 @@ function setupLobbySocket(httpServer) {
 
         if (callback) callback({ ok: true, totalInnocentPoints: state.totalInnocentPoints ?? 0 });
       } catch (err) {
+        logger.error('socket', `joinRoom error: ${err.message}`);
         console.error('[WS] joinRoom error:', err);
         if (callback) callback({ error: err.message });
       }
@@ -286,6 +289,7 @@ function setupLobbySocket(httpServer) {
 
     // Host starts the game (Phos/Skotia social deduction)
     socket.on('startGame', async ({ lobbyId }, callback) => {
+      logger.info('socket', `startGame — user=${socket.username} lobbyId=${lobbyId}`);
       try {
         const lobbyRes = await pool.query(
           'SELECT created_by, status FROM lobbies WHERE id = $1',
@@ -317,6 +321,7 @@ function setupLobbySocket(httpServer) {
         const { playerTeams, playerGroups, skotiaPlayers, groups } =
           await gameService.startGame(gameId, { excludeUserIds: [...gmUserIds] });
 
+        logger.info('socket', `startGame OK — lobby=${lobbyId} gameId=${gameId} skotia=${skotiaPlayers.length} phos=${playerTeams.size - skotiaPlayers.length}`);
         console.log(
           `[WS] startGame lobby ${lobbyId}: gameId=${gameId}, ` +
           `${skotiaPlayers.length} skotia / ${playerTeams.size - skotiaPlayers.length} phos` +
@@ -367,6 +372,7 @@ function setupLobbySocket(httpServer) {
 
         if (callback) callback({ ok: true, gameId });
       } catch (err) {
+        logger.error('socket', `startGame error: ${err.message}`);
         console.error('[WS] startGame error:', err.message);
         if (callback) callback({ error: err.message });
       }
@@ -374,6 +380,7 @@ function setupLobbySocket(httpServer) {
 
     // GM advances the game to the next movement/phase
     socket.on('gmAdvance', async ({ gameId } = {}, callback) => {
+      logger.info('socket', `gmAdvance — user=${socket.username} gameId=${gameId}`);
       try {
         if (!gameId) throw new Error('gameId is required');
 
@@ -396,6 +403,7 @@ function setupLobbySocket(httpServer) {
         gameService.clearVotingTimer(gameId);           // cancel voting timer if pending
         gameService.clearAllGroupTimersForGame(gameId); // cancel per-group turn/reveal timers
         const result = await gameService.advanceMovement(gameId);
+        logger.info('socket', `gmAdvance OK — game=${gameId} step=${result.step}`);
         console.log(`[WS] gmAdvance game ${gameId}: step=${result.step}`);
 
         // Emit the appropriate socket events (shared logic with REST route)
@@ -421,6 +429,7 @@ function setupLobbySocket(httpServer) {
 
     // Clean up on disconnect
     socket.on('disconnect', async () => {
+      logger.info('socket', `disconnect — user=${socket.username || socket.userId} socketId=${socket.id}`);
       console.log(`[WS] Disconnected: ${socket.id} (user: ${socket.userId})`);
 
       if (currentLobbyId) {

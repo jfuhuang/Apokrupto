@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const authenticateToken = require('../middleware/auth');
 const { GM_USERNAMES, ADMIN_USERNAMES } = require('../utils/config');
+const logger = require('../utils/logger');
 const { broadcastLobbyUpdate, addFakeConnection, broadcastPointsUpdate, broadcastPlayerKicked } = require('../websocket/lobbySocket');
 const { getTask } = require('../data/tasks');
 
@@ -53,6 +54,7 @@ router.get('/', async (req, res) => {
 router.get('/current', async (req, res) => {
   try {
     const userId = req.user.sub;
+    logger.info('lobby', `GET /lobbies/current — user=${req.user.username}`);
 
     const result = await pool.query(`
       SELECT lp.lobby_id as id, l.name, l.status, lp.role,
@@ -94,6 +96,7 @@ router.get('/current', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    logger.info('lobby', `GET /lobbies/${id} — user=${req.user.username}`);
     
     const result = await pool.query(`
       SELECT 
@@ -128,6 +131,7 @@ router.post('/', async (req, res) => {
   try {
     const { name, max_players } = req.body;
     const userId = req.user.sub;
+    logger.info('lobby', `POST /lobbies — user=${req.user.username} name="${name}" max=${max_players}`);
     
     // Validate input
     if (!name || !max_players) {
@@ -168,6 +172,7 @@ router.post('/:id/join', async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.sub;
+    logger.info('lobby', `POST /lobbies/${id}/join — user=${req.user.username}`);
     
     // Check if lobby exists and is joinable
     const lobbyResult = await pool.query(`
@@ -272,6 +277,7 @@ router.post('/:id/leave', async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.sub;
+    logger.info('lobby', `POST /lobbies/${id}/leave — user=${req.user.username}`);
     
     // Use a transaction to handle leaving and cleanup atomically
     const client = await pool.connect();
@@ -318,6 +324,7 @@ router.post('/:id/tasks/complete', async (req, res) => {
   const { id } = req.params;
   const userId = req.user.sub;
   const { taskId } = req.body;
+  logger.info('lobby', `POST /lobbies/${id}/tasks/complete — user=${req.user.username} taskId=${taskId}`);
 
   if (!taskId) return res.status(400).json({ error: 'taskId is required' });
 
@@ -568,6 +575,7 @@ router.post('/:id/tasks/complete', async (req, res) => {
 // Force-end an in-progress game — admin only
 router.post('/:id/force-end', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  logger.info('lobby', `POST /lobbies/${id}/force-end — user=${req.user.username}`);
   try {
     const { getIO } = require('../websocket/io');
     const { cleanupGameData } = require('../services/gameService');
