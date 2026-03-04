@@ -130,60 +130,57 @@ export default function CoopHoldTask({ task, role, currentTeam, onAction, update
   });
 
   return (
-    <View style={styles.root}>
-      {/* Top content group */}
-      <View style={styles.topGroup}>
-        <Text style={[styles.timer, timeLeft <= 5 && { color: colors.primary.neonRed }]}>
-          {timeLeft}s
-        </Text>
+    <TaskContainer>
+      <Text style={[styles.timer, timeLeft <= 5 && { color: colors.primary.neonRed }]}>
+        {timeLeft}s
+      </Text>
 
-        <Text style={styles.instruction}>Both players must hold down at the same time</Text>
+      <Text style={styles.instruction}>Both players must hold down at the same time</Text>
 
-        {/* Ring indicators */}
-        <View style={styles.ringRow}>
-          <View style={styles.ringWrapper}>
-            <Animated.View
-              style={[
-                styles.ring,
-                {
-                  borderColor: youBorderColor,
-                  backgroundColor: holding ? teamColor + '20' : 'transparent',
-                },
-              ]}
-            >
-              <Text style={styles.ringEmoji}>{holding ? '✋' : '👋'}</Text>
-            </Animated.View>
-            <Text style={styles.ringLabel}>YOU</Text>
-          </View>
-
-          <View style={styles.ringWrapper}>
-            <Animated.View
-              style={[
-                styles.ring,
-                {
-                  borderColor: partnerBorderColor,
-                  backgroundColor: partnerHolding ? teamColor + '20' : 'transparent',
-                },
-              ]}
-            >
-              <Text style={styles.ringEmoji}>{partnerHolding ? '✋' : '👋'}</Text>
-            </Animated.View>
-            <Text style={styles.ringLabel}>PARTNER</Text>
-          </View>
+      {/* Ring indicators */}
+      <View style={styles.ringRow}>
+        <View style={styles.ringWrapper}>
+          <Animated.View
+            style={[
+              styles.ring,
+              {
+                borderColor: youBorderColor,
+                backgroundColor: holding ? teamColor + '20' : 'transparent',
+              },
+            ]}
+          >
+            <Text style={styles.ringEmoji}>{holding ? '✋' : '👋'}</Text>
+          </Animated.View>
+          <Text style={styles.ringLabel}>YOU</Text>
         </View>
 
-        {/* Elapsed timer */}
-        <Text style={[styles.elapsed, { color: teamColor }]}>
-          {(elapsedMs / 1000).toFixed(1)}s / {(targetMs / 1000).toFixed(1)}s
-        </Text>
-
-        {/* Progress bar */}
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: teamColor }]} />
+        <View style={styles.ringWrapper}>
+          <Animated.View
+            style={[
+              styles.ring,
+              {
+                borderColor: partnerBorderColor,
+                backgroundColor: partnerHolding ? teamColor + '20' : 'transparent',
+              },
+            ]}
+          >
+            <Text style={styles.ringEmoji}>{partnerHolding ? '✋' : '👋'}</Text>
+          </Animated.View>
+          <Text style={styles.ringLabel}>PARTNER</Text>
         </View>
       </View>
 
-      {/* Hold area — always visible at bottom */}
+      {/* Elapsed timer */}
+      <Text style={[styles.elapsed, { color: teamColor }]}>
+        {(elapsedMs / 1000).toFixed(1)}s / {(targetMs / 1000).toFixed(1)}s
+      </Text>
+
+      {/* Progress bar */}
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: teamColor }]} />
+      </View>
+
+      {/* Hold area */}
       <Pressable
         style={[styles.holdButton, holding && { borderColor: teamColor, backgroundColor: teamColor + '15' }]}
         onPressIn={handlePressIn}
@@ -193,51 +190,42 @@ export default function CoopHoldTask({ task, role, currentTeam, onAction, update
           {holding ? 'HOLDING...' : 'HOLD HERE'}
         </Text>
       </Pressable>
-    </View>
+    </TaskContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    padding: 16,
-    justifyContent: 'space-between',
-  },
-  topGroup: {
-    alignItems: 'center',
-    gap: 12,
-  },
   timer: {
     fontFamily: fonts.accent.bold,
-    fontSize: 28,
+    fontSize: 20,
     color: colors.text.primary,
     letterSpacing: 2,
   },
   instruction: {
     fontFamily: fonts.ui.regular,
-    fontSize: 13,
+    fontSize: 12,
     color: colors.text.secondary,
     textAlign: 'center',
   },
   ringRow: {
     flexDirection: 'row',
-    gap: 32,
+    gap: 24,
     alignItems: 'center',
   },
   ringWrapper: {
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   ring: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ringEmoji: {
-    fontSize: 28,
+    fontSize: 22,
   },
   ringLabel: {
     fontFamily: fonts.display.bold,
@@ -247,23 +235,23 @@ const styles = StyleSheet.create({
   },
   elapsed: {
     fontFamily: fonts.accent.bold,
-    fontSize: 16,
+    fontSize: 13,
     letterSpacing: 1,
   },
   progressTrack: {
     width: '100%',
-    height: 8,
+    height: 6,
     backgroundColor: colors.background.frost,
-    borderRadius: 4,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 3,
   },
   holdButton: {
     width: '100%',
-    height: 80,
+    height: 64,
     borderRadius: 16,
     borderWidth: 2,
     borderColor: colors.background.frost,
