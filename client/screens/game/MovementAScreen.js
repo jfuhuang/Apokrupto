@@ -215,11 +215,12 @@ export default function MovementAScreen({
   useEffect(() => { promptModeRef.current = promptMode; }, [promptMode]);
   useEffect(() => { sketchDataRef.current = sketchData; }, [sketchData]);
 
-  // Lock to portrait while the player is actively drawing; revert to landscape otherwise.
+  // Unlock orientation while the player is actively drawing so they can freely
+  // rotate to portrait or landscape. Lock back to landscape on any other phase.
   useEffect(() => {
     const isDrawing = phase === 'my_turn' && promptMode === 'sketch';
     if (isDrawing) {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      ScreenOrientation.unlockAsync();
     } else {
       ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
     }

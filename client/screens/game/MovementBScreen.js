@@ -18,7 +18,6 @@ import { MOVEMENT_NAMES } from '../../constants/movementNames';
 import { MOVEMENT_B_DURATION_MS } from '../../constants/timings';
 import SusIcon from '../../components/SusIcon';
 import { useGame } from '../../context/GameContext';
-import { fonts } from '../../theme/typography';
 
 export default function MovementBScreen({
   token,

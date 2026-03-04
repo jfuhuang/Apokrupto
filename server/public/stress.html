@@ -306,10 +306,38 @@
 <div class="section">
   <h2>7️⃣ Movement B — Co-op Rush</h2>
   <p style="font-size:0.7rem;color:var(--muted);margin-bottom:6px;">
-    Pairs up bots and runs coop sessions via Socket.IO — stress tests the coop invite/accept/action flow.
+    Set up pairs, test invite/accept flow, then run coop task sessions.
   </p>
+
+  <h3>Pair Setup</h3>
   <div class="btn-row">
-    <button id="btn-coop-rush" onclick="runCoopRush()">Run Coop Rush (paired)</button>
+    <button id="btn-auto-pair" onclick="autoGeneratePairs()">Auto-Pair All Bots</button>
+    <button id="btn-clear-pairs" onclick="clearPairs()" class="danger">Clear Pairs</button>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:6px;align-items:flex-end;flex-wrap:wrap;">
+    <label>
+      Bot A
+      <select id="pair-bot-a" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-family:var(--font);font-size:0.8rem;width:140px;"></select>
+    </label>
+    <label>
+      Bot B
+      <select id="pair-bot-b" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-family:var(--font);font-size:0.8rem;width:140px;"></select>
+    </label>
+    <button onclick="addManualPair()" style="margin-bottom:1px;">+ Add Pair</button>
+  </div>
+  <div id="pairs-list" style="margin-top:8px;font-size:0.75rem;max-height:160px;overflow-y:auto;"></div>
+
+  <h3>Invite & Session Flow</h3>
+  <div class="btn-row">
+    <button id="btn-send-invites" onclick="runSendInvites()">Send Invites</button>
+    <button id="btn-accept-invites" onclick="runAcceptInvites()">Accept All Invites</button>
+    <button id="btn-invite-accept" onclick="runInviteAndAccept()">Invite + Accept (full)</button>
+  </div>
+  <div id="invite-status" style="margin-top:4px;font-size:0.7rem;color:var(--muted);"></div>
+
+  <h3>Coop Tasks</h3>
+  <div class="btn-row">
+    <button id="btn-coop-rush" onclick="runCoopRush()">Run Coop Rush</button>
   </div>
   <label style="flex-direction:row;align-items:center;gap:6px;margin-top:6px;">
     Tasks per pair:
@@ -373,6 +401,7 @@ const state = {
   currentMovement: null,
   errors: 0,
   aborted: false,
+  coopPairs: [],    // [{ botA, botB, inviteId?, sessionId? }]
 };
 
 // Available task IDs for Movement B rush
@@ -1219,43 +1248,250 @@ async function runCompleteB() {
 }
 
 // =========================================================================
-// 7. Co-op Rush
+// 7. Co-op Rush — Pair Setup, Invite Flow, Tasks
 // =========================================================================
+
+// ── Pair Management ──────────────────────────────────────────────────────
+
+function getAvailableBots() {
+  return state.bots.filter(b => !b.isGm && b.socket?.connected);
+}
+
+function getPairedUserIds() {
+  const ids = new Set();
+  for (const p of state.coopPairs) {
+    ids.add(p.botA.userId);
+    ids.add(p.botB.userId);
+  }
+  return ids;
+}
+
+function refreshPairDropdowns() {
+  const paired = getPairedUserIds();
+  const available = getAvailableBots().filter(b => !paired.has(b.userId));
+  const selA = document.getElementById('pair-bot-a');
+  const selB = document.getElementById('pair-bot-b');
+  selA.innerHTML = available.map(b => `<option value="${b.userId}">${b.username}</option>`).join('');
+  selB.innerHTML = available.map(b => `<option value="${b.userId}">${b.username}</option>`).join('');
+}
+
+function renderPairsList() {
+  const el = document.getElementById('pairs-list');
+  if (state.coopPairs.length === 0) {
+    el.innerHTML = '<span style="color:var(--muted);">No pairs configured. Use Auto-Pair or add manually.</span>';
+    refreshPairDropdowns();
+    return;
+  }
+  el.innerHTML = state.coopPairs.map((p, i) => {
+    const statusBadge = p.sessionId
+      ? `<span style="color:var(--green);">● session</span>`
+      : p.inviteId
+        ? `<span style="color:var(--yellow);">● invited</span>`
+        : `<span style="color:var(--muted);">○ idle</span>`;
+    return `<div style="display:flex;gap:8px;align-items:center;padding:2px 0;">
+      <span style="color:var(--blue);min-width:20px;">#${i + 1}</span>
+      <span style="color:var(--text);">${p.botA.username}</span>
+      <span style="color:var(--muted);">⟷</span>
+      <span style="color:var(--text);">${p.botB.username}</span>
+      ${statusBadge}
+      <button onclick="removePair(${i})" style="padding:2px 6px;font-size:0.65rem;border-color:var(--red);color:var(--red);">✕</button>
+    </div>`;
+  }).join('');
+  refreshPairDropdowns();
+}
+
+function autoGeneratePairs() {
+  state.coopPairs = [];
+  const players = getAvailableBots();
+  for (let i = 0; i < players.length - 1; i += 2) {
+    state.coopPairs.push({ botA: players[i], botB: players[i + 1], inviteId: null, sessionId: null });
+  }
+  logOk(`Auto-paired ${state.coopPairs.length} pairs from ${players.length} connected bots`);
+  if (players.length % 2 !== 0) {
+    logWarn(`${players[players.length - 1].username} is unpaired (odd number of bots)`);
+  }
+  renderPairsList();
+}
+
+function clearPairs() {
+  state.coopPairs = [];
+  renderPairsList();
+  document.getElementById('invite-status').textContent = '';
+  log('Pairs cleared.');
+}
+
+function addManualPair() {
+  const selA = document.getElementById('pair-bot-a');
+  const selB = document.getElementById('pair-bot-b');
+  const uidA = selA.value;
+  const uidB = selB.value;
+  if (!uidA || !uidB) { logErr('Select two bots first.'); return; }
+  if (uidA === uidB) { logErr('Cannot pair a bot with itself.'); return; }
+  const botA = state.bots.find(b => b.userId === uidA);
+  const botB = state.bots.find(b => b.userId === uidB);
+  if (!botA || !botB) { logErr('Bot not found.'); return; }
+  state.coopPairs.push({ botA, botB, inviteId: null, sessionId: null });
+  logOk(`Added pair: ${botA.username} ⟷ ${botB.username}`);
+  renderPairsList();
+}
+
+function removePair(index) {
+  const removed = state.coopPairs.splice(index, 1)[0];
+  if (removed) log(`Removed pair: ${removed.botA.username} ⟷ ${removed.botB.username}`);
+  renderPairsList();
+}
+
+// ── Invite & Session Flow ────────────────────────────────────────────────
+
+async function runSendInvites() {
+  setBusy('btn-send-invites', true);
+  if (state.coopPairs.length === 0) { logErr('No pairs. Auto-pair or add manually first.'); setBusy('btn-send-invites', false); return; }
+  if (!state.gameId) { logErr('No game.'); setBusy('btn-send-invites', false); return; }
+
+  log(`Sending ${state.coopPairs.length} coop invites...`);
+  const statusEl = document.getElementById('invite-status');
+  let ok = 0, fail = 0;
+
+  for (const pair of state.coopPairs) {
+    try {
+      // Listen for invite on target bot
+      const invitePromise = waitForEvent(pair.botB.socket, 'coopInviteReceived', 15000);
+
+      // Send invite
+      pair.botA.socket.emit('coopInvite', { gameId: state.gameId, targetUserId: pair.botB.userId });
+
+      const invite = await invitePromise;
+      pair.inviteId = invite.inviteId;
+      ok++;
+    } catch (err) {
+      fail++;
+      logErr(`Invite ${pair.botA.username} → ${pair.botB.username}: ${err.message}`);
+    }
+  }
+
+  statusEl.textContent = `Invites sent: ${ok} ok, ${fail} fail. ${ok} pairs ready to accept.`;
+  statusEl.style.color = fail === 0 ? 'var(--green)' : 'var(--yellow)';
+  logOk(`Invites: ${ok} sent, ${fail} failed`);
+  renderPairsList();
+  setBusy('btn-send-invites', false);
+}
+
+async function runAcceptInvites() {
+  setBusy('btn-accept-invites', true);
+  const pending = state.coopPairs.filter(p => p.inviteId && !p.sessionId);
+  if (pending.length === 0) { logErr('No pending invites to accept. Send invites first.'); setBusy('btn-accept-invites', false); return; }
+
+  log(`Accepting ${pending.length} coop invites...`);
+  const statusEl = document.getElementById('invite-status');
+  let ok = 0, fail = 0;
+
+  for (const pair of pending) {
+    try {
+      const sessionStartA = waitForEvent(pair.botA.socket, 'coopSessionStart', 15000);
+      const sessionStartB = waitForEvent(pair.botB.socket, 'coopSessionStart', 15000);
+
+      pair.botB.socket.emit('coopAccept', { inviteId: pair.inviteId });
+
+      const [sessA, sessB] = await Promise.all([sessionStartA, sessionStartB]);
+      pair.sessionId = sessA.sessionId;
+      pair.sessA = sessA;
+      pair.sessB = sessB;
+      ok++;
+    } catch (err) {
+      fail++;
+      logErr(`Accept ${pair.botA.username}+${pair.botB.username}: ${err.message}`);
+    }
+  }
+
+  statusEl.textContent = `Sessions created: ${ok} ok, ${fail} fail. ${ok} pairs in active sessions.`;
+  statusEl.style.color = fail === 0 ? 'var(--green)' : 'var(--yellow)';
+  logOk(`Sessions: ${ok} created, ${fail} failed`);
+  renderPairsList();
+  setBusy('btn-accept-invites', false);
+}
+
+async function runInviteAndAccept() {
+  setBusy('btn-invite-accept', true);
+  if (state.coopPairs.length === 0) { logErr('No pairs. Auto-pair or add manually first.'); setBusy('btn-invite-accept', false); return; }
+  if (!state.gameId) { logErr('No game.'); setBusy('btn-invite-accept', false); return; }
+
+  log(`Invite + Accept for ${state.coopPairs.length} pairs...`);
+  const statusEl = document.getElementById('invite-status');
+  const t0 = Date.now();
+  let ok = 0, fail = 0;
+
+  for (const pair of state.coopPairs) {
+    try {
+      // Send invite
+      const invitePromise = waitForEvent(pair.botB.socket, 'coopInviteReceived', 15000);
+      pair.botA.socket.emit('coopInvite', { gameId: state.gameId, targetUserId: pair.botB.userId });
+      const invite = await invitePromise;
+      pair.inviteId = invite.inviteId;
+
+      // Accept invite
+      const sessionStartA = waitForEvent(pair.botA.socket, 'coopSessionStart', 15000);
+      const sessionStartB = waitForEvent(pair.botB.socket, 'coopSessionStart', 15000);
+      pair.botB.socket.emit('coopAccept', { inviteId: pair.inviteId });
+      const [sessA, sessB] = await Promise.all([sessionStartA, sessionStartB]);
+      pair.sessionId = sessA.sessionId;
+      pair.sessA = sessA;
+      pair.sessB = sessB;
+      ok++;
+    } catch (err) {
+      fail++;
+      logErr(`Invite+Accept ${pair.botA.username}+${pair.botB.username}: ${err.message}`);
+    }
+  }
+
+  statusEl.textContent = `Full flow: ${ok} sessions created, ${fail} failed in ${elapsed(t0)}.`;
+  statusEl.style.color = fail === 0 ? 'var(--green)' : 'var(--yellow)';
+  logOk(`Invite+Accept done: ${ok} sessions, ${fail} failed, ${elapsed(t0)}`);
+  renderPairsList();
+  setBusy('btn-invite-accept', false);
+}
+
+// ── Coop Task Rush ───────────────────────────────────────────────────────
 
 async function runCoopRush() {
   setBusy('btn-coop-rush', true);
   if (!state.gameId) { logErr('No game.'); setBusy('btn-coop-rush', false); return; }
 
-  const players = state.bots.filter(b => !b.isGm && b.socket?.connected);
-  const tasksPerPair = parseInt(document.getElementById('coopTasksPerPair').value) || 5;
-
-  // Pair up players (adjacent pairs)
-  const pairs = [];
-  for (let i = 0; i < players.length - 1; i += 2) {
-    pairs.push([players[i], players[i + 1]]);
+  // Use configured pairs, or auto-pair if none set
+  if (state.coopPairs.length === 0) {
+    autoGeneratePairs();
   }
+  const pairs = state.coopPairs;
+  if (pairs.length === 0) { logErr('No pairs available.'); setBusy('btn-coop-rush', false); return; }
+
+  const tasksPerPair = parseInt(document.getElementById('coopTasksPerPair').value) || 5;
 
   log(`Coop rush: ${pairs.length} pairs × ${tasksPerPair} tasks = ${pairs.length * tasksPerPair} coop sessions...`);
   const t0 = Date.now();
   let sessionsOk = 0, sessionsFail = 0;
 
-  const pairPromises = pairs.map(async ([botA, botB]) => {
+  const pairPromises = pairs.map(async (pair) => {
     for (let t = 0; t < tasksPerPair; t++) {
       if (state.aborted) break;
       try {
-        await runSingleCoopSession(botA, botB);
+        await runSingleCoopSession(pair.botA, pair.botB);
         sessionsOk++;
       } catch (err) {
         sessionsFail++;
-        logErr(`Coop (${botA.username}+${botB.username}) task ${t + 1}: ${err.message}`);
+        logErr(`Coop (${pair.botA.username}+${pair.botB.username}) task ${t + 1}: ${err.message}`);
       }
     }
+    // Reset session state after rush
+    pair.inviteId = null;
+    pair.sessionId = null;
+    pair.sessA = null;
+    pair.sessB = null;
   });
 
   await Promise.all(pairPromises);
 
   const dur = elapsed(t0);
   logOk(`Coop rush done: ${sessionsOk} ok, ${sessionsFail} fail, ${dur}`);
+  renderPairsList();
 
   setBusy('btn-coop-rush', false);
 }
@@ -1605,9 +1841,12 @@ async function runResetAll() {
   state.gameId = null;
   state.currentRound = null;
   state.currentMovement = null;
+  state.coopPairs = [];
   state.errors = 0;
   state.aborted = false;
   updateStats();
+  renderPairsList();
+  document.getElementById('invite-status').textContent = '';
   logOk('All state reset.');
 }
 
@@ -1620,6 +1859,7 @@ async function runResetAll() {
   const url = window.location.origin;
   document.getElementById('serverUrl').value = url;
   updateStats();
+  renderPairsList();
 })();
 </script>
 </body>
