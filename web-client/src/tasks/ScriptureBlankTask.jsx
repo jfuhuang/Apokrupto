@@ -1,39 +1,79 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 
-export default function ScriptureBlankTask({ config, taskId, onSuccess, onFail, timeLimit = 30 }) {
-  const before = config?.before ?? '"For God so loved the'
-  const after = config?.after ?? 'that he gave his one and only Son"'
-  const answer = config?.answer ?? 'world'
-  const hint = config?.hint ?? `Starts with "${answer[0]}"`
+function shuffle(arr) {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+export default function ScriptureBlankTask({ config, taskId, onSuccess, onFail, timeLimit = 45 }) {
+  // Config format: verseParts (N+1 strings), blanks (N correct words), distractors (wrong options)
+  const verseParts = config?.verseParts ?? ['"For God so loved the ', ', that he gave his one and only Son"']
+  const correctBlanks = config?.blanks ?? ['world']
+  const distractors = config?.distractors ?? ['earth', 'people']
+  const reference = config?.reference ?? 'John 3:16'
+
+  // Shuffle the combined word bank once per task instance
+  const wordBank = useMemo(() => shuffle([...correctBlanks, ...distractors]), [taskId])
 
   const [timeLeft, setTimeLeft] = useState(timeLimit)
-  const [input, setInput] = useState('')
+  const [filled, setFilled] = useState(() => Array(correctBlanks.length).fill(null))
+  const [usedWords, setUsedWords] = useState(new Set())
   const [showHint, setShowHint] = useState(false)
   const [done, setDone] = useState(false)
-  const [correct, setCorrect] = useState(false)
-  const [error, setError] = useState('')
+  const [allCorrect, setAllCorrect] = useState(false)
+  const [wrongSlots, setWrongSlots] = useState(new Set())
 
   useEffect(() => {
     if (done) return
     if (timeLeft <= 0) { onFail?.(); return }
-    const t = setTimeout(() => setTimeLeft((s) => s - 1), 1000)
+    const t = setTimeout(() => setTimeLeft(s => s - 1), 1000)
     return () => clearTimeout(t)
   }, [timeLeft, done, onFail])
 
+  function placeWord(word) {
+    if (done || usedWords.has(word)) return
+    const slotIdx = filled.findIndex(f => f === null)
+    if (slotIdx === -1) return
+    const next = [...filled]
+    next[slotIdx] = word
+    setFilled(next)
+    setUsedWords(prev => new Set([...prev, word]))
+  }
+
+  function removeFromSlot(slotIdx) {
+    if (done) return
+    const word = filled[slotIdx]
+    if (!word) return
+    const next = [...filled]
+    next[slotIdx] = null
+    setFilled(next)
+    setUsedWords(prev => { const s = new Set(prev); s.delete(word); return s })
+    setWrongSlots(prev => { const s = new Set(prev); s.delete(slotIdx); return s })
+  }
+
   function handleSubmit() {
-    if (!input.trim() || done) return
-    const isCorrect = input.trim().toLowerCase() === answer.toLowerCase()
+    if (done || filled.some(f => f === null)) return
+    const wrongs = new Set()
+    filled.forEach((word, i) => {
+      if (word?.toLowerCase() !== correctBlanks[i]?.toLowerCase()) wrongs.add(i)
+    })
     setDone(true)
-    setCorrect(isCorrect)
-    if (isCorrect) {
-      setTimeout(() => onSuccess?.(), 800)
+    if (wrongs.size === 0) {
+      setAllCorrect(true)
+      setTimeout(() => onSuccess?.(), 900)
     } else {
-      setError(`Incorrect. The answer was "${answer}"`)
-      setTimeout(() => onFail?.(), 1500)
+      setWrongSlots(wrongs)
+      setAllCorrect(false)
+      setTimeout(() => onFail?.(), 1600)
     }
   }
 
-  const timerColor = timeLeft > 10 ? '#00FF9F' : timeLeft > 5 ? '#FFA63D' : '#FF3366'
+  const allFilled = filled.every(f => f !== null)
+  const timerColor = timeLeft > 15 ? '#00FF9F' : timeLeft > 6 ? '#FFA63D' : '#FF3366'
 
   return (
     <div style={styles.container}>
@@ -42,49 +82,84 @@ export default function ScriptureBlankTask({ config, taskId, onSuccess, onFail, 
         <span style={{ ...styles.timer, color: timerColor }}>{timeLeft}s</span>
       </div>
 
+      {/* Verse with inline blank slots */}
       <div style={styles.scriptureBox}>
         <p style={styles.scriptureText}>
-          {before}&nbsp;
-          <span style={{
-            ...styles.blank,
-            borderColor: done ? (correct ? '#00FF9F' : '#FF3366') : '#8B5CF6',
-            color: done ? (correct ? '#00FF9F' : '#FF3366') : '#8B5CF6',
-          }}>
-            {done ? (input.trim() || '___') : (input.trim() || '______')}
-          </span>
-          &nbsp;{after}
+          {verseParts.map((part, i) => (
+            <span key={i}>
+              {part}
+              {i < correctBlanks.length && (
+                <span
+                  style={{
+                    ...styles.slot,
+                    borderColor: done
+                      ? wrongSlots.has(i) ? '#FF3366' : '#00FF9F'
+                      : filled[i] ? '#8B5CF6' : 'rgba(139,92,246,0.4)',
+                    color: done
+                      ? wrongSlots.has(i) ? '#FF3366' : '#00FF9F'
+                      : filled[i] ? '#E9ECEF' : 'rgba(139,92,246,0.45)',
+                    cursor: filled[i] && !done ? 'pointer' : 'default',
+                  }}
+                  onClick={() => removeFromSlot(i)}
+                  title={filled[i] && !done ? 'Click to remove' : undefined}
+                >
+                  {filled[i] ?? '______'}
+                </span>
+              )}
+            </span>
+          ))}
         </p>
+        <p style={styles.reference}>{reference}</p>
       </div>
 
+      {/* Word bank */}
       {!done && (
-        <div style={styles.inputRow}>
-          <input
-            style={styles.input}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-            placeholder="Fill in the blank..."
-            autoFocus
-          />
-          <button style={styles.submitBtn} onClick={handleSubmit}>SUBMIT</button>
+        <div style={styles.wordBank}>
+          {wordBank.map((word, i) => {
+            const used = usedWords.has(word)
+            return (
+              <button
+                key={i}
+                style={{ ...styles.wordChip, opacity: used ? 0.25 : 1, cursor: used ? 'default' : 'pointer' }}
+                onClick={() => placeWord(word)}
+                disabled={used}
+              >
+                {word}
+              </button>
+            )
+          })}
         </div>
       )}
 
+      {/* Submit */}
+      {!done && (
+        <button
+          style={{ ...styles.submitBtn, opacity: allFilled ? 1 : 0.4, cursor: allFilled ? 'pointer' : 'default' }}
+          onClick={handleSubmit}
+          disabled={!allFilled}
+        >
+          SUBMIT
+        </button>
+      )}
+
+      {/* Hint */}
       {!done && !showHint && (
         <button style={styles.hintBtn} onClick={() => setShowHint(true)}>
           I DON'T KNOW
         </button>
       )}
-
       {showHint && !done && (
         <div style={styles.hintBox}>
-          <p style={styles.hintLabel}>HINT</p>
-          <p style={styles.hintText}>{hint}</p>
+          <p style={styles.hintLabel}>CORRECT WORDS (in order)</p>
+          <p style={styles.hintText}>{correctBlanks.join(' · ')}</p>
         </div>
       )}
 
-      {error && <p style={styles.error}>{error}</p>}
-      {done && correct && <p style={styles.successText}>✓ CORRECT!</p>}
+      {/* Result */}
+      {done && allCorrect && <p style={styles.successText}>✓ CORRECT!</p>}
+      {done && !allCorrect && (
+        <p style={styles.errorText}>✗ Incorrect — answers: {correctBlanks.join(', ')}</p>
+      )}
     </div>
   )
 }
@@ -93,8 +168,8 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 16,
-    padding: '24px 16px',
+    gap: 14,
+    padding: '20px 16px',
     width: '100%',
   },
   header: {
@@ -122,45 +197,65 @@ const styles = {
   },
   scriptureText: {
     fontFamily: 'Exo 2, sans-serif',
-    fontSize: 17,
+    fontSize: 16,
     color: '#E9ECEF',
-    lineHeight: 1.8,
+    lineHeight: 2,
     fontStyle: 'italic',
+    margin: 0,
   },
-  blank: {
+  slot: {
     display: 'inline-block',
-    minWidth: 80,
-    padding: '2px 8px',
+    padding: '2px 10px',
+    borderRadius: 4,
     borderBottom: '2px solid',
     fontStyle: 'normal',
+    fontWeight: 700,
+    fontSize: 15,
+    letterSpacing: '0.04em',
+    transition: 'all 0.15s',
+    margin: '0 3px',
+    verticalAlign: 'middle',
+  },
+  reference: {
+    fontFamily: 'Rajdhani, sans-serif',
+    fontSize: 11,
     fontWeight: 600,
-    letterSpacing: '0.05em',
+    color: '#8B5CF6',
+    letterSpacing: '0.12em',
+    marginTop: 10,
+    marginBottom: 0,
+    opacity: 0.8,
   },
-  inputRow: {
+  wordBank: {
     display: 'flex',
+    flexWrap: 'wrap',
     gap: 8,
+    justifyContent: 'center',
   },
-  input: {
-    flex: 1,
-    background: 'rgba(11,12,16,0.8)',
-    border: '1px solid rgba(139,92,246,0.4)',
-    borderRadius: 4,
-    padding: '10px 14px',
-    color: '#F8F9FA',
-    fontSize: 16,
+  wordChip: {
+    padding: '8px 16px',
+    background: 'rgba(139,92,246,0.12)',
+    border: '1.5px solid rgba(139,92,246,0.5)',
+    borderRadius: 20,
+    color: '#C4B5FD',
+    fontFamily: 'Exo 2, sans-serif',
+    fontSize: 14,
+    fontWeight: 600,
+    transition: 'opacity 0.15s',
     outline: 'none',
+    letterSpacing: '0.03em',
   },
   submitBtn: {
-    padding: '10px 16px',
+    padding: '12px',
     background: 'transparent',
     border: '2px solid #8B5CF6',
-    borderRadius: 4,
+    borderRadius: 6,
     color: '#8B5CF6',
     fontFamily: 'Orbitron, sans-serif',
     fontSize: 12,
     fontWeight: 700,
-    cursor: 'pointer',
     letterSpacing: '0.08em',
+    transition: 'opacity 0.15s',
   },
   hintBtn: {
     padding: '10px',
@@ -184,18 +279,13 @@ const styles = {
     fontWeight: 700,
     color: '#FFA63D',
     letterSpacing: '0.15em',
-    marginBottom: 4,
+    margin: '0 0 4px',
   },
   hintText: {
     fontFamily: 'Exo 2, sans-serif',
     fontSize: 14,
     color: '#F8F9FA',
-  },
-  error: {
-    color: '#FF3366',
-    fontFamily: 'Exo 2, sans-serif',
-    fontSize: 13,
-    textAlign: 'center',
+    margin: 0,
   },
   successText: {
     fontFamily: 'Orbitron, sans-serif',
@@ -203,6 +293,12 @@ const styles = {
     fontWeight: 700,
     color: '#00FF9F',
     textShadow: '0 0 12px #00FF9F',
+    textAlign: 'center',
+  },
+  errorText: {
+    color: '#FF3366',
+    fontFamily: 'Exo 2, sans-serif',
+    fontSize: 13,
     textAlign: 'center',
   },
 }
