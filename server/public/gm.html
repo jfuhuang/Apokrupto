@@ -1120,7 +1120,15 @@
         fetchState();
       });
 
-      socket.on('roundSummary', () => fetchState());
+      socket.on('roundSummary', () => {
+        fetchState();
+        // On the final round, auto-advance to game over so players aren't stuck waiting
+        if (_currentRound > 0 && _totalRounds > 0 && _currentRound >= _totalRounds) {
+          setTimeout(() => {
+            if (socket && socket.connected && gameId) advanceMovement();
+          }, 1500);
+        }
+      });
       socket.on('roundSetup', ({ roundNumber, totalRounds }) => {
         if (roundNumber) setText('round-badge', `ROUND ${roundNumber} / ${totalRounds || '?'}`);
         setText('movement-badge', '—');
