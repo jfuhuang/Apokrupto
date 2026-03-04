@@ -448,9 +448,15 @@ export default function MovementAScreen({
               </div>
             ) : (
               <div style={styles.wordList}>
-                {words.map((w, i) => (
-                  <div key={i} style={styles.wordChip}>{w}</div>
-                ))}
+                {words.map((entry, i) => {
+                  const isMe = String(entry.userId) === String(currentUserId)
+                  return (
+                    <div key={i} style={{ ...styles.wordItem, ...(isMe ? styles.wordItemMe : {}) }}>
+                      <span style={styles.wordItemAuthor}>{isMe ? 'You' : entry.username}</span>
+                      <span style={styles.wordItemText}>{entry.word}</span>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -727,18 +733,36 @@ const styles = {
   },
   wordList: {
     display: 'flex',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
     gap: 8,
     marginTop: 8,
   },
-  wordChip: {
-    background: 'rgba(139,92,246,0.15)',
-    border: '1px solid rgba(139,92,246,0.4)',
-    borderRadius: 20,
-    padding: '6px 16px',
+  wordItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    background: 'rgba(139,92,246,0.08)',
+    border: '1px solid rgba(139,92,246,0.25)',
+    borderRadius: 8,
+    padding: '10px 14px',
+  },
+  wordItemMe: {
+    background: 'rgba(0,212,255,0.08)',
+    border: '1px solid rgba(0,212,255,0.4)',
+  },
+  wordItemAuthor: {
+    fontFamily: 'Rajdhani, sans-serif',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#ADB5BD',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  wordItemText: {
     fontFamily: 'Exo 2, sans-serif',
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: 600,
     color: '#F8F9FA',
-    fontWeight: 500,
+    letterSpacing: '0.05em',
   },
 }

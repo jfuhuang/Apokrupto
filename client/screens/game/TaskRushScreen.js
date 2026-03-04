@@ -46,6 +46,33 @@ function shuffled(arr) {
   return a;
 }
 
+/**
+ * Build a task queue with uniform mechanic-type distribution.
+ * Each "round" picks one random task from each mechanic type (in shuffled type
+ * order), so every type appears equally often regardless of how many individual
+ * tasks exist per type.
+ */
+function typeUniformQueue(tasks, rounds = 3) {
+  // Group by mechanic type
+  const byType = {};
+  for (const t of tasks) {
+    const key = t.mechanic || 'unknown';
+    if (!byType[key]) byType[key] = [];
+    byType[key].push(t);
+  }
+  const types = Object.keys(byType);
+  if (types.length === 0) return [...tasks];
+
+  const queue = [];
+  for (let r = 0; r < rounds; r++) {
+    for (const type of shuffled(types)) {
+      const pool = byType[type];
+      queue.push(pool[Math.floor(Math.random() * pool.length)]);
+    }
+  }
+  return queue;
+}
+
 function getMultiplier(streak) {
   if (streak <= 1) return 1.0;
   return Math.min(1.0 + (streak - 1) * 0.25, 2.0);
@@ -66,7 +93,7 @@ export default function TaskRushScreen({
   const { setSocketConnected } = useGame();
 
   // Task queue
-  const [rushQueue, setRushQueue] = useState(() => shuffled(CHALLENGE_TASKS));
+  const [rushQueue, setRushQueue] = useState(() => typeUniformQueue(CHALLENGE_TASKS));
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // Streak & scoring
@@ -183,7 +210,7 @@ export default function TaskRushScreen({
     const nextIdx = currentIndex + 1;
     if (nextIdx >= rushQueue.length) {
       // Reshuffle for another pass
-      setRushQueue(shuffled(CHALLENGE_TASKS));
+      setRushQueue(typeUniformQueue(CHALLENGE_TASKS));
       setCurrentIndex(0);
     } else {
       setCurrentIndex(nextIdx);

@@ -25,6 +25,32 @@ function shuffle(arr) {
   return a
 }
 
+/**
+ * Build a task queue with uniform mechanic-type distribution.
+ * Each "round" picks one random task from each mechanic type (in shuffled type
+ * order), so every type appears equally often regardless of how many individual
+ * tasks exist per type.
+ */
+function typeUniformQueue(tasks, rounds = 3) {
+  const byType = {}
+  for (const t of tasks) {
+    const key = t.mechanic || 'unknown'
+    if (!byType[key]) byType[key] = []
+    byType[key].push(t)
+  }
+  const types = Object.keys(byType)
+  if (types.length === 0) return [...tasks]
+
+  const queue = []
+  for (let r = 0; r < rounds; r++) {
+    for (const type of shuffle(types)) {
+      const pool = byType[type]
+      queue.push(pool[Math.floor(Math.random() * pool.length)])
+    }
+  }
+  return queue
+}
+
 function TaskRouter({ task, onSuccess, onFail }) {
   if (!task) return null
   const props = { config: task.config, taskId: task.id, onSuccess, onFail, timeLimit: task.timeLimit || 30 }
@@ -47,7 +73,7 @@ function TaskRouter({ task, onSuccess, onFail }) {
 }
 
 export default function TaskRushScreen({ token, lobbyId, movementTimeLeft, onBack }) {
-  const [queue] = useState(() => shuffle(TASKS))
+  const [queue] = useState(() => typeUniformQueue(TASKS))
   const [taskIndex, setTaskIndex] = useState(0)
   const [result, setResult] = useState(null) // null | 'success' | 'fail'
   const [streak, setStreak] = useState(0)
