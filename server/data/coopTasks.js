@@ -15,7 +15,7 @@ const THEME_POOLS = {
   ],
   // Homophones — identical sound, different spelling
   'Homophones': [
-    [{ label: 'WRITE', display: 'Write'  }, { label: 'RIGHT',  display: 'Right'  }],
+    [{ label: 'RIGHT', display: 'Right'  }, { label: 'WRITE',  display: 'Write'  }],
     [{ label: 'KNOT',  display: 'Knot'   }, { label: 'NOT',    display: 'Not'    }],
     [{ label: 'WON',   display: 'Won'    }, { label: 'ONE',    display: 'One'    }],
     [{ label: 'SON',   display: 'Son'    }, { label: 'SUN',    display: 'Sun'    }],
@@ -28,7 +28,7 @@ const THEME_POOLS = {
   ],
   // Directional / command words that get confusing as instructions
   'Confusing Commands': [
-    [{ label: 'LEFT',  display: 'Left'  }, { label: 'RIGHT', display: 'Right' }],
+    [{ label: 'RIGHT', display: 'Right' }, { label: 'LEFT',  display: 'Left'  }],
     [{ label: 'UP',    display: 'Up'    }, { label: 'DOWN',  display: 'Down'  }],
     [{ label: 'STOP',  display: 'Stop'  }, { label: 'GO',    display: 'Go'    }],
     [{ label: 'PASS',  display: 'Pass'  }, { label: 'SKIP',  display: 'Skip'  }],

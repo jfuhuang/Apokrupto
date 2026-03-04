@@ -130,7 +130,7 @@ export default function CoopHoldTask({ task, role, currentTeam, onAction, update
   });
 
   return (
-    <TaskContainer style={{ gap: 14 }}>
+    <TaskContainer scrollable={false} style={{ justifyContent: 'space-between' }}>
       <Text style={[styles.timer, timeLeft <= 5 && { color: colors.primary.neonRed }]}>
         {timeLeft}s
       </Text>
