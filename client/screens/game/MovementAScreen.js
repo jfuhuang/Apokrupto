@@ -99,6 +99,7 @@ function SketchCarousel({ sketches, currentUserId, slideSize, containerWidth }) 
 
 const sketchCarouselStyles = StyleSheet.create({
   wrapper: {
+    alignSelf: 'stretch',
     alignItems: 'center',
     gap: 10,
   },
@@ -779,7 +780,7 @@ export default function MovementAScreen({
               sketches={allSketches}
               currentUserId={currentUserId}
               slideSize={slideSize}
-              containerWidth={windowWidth}
+              containerWidth={windowWidth - 40}
             />
 
             {timerRow}
