@@ -878,9 +878,9 @@ export const TASKS = [
     difficulty: 'easy',
     timeLimit: 0,
     config: {
-      verseParts: ['Therefore, if anyone is in Christ, the new ', ' has come: The old has ', ', the ', ' is here!'],
-      blanks: ['creation', 'gone', 'new'],
-      distractors: ['life', 'passed', 'good'],
+      verseParts: ['Therefore, if anyone is in Christ, he is a new ', ' The old has ', 'away, behold the ', ' has come!'],
+      blanks: ['creation', 'passed', 'new'],
+      distractors: ['life', 'gone', 'good'],
       reference: '2 Corinthians 5:17',
     },
   },
