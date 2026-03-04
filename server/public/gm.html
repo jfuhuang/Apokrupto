@@ -1120,8 +1120,8 @@
         fetchState();
       });
 
-      socket.on('roundSummary', () => {
-        fetchState();
+      socket.on('roundSummary', async () => {
+        await fetchState(); // wait so _currentRound/_totalRounds are updated first
         // On the final round, auto-advance to game over so players aren't stuck waiting
         if (_currentRound > 0 && _totalRounds > 0 && _currentRound >= _totalRounds) {
           setTimeout(() => {
