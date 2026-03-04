@@ -25,12 +25,14 @@ import { useGame } from '../../context/GameContext';
 const TURN_TIME_LIMIT = 30;
 
 // ── Sketch carousel component used in deliberation phase ─────────────────────
-function SketchCarousel({ sketches, currentUserId, slideSize }) {
+function SketchCarousel({ sketches, currentUserId, slideSize, containerWidth }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollRef = useRef(null);
 
+  const pageWidth = containerWidth || slideSize + 16;
+
   const handleScroll = (e) => {
-    const index = Math.round(e.nativeEvent.contentOffset.x / (slideSize + 16));
+    const index = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
     setActiveIndex(index);
   };
 
@@ -41,12 +43,8 @@ function SketchCarousel({ sketches, currentUserId, slideSize }) {
       <ScrollView
         ref={scrollRef}
         horizontal
-        pagingEnabled={false}
-        snapToInterval={slideSize + 16}
-        snapToAlignment="center"
-        decelerationRate="fast"
+        pagingEnabled
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={sketchCarouselStyles.scrollContent}
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
@@ -55,22 +53,26 @@ function SketchCarousel({ sketches, currentUserId, slideSize }) {
           return (
             <View
               key={i}
-              style={[
-                sketchCarouselStyles.slide,
-                { width: slideSize, height: slideSize },
-                isMe && sketchCarouselStyles.slideMine,
-              ]}
+              style={[sketchCarouselStyles.page, { width: pageWidth }]}
             >
-              <Text style={isMe ? sketchCarouselStyles.authorMe : sketchCarouselStyles.author}>
-                {isMe ? 'You' : entry.username}
-              </Text>
-              <View style={sketchCarouselStyles.thumbnailWrapper}>
-                <SketchThumbnail
-                  sketchData={entry.sketchData}
-                  size={slideSize - 48}
-                  strokeColor={colors.text.primary}
-                  strokeWidth={2.5}
-                />
+              <View
+                style={[
+                  sketchCarouselStyles.slide,
+                  { width: slideSize, height: slideSize },
+                  isMe && sketchCarouselStyles.slideMine,
+                ]}
+              >
+                <Text style={isMe ? sketchCarouselStyles.authorMe : sketchCarouselStyles.author}>
+                  {isMe ? 'You' : entry.username}
+                </Text>
+                <View style={sketchCarouselStyles.thumbnailWrapper}>
+                  <SketchThumbnail
+                    sketchData={entry.sketchData}
+                    size={slideSize - 48}
+                    strokeColor={colors.text.primary}
+                    strokeWidth={2.5}
+                  />
+                </View>
               </View>
             </View>
           );
@@ -100,10 +102,9 @@ const sketchCarouselStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  scrollContent: {
-    paddingHorizontal: 8,
-    gap: 16,
+  page: {
     alignItems: 'center',
+    justifyContent: 'center',
   },
   slide: {
     backgroundColor: colors.background.void,
@@ -778,6 +779,7 @@ export default function MovementAScreen({
               sketches={allSketches}
               currentUserId={currentUserId}
               slideSize={slideSize}
+              containerWidth={windowWidth}
             />
 
             {timerRow}
