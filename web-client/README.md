@@ -14,13 +14,28 @@ npm run preview    # Preview the production build locally
 
 ## Setup
 
-1. Make sure the backend server is running on port 3000 (see `server/README.md`)
-2. Install deps: `npm install`
-3. Start the dev server: `npm run dev`
-4. Open http://localhost:5173 in any browser
+1. Install deps: `npm install`
+2. Start the dev server: `npm run dev`
+3. Open http://localhost:5173 in any browser
 
-No environment variables needed in development — the Vite dev proxy forwards
-`/api` and `/socket.io` requests to `http://localhost:3000` automatically.
+### Pointing to a remote / ngrok server
+
+The web client reads the same `EXPO_PUBLIC_API_URL` environment variable as the
+React Native client. Set it to your ngrok tunnel URL (or any reachable server URL)
+and the Vite dev proxy will forward all `/api` and `/socket.io` requests there:
+
+```bash
+# in web-client/.env  (or the shared server/.env — copy as needed)
+EXPO_PUBLIC_API_URL=https://abc123.ngrok.io
+```
+
+Then start the dev server as usual — no other changes needed:
+
+```bash
+npm run dev   # proxy → https://abc123.ngrok.io
+```
+
+Without `EXPO_PUBLIC_API_URL`, the proxy defaults to `http://localhost:3000`.
 
 ## Production Deployment
 
