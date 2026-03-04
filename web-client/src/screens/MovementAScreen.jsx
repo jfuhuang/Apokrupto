@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import AnimatedBackground from '../components/AnimatedBackground.jsx'
 import SketchCanvas from '../components/SketchCanvas.jsx'
 import { fetchMovementAPrompt, submitMovementAWord, submitMovementASketch, fetchGameState } from '../utils/api.js'
+import { useGameContext } from '../context/GameContext.jsx'
 
 function SketchThumbnail({ sketchData, size = 120, isMe }) {
   const canvasRef = useRef(null)
@@ -36,13 +37,14 @@ export default function MovementAScreen({
   gameId,
   currentUserId,
   currentGroupId,
-  currentGroupMembers,
   lobbyId,
   socket,
   onMovementEnd,
 }) {
+  // Pull fresh group members from GameContext
+  const { groupMembers: contextGroupMembers } = useGameContext()
+
   const [prompt, setPrompt] = useState(null)
-  const [themeLabel, setThemeLabel] = useState('')
   const [promptMode, setPromptMode] = useState('word') // 'word' | 'sketch'
   const [word, setWord] = useState('')
   const [phase, setPhase] = useState('waiting') // 'waiting' | 'my_turn' | 'deliberation'
@@ -56,6 +58,8 @@ export default function MovementAScreen({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [submitMsg, setSubmitMsg] = useState('')
+  // Turn order from server (array of userId strings in turn sequence)
+  const [turnOrder, setTurnOrder] = useState(null)
   const timerRef = useRef(null)
   const sketchRef = useRef(null)
 
@@ -63,12 +67,22 @@ export default function MovementAScreen({
     const res = await fetchMovementAPrompt(token, gameId)
     if (res.ok) {
       setPrompt(res.data.prompt)
-      setThemeLabel(res.data.themeLabel || '')
       setPromptMode(res.data.promptMode || 'word')
       setTotalCount(res.data.totalCount || 0)
       setCompletedCount(res.data.completedCount || 0)
+      // If the server says it is already this player's turn, enter my_turn phase
+      if (res.data.currentPlayerId) {
+        setCurrentPlayerId(res.data.currentPlayerId)
+        if (String(res.data.currentPlayerId) === String(currentUserId)) {
+          setPhase('my_turn')
+          setWord('')
+        } else {
+          const member = contextGroupMembers?.find((m) => String(m.id) === String(res.data.currentPlayerId))
+          setCurrentPlayerName(member?.username || 'Unknown')
+        }
+      }
     }
-  }, [token, gameId])
+  }, [token, gameId, currentUserId, contextGroupMembers])
 
   useEffect(() => {
     loadPrompt()
@@ -114,8 +128,10 @@ export default function MovementAScreen({
     function onTurnStart(data) {
       setCurrentPlayerId(data.currentPlayerId)
       setCompletedCount(data.completedCount || 0)
-      // Find name
-      const member = currentGroupMembers?.find((m) => String(m.id) === String(data.currentPlayerId))
+      // Capture turn order when first received
+      if (data.turnOrder) setTurnOrder(data.turnOrder.map(String))
+      // Find name from context group members
+      const member = contextGroupMembers?.find((m) => String(m.id) === String(data.currentPlayerId))
       setCurrentPlayerName(member?.username || 'Unknown')
 
       if (String(data.currentPlayerId) === String(currentUserId)) {
@@ -148,7 +164,7 @@ export default function MovementAScreen({
       socket.off('deliberationStart', onDeliberationStart)
       socket.off('movementStart', onMovementStart)
     }
-  }, [socket, currentGroupId, lobbyId, currentUserId, currentGroupMembers, onMovementEnd])
+  }, [socket, currentGroupId, lobbyId, currentUserId, contextGroupMembers, onMovementEnd])
 
   async function handleSubmit() {
     setSubmitting(true)
@@ -174,6 +190,19 @@ export default function MovementAScreen({
 
   const timerColor = timeLeft > 10 ? '#00FF9F' : timeLeft > 5 ? '#FFA63D' : '#FF3366'
 
+  // Sort group members by turn order when available
+  const sortedMembers = (() => {
+    if (!contextGroupMembers || contextGroupMembers.length === 0) return []
+    if (!turnOrder) return contextGroupMembers
+    return [...contextGroupMembers].sort((a, b) => {
+      const idxA = turnOrder.indexOf(String(a.id))
+      const idxB = turnOrder.indexOf(String(b.id))
+      if (idxA === -1) return 1
+      if (idxB === -1) return -1
+      return idxA - idxB
+    })
+  })()
+
   return (
     <div style={styles.container}>
       <AnimatedBackground />
@@ -183,11 +212,20 @@ export default function MovementAScreen({
           <span style={styles.movLabel}>Social Deduction</span>
         </div>
 
-        {/* Theme + Prompt */}
+        {/* Prompt */}
         {prompt && (
           <div style={styles.promptCard}>
-            {themeLabel && <p style={styles.themeLabel}>{themeLabel}</p>}
+            <p style={styles.themeLabel}>
+              {promptMode === 'sketch' ? 'DRAW' : 'YOUR PROMPT:'}
+            </p>
             <p style={styles.promptText}>{prompt}</p>
+            {phase !== 'my_turn' && (
+              <p style={styles.waitHint}>
+                {promptMode === 'sketch'
+                  ? 'Think about what you\'ll draw while you wait.'
+                  : 'Think of your word while you wait.'}
+              </p>
+            )}
           </div>
         )}
 
@@ -204,6 +242,37 @@ export default function MovementAScreen({
                   width: `${(completedCount / totalCount) * 100}%`,
                 }}
               />
+            </div>
+          </div>
+        )}
+
+        {/* Turn order list */}
+        {sortedMembers.length > 0 && phase !== 'deliberation' && (
+          <div style={styles.turnOrderCard}>
+            <p style={styles.turnOrderLabel}>TURN ORDER</p>
+            <div style={styles.turnOrderList}>
+              {sortedMembers.map((m, idx) => {
+                const isCurrentTurn = String(m.id) === String(currentPlayerId)
+                const isMe = String(m.id) === String(currentUserId)
+                return (
+                  <div
+                    key={m.id}
+                    style={{
+                      ...styles.turnOrderRow,
+                      background: isCurrentTurn ? 'rgba(0,212,255,0.1)' : 'transparent',
+                      border: isCurrentTurn ? '1px solid rgba(0,212,255,0.4)' : '1px solid transparent',
+                    }}
+                  >
+                    <span style={{ ...styles.turnIdx, color: isCurrentTurn ? '#00D4FF' : '#6C757D' }}>
+                      {idx + 1}.
+                    </span>
+                    <span style={{ ...styles.turnName, color: isCurrentTurn ? '#F8F9FA' : '#ADB5BD' }}>
+                      {m.username}{isMe ? ' (you)' : ''}
+                    </span>
+                    {isCurrentTurn && <span style={styles.activeDot}>▶</span>}
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
@@ -355,11 +424,60 @@ const styles = {
     letterSpacing: '0.15em',
     marginBottom: 8,
   },
+  waitHint: {
+    fontFamily: 'Exo 2, sans-serif',
+    fontSize: 12,
+    color: '#6C757D',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
   promptText: {
     fontFamily: 'Exo 2, sans-serif',
     fontSize: 16,
     color: '#F8F9FA',
     lineHeight: 1.5,
+  },
+  turnOrderCard: {
+    background: 'rgba(31,40,51,0.8)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 8,
+    padding: '12px 16px',
+  },
+  turnOrderLabel: {
+    fontFamily: 'Rajdhani, sans-serif',
+    fontSize: 11,
+    fontWeight: 700,
+    color: '#6C757D',
+    letterSpacing: '0.15em',
+    marginBottom: 8,
+  },
+  turnOrderList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  turnOrderRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '6px 8px',
+    borderRadius: 4,
+    transition: 'all 0.2s',
+  },
+  turnIdx: {
+    fontFamily: 'Orbitron, sans-serif',
+    fontSize: 11,
+    fontWeight: 700,
+    minWidth: 20,
+  },
+  turnName: {
+    fontFamily: 'Exo 2, sans-serif',
+    fontSize: 13,
+    flex: 1,
+  },
+  activeDot: {
+    color: '#00D4FF',
+    fontSize: 10,
   },
   progressRow: {
     display: 'flex',

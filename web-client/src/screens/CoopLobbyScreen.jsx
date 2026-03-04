@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
 import AnimatedBackground from '../components/AnimatedBackground.jsx'
+import { useGameContext } from '../context/GameContext.jsx'
 
 export default function CoopLobbyScreen({ token, gameId, currentUserId, groupMembers, movementTimeLeft, socket, onBack, onSessionStart }) {
+  // Use context members as fallback if prop is empty
+  const { groupMembers: contextGroupMembers } = useGameContext()
+  const resolvedMembers = (groupMembers && groupMembers.length > 0) ? groupMembers : (contextGroupMembers || [])
   const [sentInvite, setSentInvite] = useState(null) // { inviteId, targetUserId, targetUsername }
   const [status, setStatus] = useState('')
 
@@ -57,7 +61,7 @@ export default function CoopLobbyScreen({ token, gameId, currentUserId, groupMem
     setStatus('Invite cancelled.')
   }
 
-  const others = (groupMembers || []).filter(m => String(m.id) !== String(currentUserId))
+  const others = resolvedMembers.filter(m => String(m.id) !== String(currentUserId))
 
   return (
     <div style={styles.container}>

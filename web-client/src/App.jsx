@@ -15,6 +15,8 @@ import VotingScreen from './screens/VotingScreen.jsx'
 import RoundSummaryScreen from './screens/RoundSummaryScreen.jsx'
 import GameOverScreen from './screens/GameOverScreen.jsx'
 import GmDashboardScreen from './screens/GmDashboardScreen.jsx'
+import DevMenuScreen from './screens/DevMenuScreen.jsx'
+import { GameProvider } from './context/GameContext.jsx'
 import { storage } from './utils/storage.js'
 import { fetchCurrentLobby } from './utils/api.js'
 import { getSocketUrl } from './utils/network.js'
@@ -222,19 +224,38 @@ export default function App() {
     }
 
     function onMovementStart(data) {
-      if (data.groupId) patchState({ currentGroupId: data.groupId })
-      if (data.groupMembers) patchState({ currentGroupMembers: data.groupMembers })
-      if (data.teamPoints) patchState({ teamPoints: data.teamPoints })
-      if (data.roundNumber) patchState({ currentRound: data.roundNumber })
-      if (data.totalRounds) patchState({ totalRounds: data.totalRounds })
-      if (data.movementBEndsAt) patchState({ movementBEndsAt: data.movementBEndsAt })
+      const patch = {}
+      if (data.groupId) patch.currentGroupId = data.groupId
+      if (data.groupMembers) patch.currentGroupMembers = data.groupMembers
+      if (data.teamPoints) patch.teamPoints = data.teamPoints
+      if (data.roundNumber) patch.currentRound = data.roundNumber
+      if (data.totalRounds) patch.totalRounds = data.totalRounds
+      if (data.movementBEndsAt) patch.movementBEndsAt = data.movementBEndsAt
+      // Navigate to the movement screen whenever the server signals a movement change
+      if (data.movement === 'A') {
+        patch.currentScreen = 'movementA'
+        patch.currentMovement = 'A'
+      } else if (data.movement === 'B') {
+        patch.currentScreen = 'movementB'
+        patch.currentMovement = 'B'
+      } else if (data.movement === 'C') {
+        patch.currentScreen = 'voting'
+        patch.currentMovement = 'C'
+      }
+      patchState(patch)
+    }
+
+    function onGameOver(data) {
+      patchState({ currentScreen: 'gameOver', gameOverResult: data })
     }
 
     socket.on('roundSummary', onRoundSummary)
     socket.on('movementStart', onMovementStart)
+    socket.on('gameOver', onGameOver)
     return () => {
       socket.off('roundSummary', onRoundSummary)
       socket.off('movementStart', onMovementStart)
+      socket.off('gameOver', onGameOver)
     }
   }, [socketKey])
 
@@ -280,6 +301,15 @@ export default function App() {
             username={state.username}
             onJoinLobby={handleJoinLobby}
             onLogout={handleLogout}
+            onDevMenu={() => patchState({ currentScreen: 'devMenu' })}
+          />
+        )
+
+      case 'devMenu':
+        return (
+          <DevMenuScreen
+            token={state.token}
+            onBack={() => patchState({ currentScreen: state.token ? 'lobbyList' : 'welcome' })}
           />
         )
 
@@ -312,59 +342,66 @@ export default function App() {
 
       case 'roundHub':
         return (
-          <RoundHubScreen
-            token={state.token}
-            gameId={state.gameId}
-            currentRound={state.currentRound}
-            totalRounds={state.totalRounds}
-            currentTeam={state.currentTeam}
-            currentGroupMembers={state.currentGroupMembers}
-            teamPoints={state.teamPoints}
-            isMarked={state.isMarked}
-            socket={socketRef.current}
-            onNavigateMovement={handleNavigateMovement}
-            onGameOver={handleGameOver}
-          />
+          <GameProvider token={state.token} gameId={state.gameId}>
+            <RoundHubScreen
+              token={state.token}
+              gameId={state.gameId}
+              lobbyId={state.currentLobbyId}
+              currentRound={state.currentRound}
+              totalRounds={state.totalRounds}
+              currentTeam={state.currentTeam}
+              currentGroupMembers={state.currentGroupMembers}
+              teamPoints={state.teamPoints}
+              isMarked={state.isMarked}
+              socket={socketRef.current}
+              onNavigateMovement={handleNavigateMovement}
+              onGameOver={handleGameOver}
+            />
+          </GameProvider>
         )
 
       case 'movementA':
         return (
-          <MovementAScreen
-            token={state.token}
-            gameId={state.gameId}
-            currentUserId={state.currentUserId}
-            currentGroupId={state.currentGroupId}
-            currentGroupMembers={state.currentGroupMembers}
-            lobbyId={state.currentLobbyId}
-            socket={socketRef.current}
-            onMovementEnd={handleMovementEnd}
-          />
+          <GameProvider token={state.token} gameId={state.gameId}>
+            <MovementAScreen
+              token={state.token}
+              gameId={state.gameId}
+              currentUserId={state.currentUserId}
+              currentGroupId={state.currentGroupId}
+              lobbyId={state.currentLobbyId}
+              socket={socketRef.current}
+              onMovementEnd={handleMovementEnd}
+            />
+          </GameProvider>
         )
 
       case 'movementB':
         return (
-          <MovementBScreen
-            token={state.token}
-            gameId={state.gameId}
-            currentUserId={state.currentUserId}
-            currentTeam={state.currentTeam}
-            currentGroupMembers={state.currentGroupMembers}
-            movementBEndsAt={state.movementBEndsAt}
-            socket={socketRef.current}
-            onMovementEnd={handleMovementEnd}
-          />
+          <GameProvider token={state.token} gameId={state.gameId}>
+            <MovementBScreen
+              token={state.token}
+              gameId={state.gameId}
+              currentUserId={state.currentUserId}
+              currentTeam={state.currentTeam}
+              currentGroupMembers={state.currentGroupMembers}
+              movementBEndsAt={state.movementBEndsAt}
+              socket={socketRef.current}
+              onMovementEnd={handleMovementEnd}
+            />
+          </GameProvider>
         )
 
       case 'voting':
         return (
-          <VotingScreen
-            token={state.token}
-            gameId={state.gameId}
-            currentUserId={state.currentUserId}
-            currentGroupMembers={state.currentGroupMembers}
-            socket={socketRef.current}
-            onMovementEnd={handleMovementEnd}
-          />
+          <GameProvider token={state.token} gameId={state.gameId}>
+            <VotingScreen
+              token={state.token}
+              gameId={state.gameId}
+              currentUserId={state.currentUserId}
+              socket={socketRef.current}
+              onMovementEnd={handleMovementEnd}
+            />
+          </GameProvider>
         )
 
       case 'roundSummary':

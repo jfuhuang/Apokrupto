@@ -5,6 +5,7 @@ import { fetchGameState } from '../utils/api.js'
 export default function RoundHubScreen({
   token,
   gameId,
+  lobbyId,
   currentRound,
   totalRounds,
   currentTeam,
@@ -57,6 +58,9 @@ export default function RoundHubScreen({
   useEffect(() => {
     if (!socket) return
 
+    // Ensure socket is in the lobby room to receive movementStart events
+    if (lobbyId) socket.emit('joinRoom', { lobbyId })
+
     function onMovementStart(data) {
       if (data.roundNumber) setState((prev) => ({ ...prev, round: data.roundNumber }))
       if (data.totalRounds) setState((prev) => ({ ...prev, totalRounds: data.totalRounds }))
@@ -82,7 +86,7 @@ export default function RoundHubScreen({
       socket.off('gameOver', onGameOverEvent)
       socket.off('announcement', onAnnouncement)
     }
-  }, [socket, onNavigateMovement, onGameOver])
+  }, [socket, lobbyId, onNavigateMovement, onGameOver])
 
   async function handleRefresh() {
     setRefreshing(true)

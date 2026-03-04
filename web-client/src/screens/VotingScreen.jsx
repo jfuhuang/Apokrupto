@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import AnimatedBackground from '../components/AnimatedBackground.jsx'
 import { fetchGameState, submitVotes } from '../utils/api.js'
+import { useGameContext } from '../context/GameContext.jsx'
 
 export default function VotingScreen({
   token,
   gameId,
   currentUserId,
-  currentGroupMembers,
   socket,
   onMovementEnd,
 }) {
+  // Use fresh group members from GameContext (polls every 3s)
+  const { groupMembers: contextGroupMembers } = useGameContext()
   const [votes, setVotes] = useState({}) // { userId: 'phos'|'skotia' }
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -17,7 +19,7 @@ export default function VotingScreen({
   const [results, setResults] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  const members = (currentGroupMembers || []).filter(
+  const members = (contextGroupMembers || []).filter(
     (m) => String(m.id) !== String(currentUserId)
   )
 

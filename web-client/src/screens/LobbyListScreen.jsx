@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import AnimatedBackground from '../components/AnimatedBackground.jsx'
 import { fetchLobbies, createLobby, joinLobby } from '../utils/api.js'
 
-export default function LobbyListScreen({ token, username, onJoinLobby, onLogout }) {
+export default function LobbyListScreen({ token, username, onJoinLobby, onLogout, onDevMenu }) {
   const [lobbies, setLobbies] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -63,7 +63,12 @@ export default function LobbyListScreen({ token, username, onJoinLobby, onLogout
             <h1 style={styles.title}>LOBBIES</h1>
             <p style={styles.sub}>Welcome, <span style={{ color: '#00D4FF' }}>{username}</span></p>
           </div>
-          <button style={styles.logoutBtn} onClick={onLogout}>LOGOUT</button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {onDevMenu && (
+              <button style={styles.devBtn} onClick={onDevMenu}>🛠 DEV</button>
+            )}
+            <button style={styles.logoutBtn} onClick={onLogout}>LOGOUT</button>
+          </div>
         </div>
 
         {error && <p style={styles.error}>{error}</p>}
@@ -181,6 +186,17 @@ const styles = {
     fontSize: 13,
     color: '#ADB5BD',
     marginTop: 2,
+  },
+  devBtn: {
+    background: 'rgba(255,166,61,0.1)',
+    border: '1px solid rgba(255,166,61,0.4)',
+    borderRadius: 4,
+    color: '#FFA63D',
+    fontFamily: 'Orbitron, sans-serif',
+    fontSize: 11,
+    letterSpacing: '0.1em',
+    padding: '6px 12px',
+    cursor: 'pointer',
   },
   logoutBtn: {
     background: 'none',
