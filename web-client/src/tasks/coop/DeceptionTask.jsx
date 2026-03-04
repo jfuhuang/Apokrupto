@@ -1,65 +1,114 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 
-// Role A (listener): choose an option. Role B (speaker): sees which word to communicate per team.
 export default function DeceptionTask({ task, role, currentTeam, onAction, update }) {
   const [chosen, setChosen] = useState(null)
-  const state = update?.state || {}
-  const resolved = state.resolved || false
 
-  function choose(idx) {
-    if (chosen !== null || resolved) return
-    setChosen(idx)
-    onAction({ action: 'selectOption', choice: idx })
-  }
+  const teamColor = currentTeam === 'skotia' ? '#FF3366' : '#00D4FF'
 
-  if (role === 'B') {
+  const handleSelect = useCallback((index) => {
+    if (chosen !== null) return
+    setChosen(index)
+    onAction('selectOption', { choice: index })
+  }, [chosen, onAction])
+
+  // Resolved state
+  if (update?.phase === 'resolved') {
     return (
       <div style={styles.wrap}>
-        <p style={styles.role}>🎙️ SPEAKER</p>
-        <p style={styles.inst}>Say this word aloud to your partner:</p>
-        <div style={styles.wordBox}>
-          <p style={styles.word}>{currentTeam === 'phos' ? task.config?.phosWord : task.config?.skotiaWord}</p>
+        <p style={styles.resolvedTitle}>OPTION CHOSEN</p>
+        <div style={styles.resolvedCard}>
+          <p style={styles.resolvedOption}>
+            {update.chosenIndex === 0
+              ? task.config?.optionA?.label
+              : task.config?.optionB?.label}
+          </p>
         </div>
-        <p style={styles.hint}>Partner must choose the right option without seeing your screen.</p>
-        {resolved && <p style={styles.result}>{state.correct ? '✓ CORRECT!' : '✗ WRONG'}</p>}
+        <p style={{ ...styles.pointsText, color: teamColor }}>
+          +{update.pointsAwarded}
+        </p>
       </div>
     )
   }
 
+  // Player A — listener
+  if (role === 'A') {
+    if (chosen !== null) {
+      return (
+        <div style={styles.wrap}>
+          <p style={styles.waitingText}>Waiting for result...</p>
+        </div>
+      )
+    }
+
+    return (
+      <div style={styles.wrap}>
+        <p style={styles.instruction}>Tap the word your partner says — but listen carefully.</p>
+        <div style={styles.optionRow}>
+          <button
+            style={{ ...styles.optionCard, borderColor: teamColor }}
+            onClick={() => handleSelect(0)}
+          >
+            <span style={styles.optionDisplay}>{task.config?.optionA?.display}</span>
+            <span style={{ ...styles.optionLabel, color: teamColor }}>{task.config?.optionA?.label}</span>
+          </button>
+          <button
+            style={{ ...styles.optionCard, borderColor: teamColor }}
+            onClick={() => handleSelect(1)}
+          >
+            <span style={styles.optionDisplay}>{task.config?.optionB?.display}</span>
+            <span style={{ ...styles.optionLabel, color: teamColor }}>{task.config?.optionB?.label}</span>
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Player B — speaker
   return (
     <div style={styles.wrap}>
-      <p style={styles.role}>👂 LISTENER</p>
-      <p style={styles.inst}>Your partner will say a word. Choose the matching option:</p>
-      <div style={styles.optionRow}>
-        {[task.config?.optionA, task.config?.optionB].map((opt, i) => (
-          <button
-            key={i}
-            onClick={() => choose(i)}
-            style={{
-              ...styles.optBtn,
-              border: chosen === i ? '2px solid #00D4FF' : '2px solid rgba(255,255,255,0.15)',
-              background: chosen === i ? 'rgba(0,212,255,0.15)' : 'rgba(255,255,255,0.05)',
-              opacity: resolved && chosen !== i ? 0.5 : 1,
-            }}
-            disabled={chosen !== null || resolved}
-          >
-            {opt}
-          </button>
-        ))}
+      <p style={{ ...styles.themeTitle, color: teamColor }}>{task.config?.theme}</p>
+      <p style={styles.instruction}>Say the word out loud. Your partner has to figure out which one you mean.</p>
+
+      <div style={{ ...styles.infoBlock, borderColor: '#00D4FF' }}>
+        <span style={{ ...styles.infoLabel, color: '#00D4FF' }}>ΦΩΣ</span>
+        <p style={styles.infoMessage}>{task.config?.phosMessage}</p>
       </div>
-      {resolved && <p style={styles.result}>{state.correct ? '✓ CORRECT!' : '✗ WRONG'}</p>}
+
+      <div style={{ ...styles.infoBlock, borderColor: '#FF3366' }}>
+        <span style={{ ...styles.infoLabel, color: '#FF3366' }}>ΣΚΟΤΊΑ</span>
+        <p style={styles.infoMessage}>{task.config?.skotiaMessage}</p>
+      </div>
+
+      <p style={styles.waitingSub}>Waiting for Player A to choose...</p>
     </div>
   )
 }
 
 const styles = {
-  wrap: { padding: 20, display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' },
-  role: { fontFamily: 'Orbitron, sans-serif', fontSize: 14, fontWeight: 700, color: '#00D4FF', letterSpacing: '0.1em' },
-  inst: { fontFamily: 'Exo 2, sans-serif', fontSize: 14, color: '#ADB5BD', textAlign: 'center' },
-  wordBox: { background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.3)', borderRadius: 8, padding: '16px 32px' },
-  word: { fontFamily: 'Orbitron, sans-serif', fontSize: 22, fontWeight: 700, color: '#00D4FF' },
-  hint: { fontFamily: 'Exo 2, sans-serif', fontSize: 12, color: '#6C757D', textAlign: 'center' },
-  optionRow: { display: 'flex', gap: 12 },
-  optBtn: { flex: 1, padding: '16px 24px', borderRadius: 8, color: '#F8F9FA', fontFamily: 'Exo 2, sans-serif', fontSize: 15, cursor: 'pointer' },
-  result: { fontFamily: 'Orbitron, sans-serif', fontSize: 18, fontWeight: 700, color: '#00FF9F' },
+  wrap: { padding: 20, display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center' },
+  instruction: { fontFamily: 'Exo 2, sans-serif', fontSize: 14, color: '#ADB5BD', textAlign: 'center' },
+  optionRow: { display: 'flex', gap: 12, width: '100%' },
+  optionCard: {
+    flex: 1, background: 'rgba(11,12,16,0.8)', borderRadius: 16, border: '2px solid',
+    padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
+    cursor: 'pointer', boxShadow: '0 0 12px rgba(0,212,255,0.15)',
+  },
+  optionDisplay: { fontSize: 36, textAlign: 'center' },
+  optionLabel: { fontFamily: 'Orbitron, sans-serif', fontSize: 12, fontWeight: 700, letterSpacing: '0.15em', textAlign: 'center' },
+  themeTitle: { fontFamily: 'Orbitron, sans-serif', fontSize: 18, fontWeight: 700, letterSpacing: '0.2em', textAlign: 'center' },
+  infoBlock: {
+    width: '100%', background: 'rgba(11,12,16,0.8)', borderRadius: 16, border: '2px solid',
+    padding: '16px', display: 'flex', flexDirection: 'column', gap: 6,
+  },
+  infoLabel: { fontFamily: 'Orbitron, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.15em' },
+  infoMessage: { fontFamily: 'Exo 2, sans-serif', fontSize: 14, color: '#F8F9FA', lineHeight: 1.5 },
+  waitingSub: { fontFamily: 'Exo 2, sans-serif', fontSize: 12, color: '#6C757D' },
+  waitingText: { fontFamily: 'Exo 2, sans-serif', fontSize: 16, color: '#ADB5BD', textAlign: 'center' },
+  resolvedTitle: { fontFamily: 'Orbitron, sans-serif', fontSize: 14, fontWeight: 700, letterSpacing: '0.2em', color: '#6C757D' },
+  resolvedCard: {
+    background: 'rgba(11,12,16,0.8)', borderRadius: 16, border: '2px solid rgba(255,255,255,0.08)',
+    padding: '24px', display: 'flex', alignItems: 'center', gap: 8,
+  },
+  resolvedOption: { fontFamily: 'Exo 2, sans-serif', fontSize: 18, fontWeight: 700, color: '#F8F9FA' },
+  pointsText: { fontFamily: 'Rajdhani, sans-serif', fontSize: 36, fontWeight: 700, letterSpacing: '0.1em' },
 }

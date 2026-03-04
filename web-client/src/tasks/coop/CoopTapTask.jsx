@@ -1,58 +1,104 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
-export default function CoopTapTask({ task, role, onAction, update }) {
-  const targetTaps = task?.config?.targetTaps || 30
-  const timeLimit = task?.config?.timeLimit || 10
-  const [myTaps, setMyTaps] = useState(0)
-  const [timeLeft, setTimeLeft] = useState(timeLimit)
-  const [done, setDone] = useState(false)
-  const state = update?.state || {}
-  const combinedTaps = (state.tapsA || 0) + (state.tapsB || 0)
-  const partnerTaps = role === 'A' ? (state.tapsB || 0) : (state.tapsA || 0)
+export default function CoopTapTask({ task, role, currentTeam, onAction, update }) {
+  const [localTaps, setLocalTaps] = useState(0)
+  const [timeLeft, setTimeLeft] = useState(task?.timeLimit || 15)
+  const timeoutFiredRef = useRef(false)
 
+  const teamColor = currentTeam === 'skotia' ? '#FF3366' : '#00D4FF'
+  const targetTaps = task?.config?.targetTaps || 50
+  const serverTotal = update?.totalTaps ?? 0
+  const totalTaps = Math.max(serverTotal, localTaps)
+  const progress = Math.min(totalTaps / targetTaps, 1)
+  const myTaps = role === 'A' ? (update?.tapsA ?? localTaps) : (update?.tapsB ?? localTaps)
+  const partnerTaps = role === 'A' ? (update?.tapsB ?? 0) : (update?.tapsA ?? 0)
+
+  // Client-side countdown
   useEffect(() => {
-    if (done) return
-    if (timeLeft <= 0) { setDone(true); return }
-    const t = setTimeout(() => setTimeLeft(s => s - 1), 1000)
-    return () => clearTimeout(t)
-  }, [timeLeft, done])
+    if (update?.phase === 'resolved') return
+    const id = setInterval(() => setTimeLeft(t => Math.max(0, t - 1)), 1000)
+    return () => clearInterval(id)
+  }, [update?.phase])
 
-  function tap() {
-    if (done) return
-    setMyTaps(p => p + 1)
-    onAction({ action: 'tap' })
+  // Fire tapTimeout when timer hits 0
+  useEffect(() => {
+    if (timeLeft === 0 && !timeoutFiredRef.current && update?.phase !== 'resolved') {
+      timeoutFiredRef.current = true
+      onAction('tapTimeout', {})
+    }
+  }, [timeLeft, update?.phase, onAction])
+
+  const handleTap = useCallback(() => {
+    if (update?.phase === 'resolved') return
+    setLocalTaps(t => t + 1)
+    onAction('tap', {})
+  }, [update?.phase, onAction])
+
+  // Resolved
+  if (update?.phase === 'resolved') {
+    const success = update.success
+    return (
+      <div style={styles.wrap}>
+        <p style={{ ...styles.resultTitle, color: success ? '#00FF9F' : '#FF3366' }}>
+          {success ? 'SUCCESS!' : 'TIME UP!'}
+        </p>
+        <p style={{ ...styles.resultPoints, color: success ? '#00FF9F' : '#6C757D' }}>
+          +{update.pointsAwarded ?? 0}
+        </p>
+      </div>
+    )
   }
-
-  const pct = Math.min(100, (combinedTaps / targetTaps) * 100)
 
   return (
     <div style={styles.wrap}>
-      <div style={styles.row}>
-        <span style={{ ...styles.timer, color: timeLeft > 5 ? '#00FF9F' : '#FF3366' }}>{timeLeft}s</span>
-        <span style={styles.sub}>{combinedTaps}/{targetTaps} combined taps</span>
+      <span style={{ ...styles.timer, color: timeLeft <= 5 ? '#FF3366' : '#F8F9FA' }}>
+        {timeLeft}s
+      </span>
+
+      {/* Progress bar */}
+      <div style={styles.progressTrack}>
+        <div style={{ ...styles.progressFill, width: `${progress * 100}%`, background: teamColor }} />
       </div>
-      <div style={styles.barBg}>
-        <div style={{ ...styles.barFill, width: `${pct}%` }} />
-      </div>
-      <div style={styles.tapRow}>
-        <span style={styles.tapStat}>You: {myTaps}</span>
-        <span style={styles.tapStat}>Partner: {partnerTaps}</span>
-      </div>
-      <button style={styles.tapBtn} onMouseDown={tap} onTouchStart={(e) => { e.preventDefault(); tap() }} disabled={done}>
-        👐 TAP!
+      <span style={styles.progressText}>{totalTaps} / {targetTaps}</span>
+
+      {/* Tap button */}
+      <button
+        style={{ ...styles.tapButton, borderColor: teamColor }}
+        onMouseDown={handleTap}
+        onTouchStart={(e) => { e.preventDefault(); handleTap() }}
+      >
+        <span style={styles.tapEmoji}>👆</span>
+        <span style={{ ...styles.tapLabel, color: teamColor }}>TAP!</span>
       </button>
+
+      {/* Score breakdown */}
+      <div style={styles.scoreRow}>
+        <span style={styles.scoreText}>You: {myTaps}</span>
+        <span style={styles.scoreDivider}>|</span>
+        <span style={styles.scoreText}>Partner: {partnerTaps}</span>
+      </div>
     </div>
   )
 }
 
 const styles = {
   wrap: { padding: 20, display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center' },
-  row: { display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' },
-  timer: { fontFamily: 'Orbitron, sans-serif', fontSize: 22, fontWeight: 700 },
-  sub: { fontFamily: 'Exo 2, sans-serif', fontSize: 13, color: '#ADB5BD' },
-  barBg: { width: '100%', height: 10, background: 'rgba(255,255,255,0.1)', borderRadius: 5, overflow: 'hidden' },
-  barFill: { height: '100%', background: 'linear-gradient(90deg, #00D4FF, #00FF9F)', borderRadius: 5, transition: 'width 0.1s' },
-  tapRow: { display: 'flex', justifyContent: 'space-around', width: '100%' },
-  tapStat: { fontFamily: 'Exo 2, sans-serif', fontSize: 14, color: '#ADB5BD' },
-  tapBtn: { padding: '24px 48px', background: 'rgba(0,212,255,0.1)', border: '2px solid #00D4FF', borderRadius: 12, color: '#00D4FF', fontFamily: 'Orbitron, sans-serif', fontSize: 20, fontWeight: 700, cursor: 'pointer', userSelect: 'none', touchAction: 'none' },
+  timer: { fontFamily: 'Rajdhani, sans-serif', fontSize: 28, fontWeight: 700, letterSpacing: '0.1em' },
+  progressTrack: { width: '100%', height: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 4, transition: 'width 0.1s' },
+  progressText: { fontFamily: 'Rajdhani, sans-serif', fontSize: 20, fontWeight: 700, color: '#F8F9FA', letterSpacing: '0.05em' },
+  tapButton: {
+    width: 140, height: 140, borderRadius: 70, border: '3px solid',
+    background: 'rgba(11,12,16,0.8)', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center', gap: 4,
+    cursor: 'pointer', boxShadow: '0 0 20px rgba(0,212,255,0.2)',
+    userSelect: 'none', touchAction: 'none',
+  },
+  tapEmoji: { fontSize: 40 },
+  tapLabel: { fontFamily: 'Orbitron, sans-serif', fontSize: 16, fontWeight: 700, letterSpacing: '0.2em' },
+  scoreRow: { display: 'flex', alignItems: 'center', gap: 12 },
+  scoreText: { fontFamily: 'Exo 2, sans-serif', fontSize: 14, color: '#ADB5BD' },
+  scoreDivider: { fontFamily: 'Exo 2, sans-serif', fontSize: 14, color: '#6C757D' },
+  resultTitle: { fontFamily: 'Orbitron, sans-serif', fontSize: 28, fontWeight: 700, letterSpacing: '0.2em' },
+  resultPoints: { fontFamily: 'Rajdhani, sans-serif', fontSize: 36, fontWeight: 700, letterSpacing: '0.1em' },
 }
