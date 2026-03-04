@@ -37,14 +37,6 @@ export default function CoopRushScreen({
 }) {
   const { setSocketConnected } = useGame();
 
-  // Decode own userId from JWT so we can look up effective role per task
-  const myUserId = React.useMemo(() => {
-    try {
-      const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-      return JSON.parse(atob(base64)).sub;
-    } catch { return null; }
-  }, [token]);
-
   const socketRef = useRef(null);
   const [currentTask, setCurrentTask] = useState(initialTask);
   const [myRole, setMyRole] = useState(role);
@@ -128,11 +120,11 @@ export default function CoopRushScreen({
         setSimonPatterns({ phosPattern, skotiaPattern });
       });
 
-      socket.on('coopNextTask', ({ sessionId: sid, task, sessionPoints: pts, roles }) => {
+      socket.on('coopNextTask', ({ sessionId: sid, task, sessionPoints: pts, role: newRole }) => {
         if (sid !== sessionId) return;
-        // Update effective role if the server sent a roles map
-        if (roles && myUserId && roles[myUserId]) {
-          setMyRole(roles[myUserId]);
+        // Update effective role sent directly by the server for this task
+        if (newRole) {
+          setMyRole(newRole);
         }
         // Switch to the new task immediately, show overlay on top
         setCurrentTask(task);
