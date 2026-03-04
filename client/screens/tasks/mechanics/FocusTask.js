@@ -136,7 +136,7 @@ function FocusTaskInner({ config, onSuccess, onFail, areaW, areaH }) {
     startTimeRef.current = Date.now();
     lastFrameRef.current = Date.now();
 
-    const fillRate = 1 / (duration * 1000); // per ms
+    const fillRate = 1.25 / (duration * 1000); // per ms (20% faster fill)
     const drain = fillRate * drainRate;
 
     const minX = EDGE_PAD;
