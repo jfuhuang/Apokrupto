@@ -103,17 +103,18 @@ export default function App() {
     checkExistingToken();
   }, []);
 
-  // ── Server sync (10 s polling safety net) ────────────────────────────────
+  // ── Server sync (3 s polling safety net) ────────────────────────────────
   const SYNC_SKIP_SCREENS = [
     'loading', 'welcome', 'login', 'register', 'lobbyList',
     'countdown', 'roleReveal', 'roundSummary', 'gameOver',
-    'taskRush', 'coopLobby', 'coopRush',
+    'taskRush', 'coopLobby', 'coopRush', 'devMenu',
   ];
 
   const syncCallbackRef = useRef(null);
   useEffect(() => {
     syncCallbackRef.current = async () => {
-      if (!token || SYNC_SKIP_SCREENS.includes(currentScreen)) return;
+      // Skip polling while viewing mock data in dev mode or not authenticated
+      if (devScreenProps || !token || SYNC_SKIP_SCREENS.includes(currentScreen)) return;
       try {
         const { ok: lobbyOk, data: lobbyData } = await fetchCurrentLobby(token);
         if (!lobbyOk) return;

@@ -83,13 +83,19 @@ export function useGameState({ setCurrentScreen }) {
   const handleGameStateUpdate = ({
     gameId: gId, totalRounds: tr, currentRound: cr,
     teamPoints: tp, isSus: sus, isGm: gm,
+    // Server also emits the nested gameState object from gameStateUpdate event
+    gameState,
   } = {}) => {
     if (gId !== undefined) setGameId(gId);
-    if (tr  !== undefined) setTotalRounds(tr);
-    if (cr  !== undefined) setCurrentRound(cr);
-    if (tp  !== undefined) setTeamPoints(tp);
+    // Accept both flat fields and the nested gameState object from the server's
+    // gameStateUpdate socket event: { gameState: { round, totalRounds, movement }, teamPoints }
+    const resolvedRound = cr ?? gameState?.round;
+    const resolvedTotal = tr ?? gameState?.totalRounds;
+    if (resolvedTotal !== undefined) setTotalRounds(resolvedTotal);
+    if (resolvedRound !== undefined) setCurrentRound(resolvedRound);
+    if (tp !== undefined) setTeamPoints(tp);
     if (sus !== undefined) setIsSus(sus);
-    if (gm  !== undefined) setIsGm(gm);
+    if (gm !== undefined) setIsGm(gm);
   };
 
   const handleRoundSetup = ({ roundNumber, groupId, groupNumber, groupMembers, teamPoints: tp }) => {

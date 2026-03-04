@@ -64,7 +64,7 @@ export default function WelcomeScreen({ onCreateAccount, onLogin, onDevMode }) {
             <Text style={styles.buttonText}>CREATE ACCOUNT</Text>
           </TouchableOpacity>
 
-          {devTapCount > 0 && devTapCount < 5 && (
+          {devTapCount > 0 && devTapCount < 5 && __DEV__ && (
             <Text style={styles.devHint}>{5 - devTapCount} more tap{5 - devTapCount !== 1 ? 's' : ''} for dev mode</Text>
           )}
         </View>

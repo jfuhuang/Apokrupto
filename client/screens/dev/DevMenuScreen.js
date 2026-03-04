@@ -229,7 +229,7 @@ export default function DevMenuScreen({ onNavigate, onBack }) {
           <Text style={styles.sectionLabel}>GAME SCREENS (mock data — no server needed)</Text>
           {entries.map((entry) => (
             <TouchableOpacity
-              key={entry.label}
+              key={`${entry.screen}-${entry.label}`}
               style={styles.item}
               onPress={() => onNavigate(entry.screen, entry.props)}
               activeOpacity={0.75}
