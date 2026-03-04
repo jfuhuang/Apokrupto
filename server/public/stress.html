@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apokrupto · Stress Test</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d0f1a;
+      --surface:  #131627;
+      --surface2: #1a1e35;
+      --border:   #252a45;
+      --blue:     #00d4ff;
+      --green:    #00ff9f;
+      --red:      #ff3366;
+      --yellow:   #ffd700;
+      --purple:   #b06aff;
+      --muted:    #4a5070;
+      --text:     #c8cfe8;
+      --font:     'Courier New', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    h1 {
+      color: var(--blue);
+      font-size: 1.4rem;
+      letter-spacing: 3px;
+      margin-bottom: 8px;
+    }
+
+    h2 {
+      color: var(--blue);
+      font-size: 1rem;
+      letter-spacing: 1px;
+      margin: 16px 0 8px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+    }
+
+    h3 {
+      color: var(--purple);
+      font-size: 0.9rem;
+      margin: 12px 0 6px;
+    }
+
+    .config-bar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    input[type="text"], input[type="number"], input[type="password"] {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-family: var(--font);
+      font-size: 0.85rem;
+      width: 220px;
+    }
+
+    input[type="number"] {
+      width: 80px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 8px 0;
+    }
+
+    button {
+      background: var(--surface2);
+      color: var(--blue);
+      border: 1px solid var(--blue);
+      border-radius: 4px;
+      padding: 7px 14px;
+      cursor: pointer;
+      font-family: var(--font);
+      font-size: 0.8rem;
+      transition: all 0.15s;
+    }
+    button:hover { background: var(--blue); color: var(--bg); }
+    button:disabled { opacity: 0.3; cursor: not-allowed; }
+    button.danger { border-color: var(--red); color: var(--red); }
+    button.danger:hover { background: var(--red); color: var(--bg); }
+    button.success { border-color: var(--green); color: var(--green); }
+    button.success:hover { background: var(--green); color: var(--bg); }
+    button.warn { border-color: var(--yellow); color: var(--yellow); }
+    button.warn:hover { background: var(--yellow); color: var(--bg); }
+    button.running { border-color: var(--purple); color: var(--purple); animation: pulse 1s infinite; }
+    @keyframes pulse { 50% { opacity: 0.6; } }
+
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+
+    .stats {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin: 8px 0;
+      font-size: 0.8rem;
+    }
+
+    .stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .stat-val {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: var(--green);
+    }
+    .stat-val.error { color: var(--red); }
+    .stat-label { color: var(--muted); font-size: 0.65rem; }
+
+    #log-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      height: 400px;
+      overflow-y: auto;
+      padding: 10px 14px;
+      font-size: 0.75rem;
+      line-height: 1.5;
+    }
+
+    .log-entry { white-space: pre-wrap; word-break: break-all; }
+    .log-info { color: var(--text); }
+    .log-ok { color: var(--green); }
+    .log-warn { color: var(--yellow); }
+    .log-err { color: var(--red); }
+    .log-dim { color: var(--muted); }
+
+    .progress-bar {
+      background: var(--surface2);
+      border-radius: 4px;
+      height: 12px;
+      overflow: hidden;
+      margin: 6px 0;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--blue);
+      transition: width 0.3s;
+      border-radius: 4px;
+    }
+
+    .state-display {
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      background: var(--surface2);
+      border-radius: 4px;
+      margin: 6px 0;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .state-display .key { color: var(--muted); }
+    .state-display .val { color: var(--green); }
+    .state-display .val.none { color: var(--red); }
+  </style>
+</head>
+<body>
+
+<h1>⚡ APOKRUPTO STRESS TEST</h1>
+<p style="color:var(--muted);font-size:0.75rem;margin-bottom:12px;">
+  Interactive stress tester — simulates 80 concurrent players through the game flow.
+</p>
+
+<!-- ── Config ── -->
+<div class="config-bar">
+  <label>
+    SERVER URL
+    <input type="text" id="serverUrl" value="" placeholder="http://localhost:3000" />
+  </label>
+  <label>
+    BOT COUNT
+    <input type="number" id="botCount" min="5" max="100" value="80" />
+  </label>
+  <label>
+    PASSWORD
+    <input type="password" id="botPassword" value="pass" />
+  </label>
+  <label>
+    BOT PREFIX
+    <input type="text" id="botPrefix" value="stress_bot" style="width:120px;" />
+  </label>
+</div>
+
+<!-- ── State Display ── -->
+<div class="section">
+  <h2>📊 State</h2>
+  <div class="stats" id="stats">
+    <div class="stat"><span class="stat-val" id="stat-users">0</span><span class="stat-label">Users</span></div>
+    <div class="stat"><span class="stat-val" id="stat-tokens">0</span><span class="stat-label">Tokens</span></div>
+    <div class="stat"><span class="stat-val" id="stat-sockets">0</span><span class="stat-label">Sockets</span></div>
+    <div class="stat"><span class="stat-val" id="stat-lobby">—</span><span class="stat-label">Lobby</span></div>
+    <div class="stat"><span class="stat-val" id="stat-game">—</span><span class="stat-label">Game</span></div>
+    <div class="stat"><span class="stat-val" id="stat-round">—</span><span class="stat-label">Round</span></div>
+    <div class="stat"><span class="stat-val" id="stat-movement">—</span><span class="stat-label">Movement</span></div>
+    <div class="stat"><span class="stat-val" id="stat-errors">0</span><span class="stat-label">Errors</span></div>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" id="progress" style="width:0%"></div></div>
+</div>
+
+<!-- ── Test Sections ── -->
+<div class="section">
+  <h2>1️⃣ Account Management</h2>
+  <div class="btn-row">
+    <button id="btn-register" onclick="runRegister()">Register All</button>
+    <button id="btn-login" onclick="runLogin()">Login All</button>
+    <button id="btn-cleanup-users" class="danger" onclick="runCleanupUsers()">Delete Stress Users (DB)</button>
+  </div>
+</div>
+
+<div class="section">
+  <h2>2️⃣ Lobby</h2>
+  <div class="btn-row">
+    <button id="btn-create-lobby" onclick="runCreateLobby()">Create Lobby</button>
+    <button id="btn-join-lobby" onclick="runJoinLobby()">All Join Lobby</button>
+    <button id="btn-connect-sockets" onclick="runConnectSockets()">Connect Sockets</button>
+    <button id="btn-disconnect-sockets" class="danger" onclick="runDisconnectSockets()">Disconnect Sockets</button>
+  </div>
+</div>
+
+<div class="section">
+  <h2>3️⃣ Game Start</h2>
+  <div class="btn-row">
+    <button id="btn-start-game" onclick="runStartGame()">Start Game (via socket)</button>
+  </div>
+</div>
+
+<div class="section">
+  <h2>4️⃣ Movement A — Word Submission</h2>
+  <div class="btn-row">
+    <button id="btn-activate-a" onclick="runActivateA()">GM: Activate Movement A</button>
+    <button id="btn-fetch-prompts" onclick="runFetchPrompts()">Fetch Prompts (all)</button>
+    <button id="btn-submit-words" onclick="runSubmitWords()">Submit Words (auto-turns)</button>
+    <button id="btn-complete-a" onclick="runCompleteA()">GM: Complete Movement A</button>
+  </div>
+</div>
+
+<div class="section">
+  <h2>5️⃣ Movement C — Voting</h2>
+  <div class="btn-row">
+    <button id="btn-activate-c" onclick="runActivateC()">GM: Activate Movement C</button>
+    <button id="btn-submit-votes" onclick="runSubmitVotes()">Submit Votes (all)</button>
+    <button id="btn-complete-c" onclick="runCompleteC()">GM: Complete Movement C</button>
+  </div>
+</div>
+
+<div class="section">
+  <h2>6️⃣ Movement B — Challenge Rush (Solo Tasks)</h2>
+  <p style="font-size:0.7rem;color:var(--muted);margin-bottom:6px;">
+    Simulates all bots completing solo tasks rapidly during Movement B — stress tests the /movement-b/complete endpoint.
+  </p>
+  <div class="btn-row">
+    <button id="btn-activate-b" onclick="runActivateB()">GM: Activate Movement B</button>
+    <button id="btn-rush-tasks" onclick="runTaskRush()">Rush Solo Tasks (all bots)</button>
+    <button id="btn-complete-b" onclick="runCompleteB()">GM: Complete Movement B</button>
+  </div>
+  <label style="flex-direction:row;align-items:center;gap:6px;margin-top:6px;">
+    Tasks per bot:
+    <input type="number" id="tasksPerBot" value="10" min="1" max="56" style="width:60px;" />
+  </label>
+</div>
+
+<div class="section">
+  <h2>7️⃣ Movement B — Co-op Rush</h2>
+  <p style="font-size:0.7rem;color:var(--muted);margin-bottom:6px;">
+    Pairs up bots and runs coop sessions via Socket.IO — stress tests the coop invite/accept/action flow.
+  </p>
+  <div class="btn-row">
+    <button id="btn-coop-rush" onclick="runCoopRush()">Run Coop Rush (paired)</button>
+  </div>
+  <label style="flex-direction:row;align-items:center;gap:6px;margin-top:6px;">
+    Tasks per pair:
+    <input type="number" id="coopTasksPerPair" value="5" min="1" max="20" style="width:60px;" />
+  </label>
+</div>
+
+<div class="section">
+  <h2>8️⃣ Round Summary & Game Flow</h2>
+  <div class="btn-row">
+    <button id="btn-summarize" onclick="runSummarize()">GM: Summarize Round</button>
+    <button id="btn-next-round" onclick="runNextRound()">GM: Next Round</button>
+    <button id="btn-game-over" onclick="runGameOver()">GM: End Game</button>
+  </div>
+</div>
+
+<div class="section">
+  <h2>🔁 Full Auto Run</h2>
+  <p style="font-size:0.7rem;color:var(--muted);margin-bottom:6px;">
+    Runs the entire game flow automatically: register → login → lobby → game → rounds.
+  </p>
+  <div class="btn-row">
+    <label style="flex-direction:row;align-items:center;gap:6px;">
+      Rounds:
+      <input type="number" id="autoRounds" value="2" min="1" max="4" style="width:60px;" />
+    </label>
+    <button class="success" id="btn-full-auto" onclick="runFullAuto()">▶ Full Auto Run</button>
+    <button class="danger" id="btn-abort" onclick="abortRun()">⬛ Abort</button>
+  </div>
+</div>
+
+<!-- ── Poll State ── -->
+<div class="section">
+  <h2>🔍 Poll Game State</h2>
+  <div class="btn-row">
+    <button onclick="runPollState()">Poll /state (bot 0)</button>
+    <button onclick="runPollGmState()">Poll /gm-state</button>
+  </div>
+  <div class="state-display" id="state-display" style="display:none;"></div>
+</div>
+
+<!-- ── Log ── -->
+<h2>📝 Log</h2>
+<div id="log-container"></div>
+<div class="btn-row" style="margin-top:6px;">
+  <button onclick="clearLog()">Clear Log</button>
+  <button class="danger" onclick="runResetAll()">Reset All State</button>
+</div>
+
+<script>
+// =========================================================================
+// State
+// =========================================================================
+
+const state = {
+  bots: [],         // { username, token, userId, socket, team, groupId, groupMembers, isGm }
+  hostIdx: 0,
+  lobbyId: null,
+  gameId: null,
+  currentRound: null,
+  currentMovement: null,
+  errors: 0,
+  aborted: false,
+};
+
+// Available task IDs for Movement B rush
+const TASK_IDS = [
+  'blank_philippians_4_13','blank_john_3_16','blank_psalm_23','blank_isaiah_40_31','blank_hebrews_11_1',
+  'trivia_psalms_author','trivia_disciples_count','trivia_jonah_days','trivia_peter_denial','trivia_baptism_river',
+  'trivia_first_book','trivia_goliath_weapon','trivia_burning_bush','trivia_garden_eden','trivia_red_sea',
+  'trivia_samson_strength','trivia_ark_builder','trivia_den_of_lions','trivia_oldest_man','trivia_pauls_letters',
+  'trivia_plagues_egypt','trivia_beatitudes',
+  'trivia_isu_mascot','trivia_isu_colors','trivia_isu_city','trivia_isu_conference','trivia_isu_founded',
+  'trivia_isu_rivalry','trivia_isu_hilton','trivia_isu_jack_trice','trivia_isu_land_grant','trivia_isu_campanile',
+  'david_and_goliath','pauls_belongings','wolves_in_sheeps_clothing','lamp_on_lampstand','protect_the_sheep',
+  'feeding_five_thousand','manna_wilderness','walls_of_jericho','march_around_jericho','ark_of_covenant',
+  'gideons_torch','fiery_furnace','solomons_temple','water_from_rock','the_lost_sheep','jonah_storm',
+  'walking_on_water','pillar_of_fire','jordan_river',
+  'still_waters','be_still','wait_on_the_lord',
+  'nehemiah_wall','building_the_altar',
+];
+
+// =========================================================================
+// Helpers
+// =========================================================================
+
+function getServerUrl() {
+  return document.getElementById('serverUrl').value.trim().replace(/\/+$/, '');
+}
+function getBotCount() {
+  return parseInt(document.getElementById('botCount').value) || 80;
+}
+function getBotPassword() {
+  return document.getElementById('botPassword').value || 'pass';
+}
+function getBotPrefix() {
+  return document.getElementById('botPrefix').value.trim() || 'stress_bot';
+}
+
+async function api(method, path, body, token) {
+  const url = `${getServerUrl()}${path}`;
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  return { status: res.status, ok: res.ok, data };
+}
+
+function decodeJwt(token) {
+  const payload = token.split('.')[1];
+  return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+}
+
+function updateStats() {
+  document.getElementById('stat-users').textContent = state.bots.length;
+  document.getElementById('stat-tokens').textContent = state.bots.filter(b => b.token).length;
+  document.getElementById('stat-sockets').textContent = state.bots.filter(b => b.socket?.connected).length;
+  document.getElementById('stat-lobby').textContent = state.lobbyId || '—';
+  document.getElementById('stat-game').textContent = state.gameId || '—';
+  document.getElementById('stat-round').textContent = state.currentRound || '—';
+  document.getElementById('stat-movement').textContent = state.currentMovement || '—';
+  const errEl = document.getElementById('stat-errors');
+  errEl.textContent = state.errors;
+  errEl.className = state.errors > 0 ? 'stat-val error' : 'stat-val';
+}
+
+function setProgress(pct) {
+  document.getElementById('progress').style.width = `${Math.min(100, Math.max(0, pct))}%`;
+}
+
+// ── Logging ──
+const logContainer = document.getElementById('log-container');
+
+function log(msg, cls = 'log-info') {
+  const ts = new Date().toISOString().slice(11, 23);
+  const el = document.createElement('div');
+  el.className = `log-entry ${cls}`;
+  el.textContent = `[${ts}] ${msg}`;
+  logContainer.appendChild(el);
+  logContainer.scrollTop = logContainer.scrollHeight;
+}
+function logOk(msg) { log(msg, 'log-ok'); }
+function logWarn(msg) { log(msg, 'log-warn'); }
+function logErr(msg) { state.errors++; updateStats(); log(msg, 'log-err'); }
+function clearLog() { logContainer.innerHTML = ''; }
+
+// ── Button state ──
+function setBusy(btnId, busy) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.disabled = busy;
+  if (busy) btn.classList.add('running');
+  else btn.classList.remove('running');
+}
+
+// ── Time measuring ──
+function elapsed(start) {
+  return `${((Date.now() - start) / 1000).toFixed(2)}s`;
+}
+
+// ── Concurrency with progress ──
+async function parallelWithProgress(items, fn, label) {
+  const total = items.length;
+  let done = 0;
+  let errors = 0;
+  const t0 = Date.now();
+
+  const results = await Promise.allSettled(items.map(async (item, i) => {
+    const result = await fn(item, i);
+    done++;
+    setProgress((done / total) * 100);
+    return result;
+  }));
+
+  results.forEach(r => { if (r.status === 'rejected') errors++; });
+  const dur = elapsed(t0);
+  if (errors > 0) logWarn(`${label}: ${done - errors}/${total} ok, ${errors} errors in ${dur}`);
+  else logOk(`${label}: ${total}/${total} ok in ${dur}`);
+  setProgress(0);
+  return results;
+}
+
+// ── Socket helpers ──
+function createSocket(token) {
+  return io(getServerUrl(), {
+    auth: { token },
+    transports: ['polling', 'websocket'],
+    reconnection: false,
+    timeout: 15000,
+  });
+}
+
+function emitWithAck(socket, event, payload, timeoutMs = 60000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Timeout: ${event} ack`)), timeoutMs);
+    socket.emit(event, payload, (response) => {
+      clearTimeout(timer);
+      if (response?.error) reject(new Error(response.error));
+      else resolve(response);
+    });
+  });
+}
+
+function waitForEvent(socket, event, timeoutMs = 120000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      socket.off(event, handler);
+      reject(new Error(`Timeout waiting for '${event}' (${timeoutMs}ms)`));
+    }, timeoutMs);
+    function handler(data) {
+      clearTimeout(timer);
+      resolve(data);
+    }
+    socket.once(event, handler);
+  });
+}
+
+// =========================================================================
+// 1. Account Management
+// =========================================================================
+
+async function runRegister() {
+  setBusy('btn-register', true);
+  const count = getBotCount();
+  const prefix = getBotPrefix();
+  const password = getBotPassword();
+
+  // Build/reset bots array
+  state.bots = [];
+  for (let i = 1; i <= count; i++) {
+    state.bots.push({
+      username: `${prefix}${i}`,
+      token: null, userId: null, socket: null,
+      team: null, groupId: null, groupMembers: [], isGm: false,
+    });
+  }
+
+  log(`Registering ${count} users (${prefix}1..${prefix}${count})...`);
+
+  await parallelWithProgress(state.bots, async (bot) => {
+    try {
+      const { status, data } = await api('POST', '/api/users/register', {
+        username: bot.username, password,
+      });
+      if (status === 201) {
+        bot.token = data.token;
+        bot.userId = String(decodeJwt(data.token).sub);
+      } else if (status === 409) {
+        // Already exists, that's fine — will login next
+      } else {
+        throw new Error(`${status}: ${JSON.stringify(data)}`);
+      }
+    } catch (err) {
+      logErr(`Register ${bot.username}: ${err.message}`);
+      throw err;
+    }
+  }, 'Register');
+
+  updateStats();
+  setBusy('btn-register', false);
+}
+
+async function runLogin() {
+  setBusy('btn-login', true);
+  const password = getBotPassword();
+  const prefix = getBotPrefix();
+  const count = getBotCount();
+
+  // Ensure bots array exists
+  if (state.bots.length === 0) {
+    state.bots = [];
+    for (let i = 1; i <= count; i++) {
+      state.bots.push({
+        username: `${prefix}${i}`,
+        token: null, userId: null, socket: null,
+        team: null, groupId: null, groupMembers: [], isGm: false,
+      });
+    }
+  }
+
+  log(`Logging in ${state.bots.length} users...`);
+
+  await parallelWithProgress(state.bots, async (bot) => {
+    try {
+      const { status, data } = await api('POST', '/api/users/login', {
+        username: bot.username, password,
+      });
+      if (status === 200) {
+        bot.token = data.token;
+        bot.userId = String(decodeJwt(data.token).sub);
+      } else {
+        throw new Error(`${status}: ${JSON.stringify(data)}`);
+      }
+    } catch (err) {
+      logErr(`Login ${bot.username}: ${err.message}`);
+      throw err;
+    }
+  }, 'Login');
+
+  updateStats();
+  setBusy('btn-login', false);
+}
+
+async function runCleanupUsers() {
+  if (!confirm('This will delete ALL stress_bot* users from the database. Continue?')) return;
+  setBusy('btn-cleanup-users', true);
+  const prefix = getBotPrefix();
+  log(`Requesting cleanup of ${prefix}* users...`);
+
+  // We'll just try to delete each user by registering a simple DELETE call — but the server
+  // doesn't have that endpoint. Instead, we clean up by logging in and then there's no API.
+  // We'll just note this for now.
+  logWarn('Server has no bulk user delete endpoint. Clean up manually via DB or use force-end on the lobby.');
+  setBusy('btn-cleanup-users', false);
+}
+
+// =========================================================================
+// 2. Lobby
+// =========================================================================
+
+async function runCreateLobby() {
+  setBusy('btn-create-lobby', true);
+  const hostBot = state.bots[state.hostIdx];
+  if (!hostBot?.token) { logErr('No host token. Login first.'); setBusy('btn-create-lobby', false); return; }
+
+  const count = getBotCount();
+  log('Creating lobby...');
+  const t0 = Date.now();
+
+  try {
+    const { status, data } = await api('POST', '/api/lobbies', {
+      name: `Stress Test ${new Date().toISOString().slice(11, 19)}`,
+      max_players: Math.max(count + 2, 5),
+    }, hostBot.token);
+
+    if (status === 201) {
+      state.lobbyId = String(data.lobby.id);
+      logOk(`Lobby ${state.lobbyId} created in ${elapsed(t0)}`);
+    } else {
+      throw new Error(`${status}: ${JSON.stringify(data)}`);
+    }
+  } catch (err) {
+    logErr(`Create lobby: ${err.message}`);
+  }
+
+  updateStats();
+  setBusy('btn-create-lobby', false);
+}
+
+async function runJoinLobby() {
+  setBusy('btn-join-lobby', true);
+  if (!state.lobbyId) { logErr('No lobby. Create one first.'); setBusy('btn-join-lobby', false); return; }
+
+  // All bots except host join (host already in from create)
+  const others = state.bots.filter((_, i) => i !== state.hostIdx);
+  log(`${others.length} bots joining lobby ${state.lobbyId}...`);
+
+  await parallelWithProgress(others, async (bot) => {
+    if (!bot.token) { logErr(`${bot.username} has no token`); throw new Error('no token'); }
+    try {
+      const { status, data } = await api('POST', `/api/lobbies/${state.lobbyId}/join`, null, bot.token);
+      if (status !== 200) throw new Error(`${status}: ${JSON.stringify(data)}`);
+    } catch (err) {
+      logErr(`Join ${bot.username}: ${err.message}`);
+      throw err;
+    }
+  }, 'Join lobby');
+
+  updateStats();
+  setBusy('btn-join-lobby', false);
+}
+
+async function runConnectSockets() {
+  setBusy('btn-connect-sockets', true);
+  log('Connecting sockets...');
+  const t0 = Date.now();
+
+  // Connect all sockets
+  await parallelWithProgress(state.bots, async (bot) => {
+    if (!bot.token) throw new Error(`${bot.username} has no token`);
+    return new Promise((resolve, reject) => {
+      if (bot.socket?.connected) { resolve(); return; }
+      if (bot.socket) { bot.socket.disconnect(); bot.socket = null; }
+      const socket = createSocket(bot.token);
+      bot.socket = socket;
+      const timer = setTimeout(() => { reject(new Error(`Timeout: ${bot.username}`)); }, 15000);
+      socket.on('connect', () => { clearTimeout(timer); resolve(); });
+      socket.on('connect_error', (err) => { clearTimeout(timer); reject(err); });
+    });
+  }, 'Sockets connect');
+
+  // Join lobby room
+  if (state.lobbyId) {
+    log('Joining lobby room...');
+    await parallelWithProgress(state.bots, async (bot) => {
+      if (!bot.socket?.connected) return;
+      try {
+        await emitWithAck(bot.socket, 'joinRoom', { lobbyId: state.lobbyId });
+      } catch (err) {
+        logErr(`${bot.username} joinRoom: ${err.message}`);
+      }
+    }, 'Join room');
+  }
+
+  logOk(`All sockets ready in ${elapsed(t0)}`);
+  updateStats();
+  setBusy('btn-connect-sockets', false);
+}
+
+async function runDisconnectSockets() {
+  log('Disconnecting all sockets...');
+  for (const bot of state.bots) {
+    if (bot.socket?.connected) bot.socket.disconnect();
+    bot.socket = null;
+  }
+  logOk('All sockets disconnected.');
+  updateStats();
+}
+
+// =========================================================================
+// 3. Game Start
+// =========================================================================
+
+async function runStartGame() {
+  setBusy('btn-start-game', true);
+  const hostBot = state.bots[state.hostIdx];
+  if (!hostBot?.socket?.connected) { logErr('Host socket not connected.'); setBusy('btn-start-game', false); return; }
+
+  log('Starting game via socket...');
+  const t0 = Date.now();
+
+  try {
+    // Set up listeners before emitting
+    const rolePromises = state.bots.map(bot => waitForEvent(bot.socket, 'roleAssigned', 60000));
+    const gameStartedPromises = state.bots.map(bot => waitForEvent(bot.socket, 'gameStarted', 60000));
+
+    const ack = await emitWithAck(hostBot.socket, 'startGame', { lobbyId: state.lobbyId });
+    state.gameId = String(ack.gameId);
+    log(`Game ${state.gameId} created.`);
+
+    const roles = await Promise.all(rolePromises);
+    roles.forEach((role, i) => {
+      state.bots[i].team = role.team;
+      state.bots[i].groupId = role.groupId ? String(role.groupId) : null;
+      state.bots[i].groupMembers = role.groupMembers || [];
+      state.bots[i].isGm = role.isGm || false;
+    });
+
+    await Promise.all(gameStartedPromises);
+
+    const players = state.bots.filter(b => !b.isGm);
+    const phos = players.filter(b => b.team === 'phos').length;
+    const skotia = players.filter(b => b.team === 'skotia').length;
+    const groups = new Set(players.map(b => b.groupId)).size;
+
+    state.currentRound = 1;
+    logOk(`Game started in ${elapsed(t0)}: ${phos} Phos, ${skotia} Skotia, ${groups} groups`);
+  } catch (err) {
+    logErr(`Start game: ${err.message}`);
+  }
+
+  updateStats();
+  setBusy('btn-start-game', false);
+}
+
+// =========================================================================
+// 4. Movement A
+// =========================================================================
+
+async function gmAdvance(description) {
+  const hostBot = state.bots[state.hostIdx];
+  if (!hostBot?.socket?.connected) { logErr('Host socket not connected.'); return null; }
+  log(`GM: ${description}...`);
+  const t0 = Date.now();
+  try {
+    const ack = await emitWithAck(hostBot.socket, 'gmAdvance', { gameId: state.gameId });
+    logOk(`GM advance (${description}) in ${elapsed(t0)}: step=${ack?.step || 'unknown'}`);
+    return ack;
+  } catch (err) {
+    logErr(`GM advance (${description}): ${err.message}`);
+    return null;
+  }
+}
+
+async function runActivateA() {
+  setBusy('btn-activate-a', true);
+
+  const players = state.bots.filter(b => !b.isGm && b.socket?.connected);
+  const movPromises = players.map(b => waitForEvent(b.socket, 'movementStart', 60000));
+
+  const ack = await gmAdvance('Activate Movement A');
+
+  if (ack) {
+    try {
+      const movData = await Promise.all(movPromises);
+      movData.forEach((data, i) => {
+        if (data.groupId) {
+          players[i].groupId = String(data.groupId);
+          players[i].groupMembers = data.groupMembers || players[i].groupMembers;
+        }
+      });
+      state.currentMovement = 'A';
+
+      // Join group rooms
+      log('Players joining group rooms...');
+      await Promise.allSettled(players.map(async (bot) => {
+        if (bot.groupId) {
+          await emitWithAck(bot.socket, 'joinRoom', { lobbyId: bot.groupId }).catch(() => {});
+        }
+      }));
+
+      logOk('Movement A active. Group rooms joined.');
+    } catch (err) {
+      logErr(`Wait for movementStart: ${err.message}`);
+    }
+  }
+
+  updateStats();
+  setBusy('btn-activate-a', false);
+}
+
+async function runFetchPrompts() {
+  setBusy('btn-fetch-prompts', true);
+  const players = state.bots.filter(b => !b.isGm && b.token);
+  if (!state.gameId) { logErr('No game.'); setBusy('btn-fetch-prompts', false); return; }
+
+  log(`Fetching prompts for ${players.length} players...`);
+
+  await parallelWithProgress(players, async (bot) => {
+    try {
+      const { status, data } = await api('GET', `/api/games/${state.gameId}/movement-a/prompt`, null, bot.token);
+      if (status !== 200) throw new Error(`${status}: ${JSON.stringify(data)}`);
+    } catch (err) {
+      logErr(`Prompt ${bot.username}: ${err.message}`);
+      throw err;
+    }
+  }, 'Fetch prompts');
+
+  setBusy('btn-fetch-prompts', false);
+}
+
+async function runSubmitWords() {
+  setBusy('btn-submit-words', true);
+  if (!state.gameId) { logErr('No game.'); setBusy('btn-submit-words', false); return; }
+
+  const players = state.bots.filter(b => !b.isGm && b.socket?.connected);
+  log(`Submitting words for ${players.length} players via turn system...`);
+
+  // Group bots by groupId
+  const groups = new Map();
+  for (const bot of players) {
+    if (!groups.has(bot.groupId)) groups.set(bot.groupId, []);
+    groups.get(bot.groupId).push(bot);
+  }
+
+  const t0 = Date.now();
+  let totalSubmitted = 0;
+
+  const groupPromises = [...groups.entries()].map(async ([groupId, groupBots]) => {
+    const botMap = new Map(groupBots.map(b => [b.userId, b]));
+    let deliberationReceived = false;
+
+    const deliberationPromise = new Promise((resolve) => {
+      for (const bot of groupBots) {
+        bot.socket.on('deliberationStart', () => {
+          deliberationReceived = true;
+          resolve();
+        });
+      }
+    });
+
+    const turnHandler = async () => {
+      while (!deliberationReceived && !state.aborted) {
+        const turnData = await Promise.race([
+          ...groupBots.map(b => waitForEvent(b.socket, 'turnStart', 300000)),
+          deliberationPromise.then(() => null),
+        ]);
+
+        if (!turnData || deliberationReceived) break;
+
+        const currentPlayerId = String(turnData.currentPlayerId);
+        const currentBot = botMap.get(currentPlayerId);
+
+        if (currentBot) {
+          try {
+            await api('POST', `/api/games/${state.gameId}/movement-a/submit/word`,
+              { word: `word_${currentBot.username}` },
+              currentBot.token
+            );
+            totalSubmitted++;
+          } catch (err) {
+            logErr(`Submit word (${currentBot.username}): ${err.message}`);
+          }
+        }
+        await new Promise(r => setTimeout(r, 300));
+      }
+    };
+
+    await Promise.race([turnHandler(), deliberationPromise]);
+
+    for (const bot of groupBots) {
+      bot.socket.removeAllListeners('deliberationStart');
+    }
+  });
+
+  await Promise.all(groupPromises);
+  logOk(`Words submitted: ${totalSubmitted} across ${groups.size} groups in ${elapsed(t0)}`);
+
+  setBusy('btn-submit-words', false);
+}
+
+async function runCompleteA() {
+  setBusy('btn-complete-a', true);
+  await gmAdvance('Complete Movement A');
+  state.currentMovement = null;
+  updateStats();
+  setBusy('btn-complete-a', false);
+}
+
+// =========================================================================
+// 5. Movement C — Voting
+// =========================================================================
+
+async function runActivateC() {
+  setBusy('btn-activate-c', true);
+
+  const players = state.bots.filter(b => !b.isGm && b.socket?.connected);
+  const movPromises = players.map(b => waitForEvent(b.socket, 'movementStart', 60000));
+
+  await gmAdvance('Activate Movement C');
+
+  try {
+    await Promise.all(movPromises);
+    state.currentMovement = 'C';
+    logOk('Movement C active.');
+  } catch (err) {
+    logErr(`Wait for movementStart (C): ${err.message}`);
+  }
+
+  updateStats();
+  setBusy('btn-activate-c', false);
+}
+
+async function runSubmitVotes() {
+  setBusy('btn-submit-votes', true);
+  if (!state.gameId) { logErr('No game.'); setBusy('btn-submit-votes', false); return; }
+
+  const players = state.bots.filter(b => !b.isGm && b.token);
+  log(`Submitting votes for ${players.length} players...`);
+
+  await parallelWithProgress(players, async (bot) => {
+    const others = bot.groupMembers
+      .map(m => String(m.id))
+      .filter(id => id !== bot.userId);
+
+    if (others.length === 0) return;
+
+    const votes = {};
+    const targetIdx = Math.floor(Math.random() * others.length);
+    others.forEach((id, i) => {
+      votes[id] = i === targetIdx ? 'skotia' : 'phos';
+    });
+
+    try {
+      const { status, data } = await api('POST', `/api/games/${state.gameId}/movement-c/vote`, { votes }, bot.token);
+      if (status !== 200) throw new Error(`${status}: ${JSON.stringify(data)}`);
+    } catch (err) {
+      logErr(`Vote ${bot.username}: ${err.message}`);
+      throw err;
+    }
+  }, 'Submit votes');
+
+  setBusy('btn-submit-votes', false);
+}
+
+async function runCompleteC() {
+  setBusy('btn-complete-c', true);
+
+  const players = state.bots.filter(b => !b.isGm && b.socket?.connected);
+  const vcPromises = players.map(b => waitForEvent(b.socket, 'votingComplete', 60000));
+
+  await gmAdvance('Complete Movement C (resolve votes)');
+
+  try {
+    await Promise.all(vcPromises);
+    state.currentMovement = null;
+    logOk('Votes resolved. votingComplete received.');
+  } catch (err) {
+    logErr(`Wait for votingComplete: ${err.message}`);
+  }
+
+  updateStats();
+  setBusy('btn-complete-c', false);
+}
+
+// =========================================================================
+// 6. Movement B — Solo Task Rush
+// =========================================================================
+
+async function runActivateB() {
+  setBusy('btn-activate-b', true);
+
+  const players = state.bots.filter(b => !b.isGm && b.socket?.connected);
+  const movPromises = players.map(b => waitForEvent(b.socket, 'movementStart', 60000));
+
+  await gmAdvance('Activate Movement B');
+
+  try {
+    await Promise.all(movPromises);
+    state.currentMovement = 'B';
+    logOk('Movement B active.');
+  } catch (err) {
+    logErr(`Wait for movementStart (B): ${err.message}`);
+  }
+
+  updateStats();
+  setBusy('btn-activate-b', false);
+}
+
+async function runTaskRush() {
+  setBusy('btn-rush-tasks', true);
+  if (!state.gameId) { logErr('No game.'); setBusy('btn-rush-tasks', false); return; }
+
+  const players = state.bots.filter(b => !b.isGm && b.token);
+  const tasksPerBot = parseInt(document.getElementById('tasksPerBot').value) || 10;
+  const totalCalls = players.length * tasksPerBot;
+
+  log(`Solo task rush: ${players.length} bots × ${tasksPerBot} tasks = ${totalCalls} calls...`);
+  const t0 = Date.now();
+  let ok = 0, fail = 0;
+
+  // Build all call items
+  const calls = [];
+  for (const bot of players) {
+    // Shuffle tasks for this bot and pick tasksPerBot of them
+    const shuffled = [...TASK_IDS].sort(() => Math.random() - 0.5);
+    for (let t = 0; t < tasksPerBot && t < shuffled.length; t++) {
+      calls.push({ bot, taskId: shuffled[t] });
+    }
+  }
+
+  // Execute all in parallel (browser will throttle connections)
+  const results = await Promise.allSettled(calls.map(async ({ bot, taskId }) => {
+    const { status, data } = await api('POST', `/api/games/${state.gameId}/movement-b/complete`,
+      { taskId, bonusPoints: Math.floor(Math.random() * 5) }, bot.token);
+    if (status === 200) { ok++; return data; }
+    else {
+      // 409 = Movement B not active is expected if timing is off; don't count as error
+      if (status === 409) { fail++; return; }
+      throw new Error(`${status}: ${JSON.stringify(data)}`);
+    }
+  }));
+
+  results.forEach(r => { if (r.status === 'rejected') fail++; });
+
+  const dur = elapsed(t0);
+  const rps = (totalCalls / ((Date.now() - t0) / 1000)).toFixed(1);
+  logOk(`Task rush done: ${ok} ok, ${fail} fail, ${dur} (${rps} req/s)`);
+
+  setBusy('btn-rush-tasks', false);
+}
+
+async function runCompleteB() {
+  setBusy('btn-complete-b', true);
+  await gmAdvance('Complete Movement B');
+  state.currentMovement = null;
+  updateStats();
+  setBusy('btn-complete-b', false);
+}
+
+// =========================================================================
+// 7. Co-op Rush
+// =========================================================================
+
+async function runCoopRush() {
+  setBusy('btn-coop-rush', true);
+  if (!state.gameId) { logErr('No game.'); setBusy('btn-coop-rush', false); return; }
+
+  const players = state.bots.filter(b => !b.isGm && b.socket?.connected);
+  const tasksPerPair = parseInt(document.getElementById('coopTasksPerPair').value) || 5;
+
+  // Pair up players (adjacent pairs)
+  const pairs = [];
+  for (let i = 0; i < players.length - 1; i += 2) {
+    pairs.push([players[i], players[i + 1]]);
+  }
+
+  log(`Coop rush: ${pairs.length} pairs × ${tasksPerPair} tasks = ${pairs.length * tasksPerPair} coop sessions...`);
+  const t0 = Date.now();
+  let sessionsOk = 0, sessionsFail = 0;
+
+  const pairPromises = pairs.map(async ([botA, botB]) => {
+    for (let t = 0; t < tasksPerPair; t++) {
+      if (state.aborted) break;
+      try {
+        await runSingleCoopSession(botA, botB);
+        sessionsOk++;
+      } catch (err) {
+        sessionsFail++;
+        logErr(`Coop (${botA.username}+${botB.username}) task ${t + 1}: ${err.message}`);
+      }
+    }
+  });
+
+  await Promise.all(pairPromises);
+
+  const dur = elapsed(t0);
+  logOk(`Coop rush done: ${sessionsOk} ok, ${sessionsFail} fail, ${dur}`);
+
+  setBusy('btn-coop-rush', false);
+}
+
+async function runSingleCoopSession(botA, botB) {
+  // botA sends invite to botB
+  const invitePromise = waitForEvent(botB.socket, 'coopInviteReceived', 30000);
+  botA.socket.emit('coopInvite', { gameId: state.gameId, targetUserId: botB.userId });
+
+  const invite = await invitePromise;
+
+  // botB accepts
+  const sessionStartA = waitForEvent(botA.socket, 'coopSessionStart', 30000);
+  const sessionStartB = waitForEvent(botB.socket, 'coopSessionStart', 30000);
+  botB.socket.emit('coopAccept', { inviteId: invite.inviteId });
+
+  const [sessA, sessB] = await Promise.all([sessionStartA, sessionStartB]);
+  const sessionId = sessA.sessionId;
+  const task = sessA.task;
+
+  // Handle the task based on type
+  await handleCoopTask(botA, botB, sessA, sessB, sessionId, task);
+}
+
+async function handleCoopTask(botA, botB, sessA, sessB, sessionId, task) {
+  const taskType = task.taskType;
+
+  // Determine effective roles (roleA/roleB may be swapped)
+  const roleA = sessA.role; // 'A' or 'B'
+  const roleB = sessB.role; // 'A' or 'B'
+  const effectiveA = roleA === 'A' ? botA : botB; // bot playing role A
+  const effectiveB = roleA === 'B' ? botA : botB; // bot playing role B
+
+  switch (taskType) {
+    case 'deception': {
+      // Role A selects an option
+      const updatePromise = waitForEvent(effectiveA.socket, 'coopTaskUpdate', 15000).catch(() => null);
+      effectiveA.socket.emit('coopAction', {
+        sessionId, action: 'selectOption', data: { choice: Math.random() < 0.5 ? 0 : 1 },
+      });
+      await updatePromise;
+      break;
+    }
+
+    case 'secret_ballot': {
+      // Role A discards a decree
+      const discardPromise = waitForEvent(effectiveB.socket, 'coopTaskUpdate', 15000).catch(() => null);
+      effectiveA.socket.emit('coopAction', {
+        sessionId, action: 'discardDecree', data: { decreeIndex: 0 },
+      });
+      await discardPromise;
+
+      // Role B enacts a decree
+      const enactPromise = waitForEvent(effectiveA.socket, 'coopTaskUpdate', 15000).catch(() => null);
+      effectiveB.socket.emit('coopAction', {
+        sessionId, action: 'enactDecree', data: { decreeIndex: 1 },
+      });
+      await enactPromise;
+      break;
+    }
+
+    case 'coop_tap': {
+      // Both tap rapidly (~80 taps combined target)
+      const tapCount = 45; // each bot taps this many
+      for (let i = 0; i < tapCount; i++) {
+        botA.socket.emit('coopAction', { sessionId, action: 'tap', data: {} });
+        botB.socket.emit('coopAction', { sessionId, action: 'tap', data: {} });
+      }
+      // Wait for completion or timeout
+      await waitForEvent(botA.socket, 'coopTaskUpdate', 20000).catch(() => {
+        // If not resolved, send timeout
+        botA.socket.emit('coopAction', { sessionId, action: 'tapTimeout', data: {} });
+      });
+      break;
+    }
+
+    case 'coop_hold': {
+      // Both hold simultaneously
+      botA.socket.emit('coopAction', { sessionId, action: 'holdStart', data: {} });
+      botB.socket.emit('coopAction', { sessionId, action: 'holdStart', data: {} });
+
+      // Wait for hold duration (server checks ~5s)
+      await new Promise(r => setTimeout(r, 5500));
+
+      // Check
+      const checkPromise = waitForEvent(botA.socket, 'coopTaskUpdate', 10000).catch(() => null);
+      botA.socket.emit('coopAction', { sessionId, action: 'holdCheck', data: {} });
+      await checkPromise;
+      break;
+    }
+
+    case 'simon_says': {
+      // Role B picks a pattern (phos or skotia)
+      const patternsPromise = waitForEvent(effectiveB.socket, 'coopSimonPatterns', 10000).catch(() => null);
+      await patternsPromise;
+
+      effectiveB.socket.emit('coopAction', {
+        sessionId, action: 'selectPattern', data: { team: 'phos' },
+      });
+
+      // Wait for inputReady
+      await waitForEvent(effectiveA.socket, 'coopTaskUpdate', 10000).catch(() => null);
+
+      // Role A submits a random sequence (might be wrong, that's fine for stress test)
+      const colors = ['red', 'blue', 'green', 'yellow'];
+      const sequence = [0, 1, 2, 3].map(() => colors[Math.floor(Math.random() * 4)]);
+      for (const color of sequence) {
+        effectiveA.socket.emit('coopAction', {
+          sessionId, action: 'tapColor', data: { color },
+        });
+      }
+      effectiveA.socket.emit('coopAction', {
+        sessionId, action: 'submitSequence', data: { sequence },
+      });
+
+      await waitForEvent(effectiveA.socket, 'coopTaskUpdate', 10000).catch(() => null);
+      break;
+    }
+
+    default:
+      logWarn(`Unknown coop task type: ${taskType}`);
+  }
+
+  // Wait a brief moment for task resolution
+  await new Promise(r => setTimeout(r, 500));
+}
+
+// =========================================================================
+// 8. Round Summary & Game Flow
+// =========================================================================
+
+async function runSummarize() {
+  setBusy('btn-summarize', true);
+
+  const players = state.bots.filter(b => !b.isGm && b.socket?.connected);
+  const summaryPromises = players.map(b => waitForEvent(b.socket, 'roundSummary', 60000));
+
+  await gmAdvance('Summarize round');
+
+  try {
+    const summaries = await Promise.all(summaryPromises);
+    const s = summaries[0];
+    logOk(`Summary: Phos +${s?.phosPoints ?? s?.phosPointsEarned ?? 0}, Skotia +${s?.skotiaPoints ?? s?.skotiaPointsEarned ?? 0}`);
+  } catch (err) {
+    logErr(`Wait for roundSummary: ${err.message}`);
+  }
+
+  updateStats();
+  setBusy('btn-summarize', false);
+}
+
+async function runNextRound() {
+  setBusy('btn-next-round', true);
+
+  const players = state.bots.filter(b => !b.isGm && b.socket?.connected);
+  const setupPromises = players.map(b => waitForEvent(b.socket, 'roundSetup', 60000));
+
+  await gmAdvance('Next round');
+
+  try {
+    const setups = await Promise.all(setupPromises);
+    setups.forEach((setup, i) => {
+      if (setup.groupId) {
+        players[i].groupId = String(setup.groupId);
+        players[i].groupMembers = setup.groupMembers || [];
+      }
+    });
+    state.currentRound = (state.currentRound || 1) + 1;
+    logOk(`Round ${state.currentRound} set up.`);
+  } catch (err) {
+    logErr(`Wait for roundSetup: ${err.message}`);
+  }
+
+  updateStats();
+  setBusy('btn-next-round', false);
+}
+
+async function runGameOver() {
+  setBusy('btn-game-over', true);
+
+  const gameOverPromises = state.bots
+    .filter(b => b.socket?.connected)
+    .map(b => waitForEvent(b.socket, 'gameOver', 60000));
+
+  await gmAdvance('Game over');
+
+  try {
+    const results = await Promise.all(gameOverPromises);
+    const r = results[0];
+    logOk(`GAME OVER: ${r?.winner || 'unknown'} wins by ${r?.condition || '?'} — Phos: ${r?.phosPoints}, Skotia: ${r?.skotiaPoints}`);
+  } catch (err) {
+    logErr(`Wait for gameOver: ${err.message}`);
+  }
+
+  updateStats();
+  setBusy('btn-game-over', false);
+}
+
+// =========================================================================
+// Poll State
+// =========================================================================
+
+async function runPollState() {
+  if (!state.gameId || !state.bots[0]?.token) { logErr('No game/token.'); return; }
+  try {
+    const { data } = await api('GET', `/api/games/${state.gameId}/state`, null, state.bots[0].token);
+    const el = document.getElementById('state-display');
+    el.style.display = 'block';
+    el.innerHTML = formatStateObj('Player State (bot 0)', data);
+  } catch (err) {
+    logErr(`Poll state: ${err.message}`);
+  }
+}
+
+async function runPollGmState() {
+  if (!state.gameId || !state.bots[0]?.token) { logErr('No game/token.'); return; }
+  try {
+    const { data } = await api('GET', `/api/games/${state.gameId}/gm-state`, null, state.bots[0].token);
+    const el = document.getElementById('state-display');
+    el.style.display = 'block';
+    el.innerHTML = formatStateObj('GM State', data);
+  } catch (err) {
+    logErr(`Poll GM state: ${err.message}`);
+  }
+}
+
+function formatStateObj(title, obj) {
+  let html = `<strong style="color:var(--blue)">${title}</strong><br>`;
+  const recurse = (o, indent = '') => {
+    for (const [k, v] of Object.entries(o)) {
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        html += `${indent}<span class="key">${k}:</span><br>`;
+        recurse(v, indent + '  ');
+      } else if (Array.isArray(v)) {
+        html += `${indent}<span class="key">${k}:</span> <span class="val">[${v.length} items]</span><br>`;
+      } else {
+        const cls = v == null || v === '' ? 'val none' : 'val';
+        html += `${indent}<span class="key">${k}:</span> <span class="${cls}">${v}</span><br>`;
+      }
+    }
+  };
+  if (obj && typeof obj === 'object') recurse(obj);
+  else html += `<span class="val">${JSON.stringify(obj)}</span>`;
+  return html;
+}
+
+// =========================================================================
+// Full Auto Run
+// =========================================================================
+
+async function runFullAuto() {
+  setBusy('btn-full-auto', true);
+  state.aborted = false;
+  const rounds = parseInt(document.getElementById('autoRounds').value) || 2;
+  const totalSteps = 4 + rounds * 6; // register, login, lobby, start + per-round(activate-a, words, complete-a, activate-c, votes, complete-c)
+  let step = 0;
+
+  function progress() { step++; setProgress((step / totalSteps) * 100); }
+
+  const t0 = Date.now();
+  log('=== FULL AUTO RUN START ===');
+
+  try {
+    // 1. Register & Login
+    await runRegister(); if (state.aborted) throw new Error('Aborted');
+    progress();
+    await runLogin(); if (state.aborted) throw new Error('Aborted');
+    progress();
+
+    // 2. Lobby
+    await runCreateLobby(); if (state.aborted) throw new Error('Aborted');
+    await runJoinLobby(); if (state.aborted) throw new Error('Aborted');
+    await runConnectSockets(); if (state.aborted) throw new Error('Aborted');
+    progress();
+
+    // 3. Start game
+    await runStartGame(); if (state.aborted) throw new Error('Aborted');
+    progress();
+
+    // 4. Rounds
+    for (let round = 1; round <= rounds; round++) {
+      log(`\n=== ROUND ${round} of ${rounds} ===`);
+      const isFinal = round === rounds;
+
+      // Movement A
+      await runActivateA(); if (state.aborted) throw new Error('Aborted');
+      progress();
+      await runSubmitWords(); if (state.aborted) throw new Error('Aborted');
+      progress();
+      await runCompleteA(); if (state.aborted) throw new Error('Aborted');
+
+      // Movement C
+      await runActivateC(); if (state.aborted) throw new Error('Aborted');
+      progress();
+      await runSubmitVotes(); if (state.aborted) throw new Error('Aborted');
+      progress();
+      await runCompleteC(); if (state.aborted) throw new Error('Aborted');
+
+      // Movement B
+      await runActivateB(); if (state.aborted) throw new Error('Aborted');
+      await runTaskRush(); if (state.aborted) throw new Error('Aborted');
+      await runCompleteB(); if (state.aborted) throw new Error('Aborted');
+      progress();
+
+      // Summary
+      await runSummarize(); if (state.aborted) throw new Error('Aborted');
+
+      if (isFinal) {
+        await runGameOver();
+      } else {
+        await runNextRound();
+      }
+      progress();
+    }
+
+    const dur = elapsed(t0);
+    logOk(`\n=== FULL AUTO RUN COMPLETE — ${dur}, ${state.errors} errors ===`);
+  } catch (err) {
+    if (err.message === 'Aborted') {
+      logWarn('=== RUN ABORTED ===');
+    } else {
+      logErr(`Full auto error: ${err.message}`);
+    }
+  }
+
+  setProgress(0);
+  setBusy('btn-full-auto', false);
+}
+
+function abortRun() {
+  state.aborted = true;
+  logWarn('Abort requested...');
+}
+
+// =========================================================================
+// Reset
+// =========================================================================
+
+async function runResetAll() {
+  // Disconnect all sockets
+  for (const bot of state.bots) {
+    if (bot.socket?.connected) bot.socket.disconnect();
+    bot.socket = null;
+  }
+  state.bots = [];
+  state.lobbyId = null;
+  state.gameId = null;
+  state.currentRound = null;
+  state.currentMovement = null;
+  state.errors = 0;
+  state.aborted = false;
+  updateStats();
+  logOk('All state reset.');
+}
+
+// =========================================================================
+// Init
+// =========================================================================
+
+// Auto-detect server URL from current page
+(function init() {
+  const url = window.location.origin;
+  document.getElementById('serverUrl').value = url;
+  updateStats();
+})();
+</script>
+</body>
+</html>
