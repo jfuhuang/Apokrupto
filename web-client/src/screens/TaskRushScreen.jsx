@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import AnimatedBackground from '../components/AnimatedBackground.jsx'
 import { TASKS, MECHANIC } from '../data/tasks.js'
+import { completeTask } from '../utils/api.js'
 import RapidTapTask from '../tasks/RapidTapTask.jsx'
 import HoldTask from '../tasks/HoldTask.jsx'
 import TriviaTask from '../tasks/TriviaTask.jsx'
@@ -45,7 +46,7 @@ function TaskRouter({ task, onSuccess, onFail }) {
   }
 }
 
-export default function TaskRushScreen({ movementTimeLeft, onBack }) {
+export default function TaskRushScreen({ token, lobbyId, movementTimeLeft, onBack }) {
   const [queue] = useState(() => shuffle(TASKS))
   const [taskIndex, setTaskIndex] = useState(0)
   const [result, setResult] = useState(null) // null | 'success' | 'fail'
@@ -64,6 +65,9 @@ export default function TaskRushScreen({ movementTimeLeft, onBack }) {
     setResult(isSuccess ? 'success' : 'fail')
     setStreak(isSuccess ? s => s + 1 : 0)
     setSessionPoints(p => p + pts)
+    if (isSuccess && token && lobbyId) {
+      completeTask(token, lobbyId, currentTask.id).catch(() => {})
+    }
     setShowing(false)
     setTimeout(() => {
       setResult(null)

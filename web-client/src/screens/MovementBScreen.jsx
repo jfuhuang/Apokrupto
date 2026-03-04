@@ -10,6 +10,7 @@ const MOVEMENT_B_DURATION_MS = 3 * 60 * 1000
 export default function MovementBScreen({
   token,
   gameId,
+  lobbyId,
   currentUserId,
   currentTeam,
   currentGroupMembers,
@@ -108,7 +109,7 @@ export default function MovementBScreen({
   const secs = timeLeft % 60
 
   if (mode === 'taskRush') {
-    return <TaskRushScreen movementTimeLeft={timeLeft} onBack={() => setMode('hub')} />
+    return <TaskRushScreen token={token} lobbyId={lobbyId} movementTimeLeft={timeLeft} onBack={() => setMode('hub')} />
   }
 
   if (mode === 'coopLobby') {

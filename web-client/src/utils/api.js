@@ -86,3 +86,6 @@ export const broadcast = (t, gameId, lobbyId, message) =>
 
 export const advanceGame = (t, gameId) =>
   req(`/api/games/${gameId}/advance`, { method: 'POST', headers: { ...authH(t), ...ngrokH } })
+
+export const completeTask = (t, lobbyId, taskId) =>
+  req(`/api/lobbies/${lobbyId}/tasks/complete`, { method: 'POST', headers: { ...jsonH, ...authH(t), ...ngrokH }, body: JSON.stringify({ taskId }) })

@@ -397,6 +397,7 @@ export default function App() {
             <MovementBScreen
               token={state.token}
               gameId={state.gameId}
+              lobbyId={state.currentLobbyId}
               currentUserId={state.currentUserId}
               currentTeam={state.currentTeam}
               currentGroupMembers={state.currentGroupMembers}
