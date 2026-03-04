@@ -77,8 +77,7 @@ server/
 ├── db.js                     # PostgreSQL connection pool
 ├── dbInit.js                 # Auto-schema creation + biblical prompt seeding
 ├── data/
-│   ├── tasks.js              # Task definitions (trivia, scripture, skill, cooperative)
-│   └── sabotages.js          # Legacy sabotage data
+│   └── tasks.js              # Task definitions (challenge tasks + trivia point catalog)
 ├── middleware/
 │   ├── auth.js               # JWT authentication middleware (REST)
 │   └── socketAuth.js         # JWT authentication middleware (Socket.IO)
@@ -226,4 +225,4 @@ All endpoints require `Authorization: Bearer <token>` unless noted.
 - **Bot players** — Admin can add dummy players via `/api/lobbies/:id/add-dummy`. Bots auto-submit during Movement A turns.
 - **Biblical prompts** — 10 prompt pairs seeded on first startup (if `prompts` table is empty).
 - **Socket rooms** — `lobby:{lobbyId}` for lobby-wide events; `lobby:{groupId}` for group-specific events (Movement A turns).
-- **Legacy sabotage system** — Still in codebase (`lobbySocket.js`, `lobbyRoutes.js`). Not part of the Phos/Skotia game. Safe to ignore.
+- **Legacy sabotage system** — Server-side sabotage routes remain in `lobbySocket.js` and `lobbyRoutes.js`. Client-side `sabotages.js` has been removed. Not part of the Phos/Skotia game. Safe to ignore.

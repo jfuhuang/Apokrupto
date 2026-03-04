@@ -37,8 +37,8 @@ React Native (Expo 54) mobile client for the Apokrupto social-deduction party ga
 | Task | `screens/tasks/TaskScreen.js` | Task runner wrapper |
 | Dev Menu | `screens/dev/DevMenuScreen.js` | Debug navigation to any screen |
 
-### Task Mechanics (10 types)
-`screens/tasks/mechanics/`: CipherTask, CollectTask, DragPlaceTask, GuardTask, HoldTask, MatchPairTask, QuizTask, RapidTapTask, ScriptureMemoryTask, SlingTask
+### Task Mechanics (14 types)
+`screens/tasks/mechanics/`: BailWaterTask, BuildTask, CollectTask, DragPlaceTask, FocusTask, GuardTask, HoldTask, MarchJerichoTask, PatienceTask, RapidTapTask, ScriptureBlankTask, SlingTask, TraceTask, TriviaTask
 
 ## Prerequisites
 
@@ -81,8 +81,7 @@ client/
 │   ├── AnimatedBackground.js     # Reusable particle animation
 │   └── LobbyCard.js             # Lobby list item card
 ├── data/
-│   ├── tasks.js                  # Task definitions
-│   └── sabotages.js              # Legacy sabotage data
+│   └── tasks.js                  # Task definitions (CHALLENGES category only)
 ├── screens/
 │   ├── auth/                     # LoginScreen, RegistrationScreen
 │   ├── dev/                      # DevMenuScreen

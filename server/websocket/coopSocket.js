@@ -56,9 +56,12 @@ function findSocketsForUser(io, userId) {
  */
 function getPlayerRole(session, userId) {
   const uid = String(userId);
-  if (session.playerA.userId === uid) return 'A';
-  if (session.playerB.userId === uid) return 'B';
-  return null;
+  const isA = session.playerA.userId === uid;
+  const isB = session.playerB.userId === uid;
+  if (!isA && !isB) return null;
+  const structural = isA ? 'A' : 'B';
+  if (session.taskRoleSwap) return structural === 'A' ? 'B' : 'A';
+  return structural;
 }
 
 /**
@@ -72,14 +75,22 @@ function scheduleNextTask(io, sessionId, delayMs) {
       const task = coopService.advanceTask(sessionId);
       if (task) {
         const totalPts = (session.sessionPoints?.A || 0) + (session.sessionPoints?.B || 0);
+        const roles = {
+          [session.playerA.userId]: getPlayerRole(session, session.playerA.userId),
+          [session.playerB.userId]: getPlayerRole(session, session.playerB.userId),
+        };
         io.to(`coop:${sessionId}`).emit('coopNextTask', {
           sessionId,
           task: sanitizeTask(task),
           sessionPoints: totalPts,
+          roles,
         });
-        // For simon_says: send patterns to Player B only (keeps patterns off Player A's device)
+        // For simon_says: send patterns to the player whose effective role is B
+        const effectiveBUserId = roles[session.playerA.userId] === 'B'
+          ? session.playerA.userId
+          : session.playerB.userId;
         if (task.taskType === 'simon_says' && task._server) {
-          const playerBSockets = findSocketsForUser(io, session.playerB.userId);
+          const playerBSockets = findSocketsForUser(io, effectiveBUserId);
           for (const s of playerBSockets) {
             s.emit('coopSimonPatterns', {
               sessionId,
@@ -162,11 +173,13 @@ function registerCoopHandlers(socket) {
         const playerASockets = findSocketsForUser(io, session.playerA.userId);
         const playerBSockets = findSocketsForUser(io, session.playerB.userId);
 
+        const roleA = getPlayerRole(session, session.playerA.userId);
+        const roleB = getPlayerRole(session, session.playerB.userId);
         for (const s of playerASockets) {
           s.join(sessionRoom);
           s.emit('coopSessionStart', {
             sessionId: session.id,
-            role: 'A',
+            role: roleA,
             partner: { userId: session.playerB.userId, username: session.playerB.username },
             task: sanitizeTask(task),
           });
@@ -175,12 +188,15 @@ function registerCoopHandlers(socket) {
           s.join(sessionRoom);
           s.emit('coopSessionStart', {
             sessionId: session.id,
-            role: 'B',
+            role: roleB,
             partner: { userId: session.playerA.userId, username: session.playerA.username },
             task: sanitizeTask(task),
           });
-          // For simon_says: also send patterns to Player B only
-          if (task.taskType === 'simon_says' && task._server) {
+        }
+        // For simon_says: send patterns to the player whose effective role is B
+        if (task.taskType === 'simon_says' && task._server) {
+          const effectiveBSockets = roleA === 'B' ? playerASockets : playerBSockets;
+          for (const s of effectiveBSockets) {
             s.emit('coopSimonPatterns', {
               sessionId: session.id,
               phosPattern: task._server.phosPattern,

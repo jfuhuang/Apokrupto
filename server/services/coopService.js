@@ -85,6 +85,7 @@ function acceptInvite(inviteId, acceptorId, acceptorUsername) {
     status: 'active',
     holdState: null,
     tapState: null,
+    taskRoleSwap: Math.random() < 0.5,
   };
 
   _sessions.set(sessionId, session);
@@ -143,6 +144,7 @@ function advanceTask(sessionId) {
   if (!session) throw new Error('Session not found');
 
   session.taskIndex += 1;
+  session.taskRoleSwap = Math.random() < 0.5;
   const task = generateCoopTask();
   session.currentTask = task;
   session.holdState = null;

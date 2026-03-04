@@ -218,8 +218,6 @@ Solo task points use a **1–10 scale** (alive/dead variants). Coop task base po
 | Round Summary | `screens/game/RoundSummaryScreen.js` | Built |
 | GM Dashboard | `screens/game/GmDashboardScreen.js` | Built |
 | Game Over | `screens/game/GameOverScreen.js` | Updated |
-| Task | `screens/tasks/TaskScreen.js` | Existing |
-| Cipher Task | `screens/tasks/mechanics/CipherTask.js` | Existing |
 | Dev Menu | `screens/dev/DevMenuScreen.js` | Existing |
 
 ### UI conventions
@@ -251,7 +249,7 @@ Solo task points use a **1–10 scale** (alive/dead variants). Coop task base po
 - **Turn state is in-memory** — `groupTurnState` Map in `gameService.js` stores Movement A turn order. Lost on server restart, which would break an in-progress Movement A.
 - **Group assignment** — `computeGroupCount(n)` in `gameService.js` targets groups of 5 but allows 4–6 members so any player count works (not just multiples of 5). Always 1 Skotia per group. Groups are reshuffled each round.
 - **Prompt seeding** — 10 biblical prompt pairs inserted on first startup (if `prompts` table is empty).
-- **Legacy sabotage system** — still in the codebase (`lobbySocket.js`, `lobbyRoutes.js`). Not part of the Phos/Skotia game. Safe to ignore.
+- **Legacy sabotage system** — server-side sabotage routes remain in `lobbySocket.js` and `lobbyRoutes.js`. Client-side `sabotages.js` has been removed. Not part of the Phos/Skotia game. Safe to ignore.
 - **Safety-net polling** — All active game screens (MovementA, MovementB, VotingScreen, RoundHub, RoundSummary, GameOverScreen) poll `GET /api/games/:id/state` every 3 s. If the movement has advanced while the socket was disconnected, the screen transitions automatically. This makes socket delivery non-critical for progression.
 - **Pull-to-refresh** — RoundHubScreen, MovementBScreen, VotingScreen, and RoundSummaryScreen support pull-to-refresh (ScrollView + RefreshControl) for manual state sync. MovementAScreen does not (no natural ScrollView).
 - **Coop: disconnect grace period** — `coopSocket.js` defers `coopService.endSession` by 8 s on disconnect. A `coopRejoin` socket event cancels the timer and re-adds the socket to `coop:{sessionId}`. Use this pattern when adding future coop reconnect logic.
@@ -260,7 +258,7 @@ Solo task points use a **1–10 scale** (alive/dead variants). Coop task base po
 - **Coop: Deception task clue fix** — `generateDeception()` in `server/data/coopTasks.js` now gives each role the correct opposing clue: Phos player is told the Phos-benefit word, Skotia player the Skotia-benefit word.
 - **Movement A deliberation** — `MovementAScreen` deliberation phase shows a horizontal `SketchCarousel` (snap-scrolling, dot indicators); player's own sketch is highlighted with a blue border.
 - **ScriptureBlankTask hint** — Players can tap 'I DON'T KNOW' to reveal a hint box listing all correct words in order. One-shot, non-closeable.
-- **`ScriptureMemoryTask` removed** — Replaced by `ScriptureBlankTask` which covers the same mechanic with a richer drag-and-drop UI.
+- **Legacy task mechanics removed** — `ScriptureMemoryTask`, `CipherTask`, `QuizTask`, `MatchPairTask`, `TaskResultOverlay`, and `client/data/sabotages.js` have been deleted. 14 active solo mechanics remain in `TaskRushScreen.js`; 5 co-op task types in `CoopRushScreen.js`.
 - **DB cleanup timeout** — `gameService.js` game cleanup uses a dedicated pool client with `statement_timeout = 120_000` (2 min) to prevent cascading DELETEs from timing out on large games.
 
 ## What Still Needs to Be Built

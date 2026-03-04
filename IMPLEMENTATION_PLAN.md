@@ -75,7 +75,7 @@ All tables implemented in `server/dbInit.js` with auto-creation on startup:
 ## Phase 4 — Movement B: Task Phase ✅ (partially)
 
 ### 4.1 Task Mechanics ✅
-- [X] 10 task types implemented: CipherTask, CollectTask, DragPlaceTask, GuardTask, HoldTask, MatchPairTask, QuizTask, RapidTapTask, ScriptureMemoryTask, SlingTask
+- [X] 14 task mechanics implemented: SlingTask, CollectTask, DragPlaceTask, GuardTask, RapidTapTask, HoldTask, TraceTask, PatienceTask, BuildTask, TriviaTask, ScriptureBlankTask, BailWaterTask, MarchJerichoTask, FocusTask
 - [X] `MovementBScreen.js` — task selector with difficulty indicators + task runner
 - [X] Timer: phase ends when GM advances or optional time limit expires
 

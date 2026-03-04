@@ -37,8 +37,17 @@ export default function CoopRushScreen({
 }) {
   const { setSocketConnected } = useGame();
 
+  // Decode own userId from JWT so we can look up effective role per task
+  const myUserId = React.useMemo(() => {
+    try {
+      const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(base64)).sub;
+    } catch { return null; }
+  }, [token]);
+
   const socketRef = useRef(null);
   const [currentTask, setCurrentTask] = useState(initialTask);
+  const [myRole, setMyRole] = useState(role);
   const [taskUpdate, setTaskUpdate] = useState(null);
   const [sessionPoints, setSessionPoints] = useState(0);
   const sessionPointsRef = useRef(0);
@@ -119,8 +128,12 @@ export default function CoopRushScreen({
         setSimonPatterns({ phosPattern, skotiaPattern });
       });
 
-      socket.on('coopNextTask', ({ sessionId: sid, task, sessionPoints: pts }) => {
+      socket.on('coopNextTask', ({ sessionId: sid, task, sessionPoints: pts, roles }) => {
         if (sid !== sessionId) return;
+        // Update effective role if the server sent a roles map
+        if (roles && myUserId && roles[myUserId]) {
+          setMyRole(roles[myUserId]);
+        }
         // Switch to the new task immediately, show overlay on top
         setCurrentTask(task);
         setTaskUpdate(null);
@@ -207,7 +220,7 @@ export default function CoopRushScreen({
     const taskKey = currentTask.taskId;
     const taskProps = {
       task: currentTask,
-      role,
+      role: myRole,
       currentTeam,
       onAction: handleAction,
       update: taskUpdate,
@@ -243,7 +256,7 @@ export default function CoopRushScreen({
             <View>
               <Text style={[styles.hudTaskLabel, { color: teamColor }]}>{taskLabel}</Text>
               <Text style={styles.hudPartner}>
-                w/ {partnerUsername} · Role {role}
+              w/ {partnerUsername} · Role {myRole}
               </Text>
             </View>
           </View>
