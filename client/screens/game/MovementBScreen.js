@@ -18,6 +18,7 @@ import { MOVEMENT_NAMES } from '../../constants/movementNames';
 import { MOVEMENT_B_DURATION_MS } from '../../constants/timings';
 import SusIcon from '../../components/SusIcon';
 import { useGame } from '../../context/GameContext';
+import { fonts } from '../../theme/typography';
 
 export default function MovementBScreen({
   token,
@@ -30,16 +31,19 @@ export default function MovementBScreen({
   onMovementComplete,
   onEnterRush,
   onEnterCoop,
+  onDirectSessionStart,
 }) {
   const { setSocketConnected } = useGame();
 
   const [activeTab, setActiveTab] = useState('rush'); // 'rush' | 'coop'
   const [sessionPoints, setSessionPoints] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(null);
+  const [incomingInvite, setIncomingInvite] = useState(null); // { inviteId, fromUserId, fromUsername }
 
   const endsAtRef = useRef(null);
   const socketRef = useRef(null);
   const timerBarAnim = useRef(new Animated.Value(1)).current;
+  const bannerAnim = useRef(new Animated.Value(0)).current;
   const totalDurationRef = useRef(MOVEMENT_B_DURATION_MS);
   const safetyExitedRef = useRef(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -106,6 +110,24 @@ export default function MovementBScreen({
         }
       });
 
+      socket.on('coopInviteReceived', ({ inviteId, fromUserId, fromUsername }) => {
+        setIncomingInvite({ inviteId, fromUserId, fromUsername });
+        bannerAnim.setValue(0);
+        Animated.timing(bannerAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      });
+
+      socket.on('coopInviteCancelled', ({ inviteId }) => {
+        setIncomingInvite((cur) => (cur?.inviteId === inviteId ? null : cur));
+      });
+
+      socket.on('coopSessionStart', (data) => {
+        if (onDirectSessionStart) onDirectSessionStart(data);
+      });
+
       socket.on('connect_error', (err) =>
         logger.error('MovementB', `socket error: ${err.message}`)
       );
@@ -168,6 +190,26 @@ export default function MovementBScreen({
       setRefreshing(false);
     }
   };
+
+  // ── Co-op invite handlers ────────────────────────────────────────────────
+  const handleInviteAccept = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket || !incomingInvite) return;
+    socket.emit('coopAccept', { inviteId: incomingInvite.inviteId }, (res) => {
+      if (res?.error) {
+        logger.error('MovementB', 'coopAccept failed:', res.error);
+        setIncomingInvite(null);
+      }
+    });
+  }, [incomingInvite]);
+
+  const handleInviteDecline = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket || !incomingInvite) return;
+    socket.emit('coopDecline', { inviteId: incomingInvite.inviteId }, () => {
+      setIncomingInvite(null);
+    });
+  }, [incomingInvite]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────
   const teamColor =
@@ -303,6 +345,35 @@ export default function MovementBScreen({
         </View>
 
         </ScrollView>
+
+        {/* ── Floating co-op invite banner ── */}
+        {incomingInvite && (
+          <Animated.View style={[styles.inviteOverlay, { opacity: bannerAnim }]}>
+            <View style={[styles.inviteBanner, { borderColor: teamColor }]}>
+              <Text style={styles.bannerText}>
+                <Text style={{ color: teamColor, fontFamily: fonts.display.bold }}>
+                  {incomingInvite.fromUsername}
+                </Text>{' '}wants to co-op!
+              </Text>
+              <View style={styles.bannerActions}>
+                <TouchableOpacity
+                  style={[styles.bannerBtn, { backgroundColor: colors.state.success }]}
+                  onPress={handleInviteAccept}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.bannerBtnText}>ACCEPT</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.bannerBtn, { backgroundColor: colors.primary.neonRed }]}
+                  onPress={handleInviteDecline}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.bannerBtnText}>DECLINE</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Animated.View>
+        )}
 
       </SafeAreaView>
     </View>
@@ -508,5 +579,48 @@ const styles = StyleSheet.create({
     color: colors.accent.neonGreen,
     textAlign: 'center',
     letterSpacing: 0.5,
+  },
+
+  // ── Floating invite banner ─────────────────────────────────────────────
+  inviteOverlay: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    zIndex: 100,
+  },
+  inviteBanner: {
+    backgroundColor: colors.background.void,
+    borderRadius: 16,
+    borderWidth: 2,
+    padding: 16,
+    alignItems: 'center',
+    gap: 12,
+    shadowColor: colors.primary.electricBlue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  bannerText: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 15,
+    color: colors.text.primary,
+    textAlign: 'center',
+  },
+  bannerActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  bannerBtn: {
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 28,
+  },
+  bannerBtnText: {
+    fontFamily: fonts.display.bold,
+    fontSize: 12,
+    letterSpacing: 2,
+    color: colors.background.space,
   },
 });

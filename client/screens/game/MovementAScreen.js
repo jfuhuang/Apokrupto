@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { io } from 'socket.io-client';
 import logger from '../../utils/logger';
 import { getApiUrl } from '../../config';
@@ -176,7 +177,8 @@ export default function MovementAScreen({
   groupMembers,
   onMovementComplete,
 }) {
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isPortrait = windowHeight > windowWidth;
   const { setSocketConnected } = useGame();
 
   const [phase, setPhase] = useState('waiting_turn');
@@ -212,6 +214,19 @@ export default function MovementAScreen({
   useEffect(() => { wordInputRef.current = wordInput; }, [wordInput]);
   useEffect(() => { promptModeRef.current = promptMode; }, [promptMode]);
   useEffect(() => { sketchDataRef.current = sketchData; }, [sketchData]);
+
+  // Lock to portrait while the player is actively drawing; revert to landscape otherwise.
+  useEffect(() => {
+    const isDrawing = phase === 'my_turn' && promptMode === 'sketch';
+    if (isDrawing) {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    } else {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+    }
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+    };
+  }, [phase, promptMode]);
 
   // Fetch prompt (server returns team-specific prompt via JWT).
   // Used on mount (with retries) and on pull-to-refresh (single attempt).
@@ -617,6 +632,10 @@ export default function MovementAScreen({
     if (phase === 'waiting_turn') {
       return (
         <View style={styles.phaseContainer}>
+          <Text style={styles.waitingForLabel}>
+            Waiting for {currentTurnPlayerName}...
+          </Text>
+
           <View style={styles.promptSection}>
             <Text style={styles.promptLabel}>
               {promptMode === 'sketch' ? 'DRAW' : 'YOUR PROMPT'}
@@ -830,16 +849,31 @@ export default function MovementAScreen({
           </View>
 
           <View style={styles.sketchTurnLayout}>
-            {/* Compact header: YOUR TURN + timer + prompt inline */}
-            <View style={styles.sketchTopBar}>
-              <Text style={styles.yourTurnLabel}>YOUR TURN</Text>
-              <Text style={styles.sketchPromptInline} numberOfLines={1}>{prompt || '...'}</Text>
-              <View style={[styles.sketchTimerBadge, turnSecondsLeft <= 10 && styles.sketchTimerBadgeUrgent]}>
-                <Text style={[styles.sketchTimerText, turnSecondsLeft <= 10 && styles.sketchTimerTextUrgent]}>
-                  {turnSecondsLeft}s
-                </Text>
+            {/* Portrait: stack YOUR TURN + timer on one row, prompt on next row.
+                Landscape: keep everything on a single row. */}
+            {isPortrait ? (
+              <View style={styles.sketchTopBarPortrait}>
+                <View style={styles.sketchTopBarRow}>
+                  <Text style={styles.yourTurnLabel}>YOUR TURN</Text>
+                  <View style={[styles.sketchTimerBadge, turnSecondsLeft <= 10 && styles.sketchTimerBadgeUrgent]}>
+                    <Text style={[styles.sketchTimerText, turnSecondsLeft <= 10 && styles.sketchTimerTextUrgent]}>
+                      {turnSecondsLeft}s
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.sketchPromptInlinePortrait} numberOfLines={2}>{prompt || '...'}</Text>
               </View>
-            </View>
+            ) : (
+              <View style={styles.sketchTopBar}>
+                <Text style={styles.yourTurnLabel}>YOUR TURN</Text>
+                <Text style={styles.sketchPromptInline} numberOfLines={1}>{prompt || '...'}</Text>
+                <View style={[styles.sketchTimerBadge, turnSecondsLeft <= 10 && styles.sketchTimerBadgeUrgent]}>
+                  <Text style={[styles.sketchTimerText, turnSecondsLeft <= 10 && styles.sketchTimerTextUrgent]}>
+                    {turnSecondsLeft}s
+                  </Text>
+                </View>
+              </View>
+            )}
 
             {/* Canvas fills remaining space */}
             <SketchCanvas
@@ -1015,10 +1049,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  // Portrait-mode header: two rows to keep the canvas tall
+  sketchTopBarPortrait: {
+    gap: 4,
+  },
+  sketchTopBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   sketchPromptInline: {
     flex: 1,
     fontFamily: fonts.accent.bold,
     fontSize: 14,
+    color: colors.text.secondary,
+    letterSpacing: 0.5,
+  },
+  sketchPromptInlinePortrait: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 15,
     color: colors.text.secondary,
     letterSpacing: 0.5,
   },
@@ -1241,6 +1290,15 @@ const styles = StyleSheet.create({
     textShadowColor: colors.shadow.electricBlue,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 12,
+  },
+  waitingForLabel: {
+    fontFamily: fonts.display.bold,
+    fontSize: 18,
+    letterSpacing: 1,
+    color: colors.primary.electricBlue,
+    textAlign: 'center',
+    marginBottom: 16,
+    marginTop: 8,
   },
   waitingLabel: {
     ...typography.body,

@@ -421,6 +421,14 @@ export default function App() {
             onMovementComplete={() => setCurrentScreen('roundHub')}
             onEnterRush={() => setCurrentScreen('taskRush')}
             onEnterCoop={() => setCurrentScreen('coopLobby')}
+            onDirectSessionStart={({ sessionId: sid, partner, role: r, task }) => {
+              setCoopSessionId(sid);
+              setCoopPartnerId(partner?.userId ?? null);
+              setCoopPartnerUsername(partner?.username ?? null);
+              setCoopRole(r);
+              setCoopInitialTask(task);
+              setCurrentScreen('coopRush');
+            }}
           />
         );
 
