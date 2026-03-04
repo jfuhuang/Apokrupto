@@ -51,31 +51,14 @@ export default function App() {
   const [state, setState] = useState(INITIAL_STATE)
   const [socketConnected, setSocketConnected] = useState(false)
   const socketRef = useRef(null)
+  // Bumped each time a new socket is created so socket-listener effects re-run
+  const [socketKey, setSocketKey] = useState(0)
 
   function patchState(patch) {
     setState((prev) => ({ ...prev, ...patch }))
   }
 
-  // On mount: restore token
-  useEffect(() => {
-    const token = storage.getToken()
-    if (!token) {
-      patchState({ currentScreen: 'welcome' })
-      return
-    }
-    const payload = decodeJwt(token)
-    if (!payload) {
-      storage.removeToken()
-      patchState({ currentScreen: 'welcome' })
-      return
-    }
-    patchState({ token, currentUserId: payload.sub, username: payload.username || payload.sub })
-    // Reconnect socket and check for active lobby
-    connectSocket(token)
-    checkCurrentLobby(token)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  function connectSocket(token) {
+  const connectSocket = useCallback((token) => {
     if (socketRef.current) {
       socketRef.current.disconnect()
     }
@@ -87,10 +70,11 @@ export default function App() {
     socket.on('connect', () => setSocketConnected(true))
     socket.on('disconnect', () => setSocketConnected(false))
     socket.on('connect_error', () => setSocketConnected(false))
+    setSocketKey((k) => k + 1)
     return socket
-  }
+  }, [])
 
-  async function checkCurrentLobby(token) {
+  const checkCurrentLobby = useCallback(async (token) => {
     const res = await fetchCurrentLobby(token)
     if (res.ok && res.data.lobby) {
       const lobby = res.data.lobby
@@ -112,7 +96,25 @@ export default function App() {
     } else {
       patchState({ currentScreen: 'lobbyList' })
     }
-  }
+  }, [])
+
+  // On mount: restore token
+  useEffect(() => {
+    const token = storage.getToken()
+    if (!token) {
+      patchState({ currentScreen: 'welcome' })
+      return
+    }
+    const payload = decodeJwt(token)
+    if (!payload) {
+      storage.removeToken()
+      patchState({ currentScreen: 'welcome' })
+      return
+    }
+    patchState({ token, currentUserId: payload.sub, username: payload.username || payload.sub })
+    connectSocket(token)
+    checkCurrentLobby(token)
+  }, [connectSocket, checkCurrentLobby])
 
   function handleLoginSuccess(token, username) {
     const payload = decodeJwt(token)
@@ -193,11 +195,7 @@ export default function App() {
     patchState({ currentScreen: 'gameOver', gameOverResult: data })
   }
 
-  function handleRoundSummaryReceived(summary) {
-    patchState({ roundSummary: summary, currentScreen: 'roundSummary' })
-  }
-
-  // Handle movementStart for round-level updates
+  // Handle movementStart for round-level updates (next round after summary)
   function handleNextRound(data) {
     patchState({
       currentRound: data.roundNumber || state.currentRound + 1,
@@ -211,13 +209,14 @@ export default function App() {
     })
   }
 
-  // Socket: listen for roundSummary
+  // Socket: listen for roundSummary and top-level movementStart updates.
+  // Re-runs whenever socketKey changes (i.e. a new socket was created).
   useEffect(() => {
     const socket = socketRef.current
     if (!socket) return
 
     function onRoundSummary(data) {
-      handleRoundSummaryReceived(data)
+      patchState({ roundSummary: data, currentScreen: 'roundSummary' })
     }
 
     function onMovementStart(data) {
@@ -234,7 +233,7 @@ export default function App() {
       socket.off('roundSummary', onRoundSummary)
       socket.off('movementStart', onMovementStart)
     }
-  }) // run every render so we always have latest handlers — intentional
+  }, [socketKey])
 
   const { currentScreen } = state
 

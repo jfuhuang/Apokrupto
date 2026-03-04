@@ -1,7 +1,7 @@
 import AnimatedBackground from '../components/AnimatedBackground.jsx'
 
 export default function GameOverScreen({ result, onReturnToLobbyList }) {
-  const winner = result?.winner || result?.winner
+  const winner = result?.winner
   const phosPoints = result?.phosPoints ?? result?.teamPoints?.phos ?? 0
   const skotiaPoints = result?.skotiaPoints ?? result?.teamPoints?.skotia ?? 0
   const skotiaPlayers = result?.skotiaPlayers || []
