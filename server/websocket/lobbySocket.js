@@ -210,6 +210,11 @@ function setupLobbySocket(httpServer) {
 
     console.log(`[WS] Socket Connected: ${socket.id} (user: ${socket.userId}, username: ${socket.username})`);
 
+    // Dev debug: echo ping → pong
+    socket.on('debug:ping', () => {
+      socket.emit('debug:pong', { ts: Date.now(), socketId: socket.id, userId: socket.userId });
+    });
+
     // Client joins a lobby room
     socket.on('joinRoom', async ({ lobbyId }, callback) => {
       try {

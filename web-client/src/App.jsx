@@ -20,6 +20,7 @@ import { GameProvider } from './context/GameContext.jsx'
 import { storage } from './utils/storage.js'
 import { fetchCurrentLobby } from './utils/api.js'
 import { getSocketUrl } from './utils/network.js'
+import SocketDebugPanel from './components/SocketDebugPanel.jsx'
 
 function decodeJwt(token) {
   try {
@@ -462,6 +463,7 @@ export default function App() {
     <>
       {renderScreen()}
       <ConnectionDot isConnected={socketConnected} />
+      <SocketDebugPanel key={socketKey} socket={socketRef.current} isConnected={socketConnected} />
     </>
   )
 }
