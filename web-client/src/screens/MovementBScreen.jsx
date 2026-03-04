@@ -109,7 +109,7 @@ export default function MovementBScreen({
   const secs = timeLeft % 60
 
   if (mode === 'taskRush') {
-    return <TaskRushScreen token={token} lobbyId={lobbyId} movementTimeLeft={timeLeft} onBack={() => setMode('hub')} />
+    return <TaskRushScreen token={token} gameId={gameId} movementTimeLeft={timeLeft} onBack={() => setMode('hub')} />
   }
 
   if (mode === 'coopLobby') {

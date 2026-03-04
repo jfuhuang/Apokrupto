@@ -20,12 +20,33 @@ const MECHANIC = {
 };
 
 const TASKS = [
-  // Fill-in-the-blank scripture
-  { id: 'blank_philippians_4_13', mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
-  { id: 'blank_john_3_16',        mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
-  { id: 'blank_psalm_23',         mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 4, dead: 2 } },
-  { id: 'blank_isaiah_40_31',     mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 5, dead: 3 } },
-  { id: 'blank_hebrews_11_1',     mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 4, dead: 2 } },
+  // Scripture Blank — Navigators TMS Pack A (ESV)
+  { id: 'blank_2cor_5_17',   mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
+  { id: 'blank_gal_2_20',    mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 4, dead: 2 } },
+  { id: 'blank_rom_12_1',    mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 4, dead: 2 } },
+  { id: 'blank_john_14_21',  mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
+  { id: 'blank_2tim_3_16',   mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
+  { id: 'blank_josh_1_8',    mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 4, dead: 2 } },
+  { id: 'blank_john_15_7',   mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
+  { id: 'blank_phil_4_6',    mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 4, dead: 2 } },
+  { id: 'blank_matt_18_20',  mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
+  { id: 'blank_heb_10_24',   mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 5, dead: 3 } },
+  { id: 'blank_matt_4_19',   mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
+  { id: 'blank_rom_1_16',    mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 4, dead: 2 } },
+
+  // Scripture Blank — Navigators TMS Pack B (ESV)
+  { id: 'blank_rom_3_23',    mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
+  { id: 'blank_isa_53_6',    mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 4, dead: 2 } },
+  { id: 'blank_rom_6_23',    mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
+  { id: 'blank_heb_9_27',    mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
+  { id: 'blank_rom_5_8',     mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
+  { id: 'blank_1pet_3_18',   mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 4, dead: 2 } },
+  { id: 'blank_eph_2_8',     mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
+  { id: 'blank_tit_3_5',     mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 4, dead: 2 } },
+  { id: 'blank_john_1_12',   mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
+  { id: 'blank_rev_3_20',    mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
+  { id: 'blank_1john_5_13',  mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 3, dead: 2 } },
+  { id: 'blank_john_5_24',   mechanic: MECHANIC.SCRIPTURE_BLANK, points: { alive: 4, dead: 2 } },
 
   // Single-question trivia
   { id: 'trivia_psalms_author',   mechanic: MECHANIC.TRIVIA, points: { alive: 2, dead: 1 } },

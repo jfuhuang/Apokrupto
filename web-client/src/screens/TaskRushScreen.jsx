@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import AnimatedBackground from '../components/AnimatedBackground.jsx'
 import { TASKS, MECHANIC } from '../data/tasks.js'
-import { completeTask } from '../utils/api.js'
+import { submitMovementBTask, submitMovementBFail } from '../utils/api.js'
 import RapidTapTask from '../tasks/RapidTapTask.jsx'
 import HoldTask from '../tasks/HoldTask.jsx'
 import TriviaTask from '../tasks/TriviaTask.jsx'
@@ -72,7 +72,7 @@ function TaskRouter({ task, onSuccess, onFail }) {
   }
 }
 
-export default function TaskRushScreen({ token, lobbyId, movementTimeLeft, onBack }) {
+export default function TaskRushScreen({ token, gameId, movementTimeLeft, onBack }) {
   const [queue] = useState(() => typeUniformQueue(TASKS))
   const [taskIndex, setTaskIndex] = useState(0)
   const [result, setResult] = useState(null) // null | 'success' | 'fail'
@@ -94,11 +94,16 @@ export default function TaskRushScreen({ token, lobbyId, movementTimeLeft, onBac
     if (advancingRef.current) return  // drop duplicate fires from same task
     advancingRef.current = true
     const pts = isSuccess ? Math.round((currentTask.points?.alive || 2) * multiplier) : 0
+    const bonusPoints = pts - (currentTask.points?.alive || 2)  // streak increment above base
     setResult(isSuccess ? 'success' : 'fail')
     setStreak(isSuccess ? s => s + 1 : 0)
     setSessionPoints(p => p + pts)
-    if (isSuccess && token && lobbyId) {
-      completeTask(token, lobbyId, currentTask.id).catch(() => {})
+    if (token && gameId) {
+      if (isSuccess) {
+        submitMovementBTask(token, gameId, currentTask.id, Math.max(0, bonusPoints)).catch(() => {})
+      } else {
+        submitMovementBFail(token, gameId, currentTask.id).catch(() => {})
+      }
     }
     setShowing(false)
     setTimeout(() => {

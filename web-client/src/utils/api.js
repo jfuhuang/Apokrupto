@@ -89,3 +89,9 @@ export const advanceGame = (t, gameId) =>
 
 export const completeTask = (t, lobbyId, taskId) =>
   req(`/api/lobbies/${lobbyId}/tasks/complete`, { method: 'POST', headers: { ...jsonH, ...authH(t), ...ngrokH }, body: JSON.stringify({ taskId }) })
+
+export const submitMovementBTask = (t, gameId, taskId, bonusPoints = 0) =>
+  req(`/api/games/${gameId}/movement-b/complete`, { method: 'POST', headers: { ...jsonH, ...authH(t), ...ngrokH }, body: JSON.stringify({ taskId, bonusPoints }) })
+
+export const submitMovementBFail = (t, gameId, taskId) =>
+  req(`/api/games/${gameId}/movement-b/fail`, { method: 'POST', headers: { ...jsonH, ...authH(t), ...ngrokH }, body: JSON.stringify({ taskId }) })
