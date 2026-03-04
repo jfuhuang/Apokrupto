@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 const _votingTimers   = new Map(); // gameId → timeoutId
 const _votingEndTimes = new Map(); // gameId → votingEndsAt (epoch ms)
-const VOTING_DURATION_MS = 60 * 1000; // 60 seconds
+const VOTING_DURATION_MS = 30 * 1000; // 30 seconds
 
 function clearVotingTimer(gameId) {
   const key = String(gameId);

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
@@ -46,30 +46,36 @@ export default function RoleRevealScreen({ role, skotiaTeammates = [], onRevealC
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <Animated.View style={[styles.card, { opacity: fadeAnim, borderColor: config.borderColor }]}>
-          <Text style={styles.youAre}>YOU ARE</Text>
-          <Text
-            style={[
-              styles.roleName,
-              {
-                color: config.accentColor,
-                textShadowColor: config.glowColor,
-              },
-            ]}
+          <ScrollView
+            contentContainerStyle={styles.cardContent}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
           >
-            {config.label}
-          </Text>
-          <View style={[styles.divider, { backgroundColor: config.accentColor }]} />
-          <Text style={styles.description}>{config.description}</Text>
-          {role === 'skotia' && skotiaTeammates.length > 0 && (
-            <View style={styles.fellowSection}>
-              <Text style={styles.fellowLabel}>YOUR TEAM</Text>
-              {skotiaTeammates.map((name) => (
-                <Text key={name} style={[styles.fellowName, { color: config.accentColor }]}>
-                  {name}
-                </Text>
-              ))}
-            </View>
-          )}
+            <Text style={styles.youAre}>YOU ARE</Text>
+            <Text
+              style={[
+                styles.roleName,
+                {
+                  color: config.accentColor,
+                  textShadowColor: config.glowColor,
+                },
+              ]}
+            >
+              {config.label}
+            </Text>
+            <View style={[styles.divider, { backgroundColor: config.accentColor }]} />
+            <Text style={styles.description}>{config.description}</Text>
+            {role === 'skotia' && skotiaTeammates.length > 0 && (
+              <View style={styles.fellowSection}>
+                <Text style={styles.fellowLabel}>YOUR TEAM</Text>
+                {skotiaTeammates.map((name) => (
+                  <Text key={name} style={[styles.fellowName, { color: config.accentColor }]}>
+                    {name}
+                  </Text>
+                ))}
+              </View>
+            )}
+          </ScrollView>
         </Animated.View>
       </SafeAreaView>
     </View>
@@ -89,9 +95,13 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
+    maxHeight: '85%',
     backgroundColor: colors.background.void,
     borderRadius: 16,
     borderWidth: 1,
+    overflow: 'hidden',
+  },
+  cardContent: {
     padding: 32,
     alignItems: 'center',
   },

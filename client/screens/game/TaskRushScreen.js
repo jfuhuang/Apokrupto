@@ -12,7 +12,7 @@ import { getApiUrl } from '../../config';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
 import { TASKS, TASK_CATEGORY, MECHANIC } from '../../data/tasks';
-import { submitMovementBTask } from '../../utils/api';
+import { submitMovementBTask, submitMovementBFail } from '../../utils/api';
 import RushResultOverlay from '../tasks/components/RushResultOverlay';
 import SusIcon from '../../components/SusIcon';
 import TaskSprite from '../../components/TaskSprite';
@@ -235,14 +235,21 @@ export default function TaskRushScreen({
     handledRef.current = true;
     clearTimeout(taskTimerRef.current);
 
+    const task = rushQueue[currentIndex];
+
     setLastResult({ success: false, basePoints: 0, bonusPoints: 0, streakCount: streak });
     setStreak(0);
     setPhase('result');
 
     flashBg('fail');
 
+    // If Phos player fails, award Skotia points on the server (fire-and-forget)
+    if (currentTeam === 'phos' && task) {
+      submitMovementBFail(token, gameId, task.id).catch(() => {});
+    }
+
     setTimeout(() => advanceToNextTask(), RUSH_RESULT_MS);
-  }, [streak, advanceToNextTask, flashBg]);
+  }, [streak, currentIndex, rushQueue, currentTeam, token, gameId, advanceToNextTask, flashBg]);
 
   // ── Render mechanic ─────────────────────────────────────────────────────
   const renderMechanic = () => {

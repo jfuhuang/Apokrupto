@@ -742,12 +742,13 @@ router.post('/:gameId/movement-b/complete', auth, async (req, res) => {
     }
     const { team, is_marked } = playerRes.rows[0];
 
-    // 3. Determine points (base + streak bonus), apply Sus penalty if marked
+    // 3. Determine points (base + streak bonus), apply Sus penalty if marked, x3 for Skotia
     const rawPoints = basePoints + cappedBonus;
     const isSusPenaltyApplied = !!is_marked;
-    const pointsEarned = isSusPenaltyApplied
+    const reducedPoints = isSusPenaltyApplied
       ? Math.floor(rawPoints * POINTS.SUS_CHALLENGE_MULTIPLIER)
       : rawPoints;
+    const pointsEarned = team === 'skotia' ? reducedPoints * 3 : reducedPoints;
 
     // 4. Award to team
     await client.query(
@@ -769,6 +770,78 @@ router.post('/:gameId/movement-b/complete', auth, async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('[movement-b/complete] error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/games/:gameId/movement-b/fail
+// Phos player failed a task during Movement B. Awards points to Skotia.
+// Body: { taskId }
+// ---------------------------------------------------------------------------
+router.post('/:gameId/movement-b/fail', auth, async (req, res) => {
+  const { gameId } = req.params;
+  const userId     = req.user.sub;
+  const { taskId } = req.body;
+
+  if (!taskId) return res.status(400).json({ error: 'taskId is required' });
+
+  const taskDef = getTask(taskId);
+  if (!taskDef) return res.status(400).json({ error: 'Unknown task' });
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Verify Movement B is active
+    const movRes = await client.query(
+      `SELECT m.id FROM movements m
+       JOIN rounds r ON r.id = m.round_id
+       WHERE r.game_id = $1 AND r.status = 'active'
+         AND m.movement_type = 'B' AND m.status = 'active'`,
+      [gameId]
+    );
+    if (movRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Movement B is not active' });
+    }
+
+    // 2. Verify player is Phos (only Phos failures award Skotia points)
+    const playerRes = await client.query(
+      'SELECT team FROM game_players WHERE game_id = $1 AND user_id = $2',
+      [gameId, userId]
+    );
+    if (playerRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Player not in this game' });
+    }
+    if (playerRes.rows[0].team !== 'phos') {
+      await client.query('ROLLBACK');
+      return res.json({ ok: true, skotiaPointsEarned: 0 }); // Skotia failure does nothing extra
+    }
+
+    // 3. Award Skotia points equal to the task's base value
+    const skotiaPointsEarned = taskDef.points.alive;
+    await client.query(
+      'UPDATE game_teams SET points = points + $1 WHERE game_id = $2 AND team = $3',
+      [skotiaPointsEarned, gameId, 'skotia']
+    );
+
+    // 4. Read updated team points
+    const tpRes = await client.query(
+      'SELECT team, points FROM game_teams WHERE game_id = $1',
+      [gameId]
+    );
+    const teamPoints = { phos: 0, skotia: 0 };
+    for (const r of tpRes.rows) teamPoints[r.team] = r.points;
+
+    await client.query('COMMIT');
+    res.json({ ok: true, skotiaPointsEarned, teamPoints });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[movement-b/fail] error:', err.message);
     res.status(500).json({ error: 'Server error' });
   } finally {
     client.release();

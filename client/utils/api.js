@@ -121,3 +121,11 @@ export async function submitMovementBTask(token, gameId, taskId, bonusPoints = 0
   });
 }
 
+export async function submitMovementBFail(token, gameId, taskId) {
+  return request(`/api/games/${gameId}/movement-b/fail`, {
+    method: 'POST',
+    headers: { ...jsonHeaders, ...authHeader(token) },
+    body: JSON.stringify({ taskId }),
+  });
+}
+

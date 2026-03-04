@@ -400,7 +400,7 @@ const _deliberationGroupsReady = new Map(); // gameId → { ready: N, total: M }
 const _deliberationTimers       = new Map(); // gameId → timeoutId
 const _deliberationEndTimes     = new Map(); // gameId → deliberationEndsAt (epoch ms)
 
-const DELIBERATION_DURATION_MS = 120_000;
+const DELIBERATION_DURATION_MS = 60_000; // 1 minute
 
 function clearDeliberationTimer(gameId) {
   const key = String(gameId);
