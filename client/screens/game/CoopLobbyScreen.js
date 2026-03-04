@@ -43,12 +43,17 @@ export default function CoopLobbyScreen({
   const timerBarAnim = useRef(new Animated.Value(1)).current;
   const bannerAnim = useRef(new Animated.Value(0)).current;
 
+  const { currentGroupMembers: contextGroupMembers } = useGame();
+
   const userId = parseJwt(token).sub ? String(parseJwt(token).sub) : null;
   const teamColor =
     currentTeam === 'skotia' ? colors.primary.neonRed : colors.primary.electricBlue;
 
+  // Use context group members as fallback when prop is empty
+  const effectiveGroupMembers =
+    (groupMembers && groupMembers.length > 0) ? groupMembers : (contextGroupMembers || []);
   // Filter self from group members
-  const otherMembers = (groupMembers || []).filter(
+  const otherMembers = effectiveGroupMembers.filter(
     (m) => String(m.id) !== userId
   );
 

@@ -1,14 +1,15 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedBackground from '../../components/AnimatedBackground';
 import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
+import { typography, fonts } from '../../theme/typography';
 
-export default function WelcomeScreen({ onCreateAccount, onLogin }) {
+export default function WelcomeScreen({ onCreateAccount, onLogin, onDevMode }) {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const floatAnim = useRef(new Animated.Value(0)).current;
+  const [devTapCount, setDevTapCount] = useState(0);
 
   useEffect(() => {
     Animated.loop(
@@ -27,6 +28,16 @@ export default function WelcomeScreen({ onCreateAccount, onLogin }) {
     ).start();
   }, []);
 
+  // Tap the subtitle 5 times to reveal the dev menu
+  const handleSubtitleTap = () => {
+    const next = devTapCount + 1;
+    setDevTapCount(next);
+    if (next >= 5 && onDevMode) {
+      setDevTapCount(0);
+      onDevMode();
+    }
+  };
+
   return (
     <View style={styles.container}>
       <AnimatedBackground />
@@ -39,7 +50,9 @@ export default function WelcomeScreen({ onCreateAccount, onLogin }) {
           ]}
         >
           <Text style={[styles.title, isLandscape && styles.titleLandscape]} numberOfLines={1} adjustsFontSizeToFit>APOKRUPTO</Text>
-          <Text style={[styles.subtitle, isLandscape && styles.subtitleLandscape]}>Real World Deception</Text>
+          <TouchableOpacity onPress={handleSubtitleTap} activeOpacity={1}>
+            <Text style={[styles.subtitle, isLandscape && styles.subtitleLandscape]}>Real World Deception</Text>
+          </TouchableOpacity>
         </Animated.View>
 
         <View style={[styles.buttonContainer, isLandscape && styles.buttonContainerLandscape]}>
@@ -51,7 +64,9 @@ export default function WelcomeScreen({ onCreateAccount, onLogin }) {
             <Text style={styles.buttonText}>CREATE ACCOUNT</Text>
           </TouchableOpacity>
 
-
+          {devTapCount > 0 && devTapCount < 5 && (
+            <Text style={styles.devHint}>{5 - devTapCount} more tap{5 - devTapCount !== 1 ? 's' : ''} for dev mode</Text>
+          )}
         </View>
       </SafeAreaView>
     </View>
@@ -143,5 +158,12 @@ const styles = StyleSheet.create({
   },
   subtitleLandscape: {
     fontSize: 24,
+  },
+  devHint: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 11,
+    color: colors.text.disabled,
+    textAlign: 'center',
+    marginTop: 4,
   },
 });

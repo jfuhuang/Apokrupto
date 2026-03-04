@@ -263,21 +263,24 @@ export default function TaskRushScreen({
       taskId: currentTask.id,
     };
 
+    // key={currentIndex} ensures the component fully remounts for each new task,
+    // resetting any internal state (e.g. doneRef, answered) even if the same
+    // mechanic type appears consecutively.
     switch (currentTask.mechanic) {
-      case MECHANIC.SLING:      return <SlingTask {...props} />;
-      case MECHANIC.COLLECT:    return <CollectTask {...props} />;
-      case MECHANIC.DRAG_PLACE: return <DragPlaceTask {...props} />;
-      case MECHANIC.GUARD:      return <GuardTask {...props} />;
-      case MECHANIC.RAPID_TAP:  return <RapidTapTask {...props} />;
-      case MECHANIC.HOLD:       return <HoldTask {...props} />;
-      case MECHANIC.TRACE:      return <TraceTask {...props} />;
-      case MECHANIC.PATIENCE:   return <PatienceTask {...props} />;
-      case MECHANIC.BUILD:            return <BuildTask {...props} />;
-      case MECHANIC.TRIVIA:           return <TriviaTask {...props} />;
-      case MECHANIC.SCRIPTURE_BLANK:  return <ScriptureBlankTask {...props} />;
-      case MECHANIC.BAIL_WATER:       return <BailWaterTask {...props} />;
-      case MECHANIC.MARCH_JERICHO:    return <MarchJerichoTask {...props} />;
-      case MECHANIC.FOCUS:            return <FocusTask {...props} />;
+      case MECHANIC.SLING:      return <SlingTask key={currentIndex} {...props} />;
+      case MECHANIC.COLLECT:    return <CollectTask key={currentIndex} {...props} />;
+      case MECHANIC.DRAG_PLACE: return <DragPlaceTask key={currentIndex} {...props} />;
+      case MECHANIC.GUARD:      return <GuardTask key={currentIndex} {...props} />;
+      case MECHANIC.RAPID_TAP:  return <RapidTapTask key={currentIndex} {...props} />;
+      case MECHANIC.HOLD:       return <HoldTask key={currentIndex} {...props} />;
+      case MECHANIC.TRACE:      return <TraceTask key={currentIndex} {...props} />;
+      case MECHANIC.PATIENCE:   return <PatienceTask key={currentIndex} {...props} />;
+      case MECHANIC.BUILD:            return <BuildTask key={currentIndex} {...props} />;
+      case MECHANIC.TRIVIA:           return <TriviaTask key={currentIndex} {...props} />;
+      case MECHANIC.SCRIPTURE_BLANK:  return <ScriptureBlankTask key={currentIndex} {...props} />;
+      case MECHANIC.BAIL_WATER:       return <BailWaterTask key={currentIndex} {...props} />;
+      case MECHANIC.MARCH_JERICHO:    return <MarchJerichoTask key={currentIndex} {...props} />;
+      case MECHANIC.FOCUS:            return <FocusTask key={currentIndex} {...props} />;
       default:                        return null;
     }
   };

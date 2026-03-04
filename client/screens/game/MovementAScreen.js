@@ -217,15 +217,18 @@ export default function MovementAScreen({
 
   // Unlock orientation while the player is actively drawing so they can freely
   // rotate to portrait or landscape. Lock back to landscape on any other phase.
+  // ScreenOrientation is not available on web — wrap in try/catch.
   useEffect(() => {
     const isDrawing = phase === 'my_turn' && promptMode === 'sketch';
-    if (isDrawing) {
-      ScreenOrientation.unlockAsync();
-    } else {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-    }
+    try {
+      if (isDrawing) {
+        ScreenOrientation.unlockAsync();
+      } else {
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      }
+    } catch (_) { /* not supported on web */ }
     return () => {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      try { ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE); } catch (_) {}
     };
   }, [phase, promptMode]);
 
@@ -255,6 +258,17 @@ export default function MovementAScreen({
           setPrompt(data.prompt);
           if (data.promptMode) setPromptMode(data.promptMode);
         }
+        // Seed the current turn player from the API response so the roster shows
+        // the correct active player even before the first turnStart socket event.
+        if (data.currentPlayerId && !currentTurnPlayerId) {
+          setCurrentTurnPlayerId(String(data.currentPlayerId));
+          const name = groupMembers?.find((m) => String(m.id) === String(data.currentPlayerId))?.username || 'Someone';
+          setCurrentTurnPlayerName(name);
+          if (String(data.currentPlayerId) === String(currentUserId)) {
+            setPhase('my_turn');
+          }
+        }
+        if (data.completedCount != null) setCompletedCount(data.completedCount);
       } catch (err) {
         if (n <= retries) {
           await new Promise((r) => setTimeout(r, 1500));
@@ -639,7 +653,7 @@ export default function MovementAScreen({
 
           <View style={styles.promptSection}>
             <Text style={styles.promptLabel}>
-              {promptMode === 'sketch' ? 'DRAW' : 'YOUR PROMPT'}
+              Your prompt:
             </Text>
             <View style={styles.promptBox}>
               <Text style={styles.promptText}>{prompt || '...'}</Text>
@@ -688,7 +702,7 @@ export default function MovementAScreen({
       const promptDisplay = (
         <View style={styles.promptSection}>
           <Text style={styles.promptLabel}>
-            {promptMode === 'sketch' ? 'DRAW' : 'YOUR PROMPT'}
+            Your prompt:
           </Text>
           <View style={[styles.promptBox, styles.promptBoxActive]}>
             <Text style={styles.promptText}>{prompt || '...'}</Text>

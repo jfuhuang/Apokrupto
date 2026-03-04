@@ -38,13 +38,17 @@ export default function VotingScreen({
   const [votingSecondsLeft, setVotingSecondsLeft] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const { setSocketConnected } = useGame();
+  const { setSocketConnected, currentGroupMembers: contextGroupMembers } = useGame();
 
   const socketRef = useRef(null);
   const safetyExitedRef = useRef(false);
   const votingTimerRef = useRef(null);
 
-  const others = (groupMembers || []).filter((m) => String(m.id) !== String(currentUserId));
+  // Use context group members as fallback when prop is empty (e.g. on web when
+  // movementStart{C} doesn't carry group info).
+  const effectiveGroupMembers =
+    (groupMembers && groupMembers.length > 0) ? groupMembers : (contextGroupMembers || []);
+  const others = effectiveGroupMembers.filter((m) => String(m.id) !== String(currentUserId));
 
   useEffect(() => {
     let socket;

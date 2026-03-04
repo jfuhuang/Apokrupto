@@ -37,6 +37,7 @@ import VotingScreen from './screens/game/VotingScreen';
 import RoundSummaryScreen from './screens/game/RoundSummaryScreen';
 import GmWaitingScreen from './screens/game/GmWaitingScreen';
 import GameOverScreen from './screens/game/GameOverScreen';
+import DevMenuScreen from './screens/dev/DevMenuScreen';
 import { colors } from './theme/colors';
 import { fetchCurrentLobby, fetchPlayerGameState } from './utils/api';
 import { useGameState } from './hooks/useGameState';
@@ -81,6 +82,9 @@ export default function App() {
     handleRoundSummary, handleGameStateUpdate, handleRoundSetup,
     handleGameOver,
   } = handlers;
+
+  // Dev mode — stores extra props passed by DevMenuScreen for each preview screen
+  const [devScreenProps, setDevScreenProps] = useState(null);
 
   const [fontsLoaded] = useFonts({
     Orbitron_400Regular,
@@ -299,6 +303,13 @@ export default function App() {
     }
 
     const userId = token ? String(parseJwt(token).sub) : null;
+    // Merge dev props over the real props when previewing from DevMenuScreen.
+    // Individual screen cases spread devScreenProps last so mock values take precedence.
+    const dev = devScreenProps || {};
+    const devBack = () => {
+      setDevScreenProps(null);
+      setCurrentScreen('devMenu');
+    };
 
     switch (currentScreen) {
       case 'loading':
@@ -313,6 +324,18 @@ export default function App() {
           <WelcomeScreen
             onCreateAccount={() => setCurrentScreen('register')}
             onLogin={() => setCurrentScreen('login')}
+            onDevMode={() => setCurrentScreen('devMenu')}
+          />
+        );
+
+      case 'devMenu':
+        return (
+          <DevMenuScreen
+            onBack={() => setCurrentScreen('welcome')}
+            onNavigate={(screen, extraProps) => {
+              setDevScreenProps(extraProps || null);
+              setCurrentScreen(screen);
+            }}
           />
         );
 
@@ -357,68 +380,69 @@ export default function App() {
       case 'countdown':
         return (
           <CountdownScreen
-            onCountdownComplete={handleCountdownComplete}
+            onCountdownComplete={dev.onCountdownComplete || handleCountdownComplete}
+            {...dev}
           />
         );
 
       case 'roleReveal':
         return (
           <RoleRevealScreen
-            role={currentTeam}
-            skotiaTeammates={skotiaTeammates}
-            onRevealComplete={handleRoleRevealComplete}
+            role={dev.role || currentTeam}
+            skotiaTeammates={dev.skotiaTeammates || skotiaTeammates}
+            onRevealComplete={dev.onRevealComplete || handleRoleRevealComplete}
           />
         );
 
       case 'roundHub':
         return (
           <RoundHubScreen
-            token={token}
-            gameId={gameId}
-            lobbyId={currentLobbyId}
-            currentRound={currentRound}
-            totalRounds={totalRounds}
-            currentTeam={currentTeam}
-            isSus={isSus}
-            currentGroupMembers={currentGroupMembers}
-            groupNumber={currentGroupNumber}
-            teamPoints={teamPoints}
-            onMovementReady={handleMovementReady}
-            onGameStateUpdate={handleGameStateUpdate}
-            onSusStatusUpdate={handleSusStatusUpdate}
-            onRoundSummary={handleRoundSummary}
-            onRoundSetup={handleRoundSetup}
-            onGameOver={handleGameOver}
-            onLobbyGone={handleLobbyGone}
+            token={dev.token || token}
+            gameId={dev.gameId || gameId}
+            lobbyId={dev.lobbyId || currentLobbyId}
+            currentRound={dev.currentRound ?? currentRound}
+            totalRounds={dev.totalRounds ?? totalRounds}
+            currentTeam={dev.currentTeam || currentTeam}
+            isSus={dev.isSus ?? isSus}
+            currentGroupMembers={dev.currentGroupMembers || currentGroupMembers}
+            groupNumber={dev.groupNumber ?? currentGroupNumber}
+            teamPoints={dev.teamPoints || teamPoints}
+            onMovementReady={devScreenProps ? devBack : handleMovementReady}
+            onGameStateUpdate={devScreenProps ? () => {} : handleGameStateUpdate}
+            onSusStatusUpdate={devScreenProps ? () => {} : handleSusStatusUpdate}
+            onRoundSummary={devScreenProps ? devBack : handleRoundSummary}
+            onRoundSetup={devScreenProps ? devBack : handleRoundSetup}
+            onGameOver={devScreenProps ? devBack : handleGameOver}
+            onLobbyGone={devScreenProps ? devBack : handleLobbyGone}
           />
         );
 
       case 'movementA':
         return (
           <MovementAScreen
-            token={token}
-            gameId={gameId}
-            lobbyId={currentLobbyId}
-            groupId={currentGroupId}
-            currentUserId={userId}
-            currentTeam={currentTeam}
-            roundNumber={currentRound}
-            groupMembers={currentGroupMembers}
-            onMovementComplete={handleMovementAComplete}
+            token={dev.token || token}
+            gameId={dev.gameId || gameId}
+            lobbyId={dev.lobbyId || currentLobbyId}
+            groupId={dev.groupId || currentGroupId}
+            currentUserId={dev.currentUserId || userId}
+            currentTeam={dev.currentTeam || currentTeam}
+            roundNumber={dev.roundNumber ?? currentRound}
+            groupMembers={dev.groupMembers || currentGroupMembers}
+            onMovementComplete={devScreenProps ? devBack : handleMovementAComplete}
           />
         );
 
       case 'movementB':
         return (
           <MovementBScreen
-            token={token}
-            gameId={gameId}
-            lobbyId={currentLobbyId}
-            currentTeam={currentTeam}
-            roundNumber={currentRound}
-            movementBEndsAt={movementBEndsAt}
-            isSus={isSus}
-            onMovementComplete={() => setCurrentScreen('roundHub')}
+            token={dev.token || token}
+            gameId={dev.gameId || gameId}
+            lobbyId={dev.lobbyId || currentLobbyId}
+            currentTeam={dev.currentTeam || currentTeam}
+            roundNumber={dev.roundNumber ?? currentRound}
+            movementBEndsAt={dev.movementBEndsAt || movementBEndsAt}
+            isSus={dev.isSus ?? isSus}
+            onMovementComplete={devScreenProps ? devBack : (() => setCurrentScreen('roundHub'))}
             onEnterRush={() => setCurrentScreen('taskRush')}
             onEnterCoop={() => setCurrentScreen('coopLobby')}
             onDirectSessionStart={({ sessionId: sid, partner, role: r, task }) => {
@@ -435,28 +459,28 @@ export default function App() {
       case 'taskRush':
         return (
           <TaskRushScreen
-            token={token}
-            gameId={gameId}
-            lobbyId={currentLobbyId}
-            currentTeam={currentTeam}
-            roundNumber={currentRound}
-            movementBEndsAt={movementBEndsAt}
-            isSus={isSus}
-            onExitRush={() => setCurrentScreen('movementB')}
-            onMovementComplete={() => setCurrentScreen('roundHub')}
+            token={dev.token || token}
+            gameId={dev.gameId || gameId}
+            lobbyId={dev.lobbyId || currentLobbyId}
+            currentTeam={dev.currentTeam || currentTeam}
+            roundNumber={dev.roundNumber ?? currentRound}
+            movementBEndsAt={dev.movementBEndsAt || movementBEndsAt}
+            isSus={dev.isSus ?? isSus}
+            onExitRush={devScreenProps ? devBack : (() => setCurrentScreen('movementB'))}
+            onMovementComplete={devScreenProps ? devBack : (() => setCurrentScreen('roundHub'))}
           />
         );
 
       case 'coopLobby':
         return (
           <CoopLobbyScreen
-            token={token}
-            gameId={gameId}
-            lobbyId={currentLobbyId}
-            currentTeam={currentTeam}
-            groupMembers={currentGroupMembers}
-            isSus={isSus}
-            movementBEndsAt={movementBEndsAt}
+            token={dev.token || token}
+            gameId={dev.gameId || gameId}
+            lobbyId={dev.lobbyId || currentLobbyId}
+            currentTeam={dev.currentTeam || currentTeam}
+            groupMembers={dev.groupMembers || currentGroupMembers}
+            isSus={dev.isSus ?? isSus}
+            movementBEndsAt={dev.movementBEndsAt || movementBEndsAt}
             onSessionStart={({ sessionId: sid, partner, role: r, task }) => {
               setCoopSessionId(sid);
               setCoopPartnerId(partner?.userId ?? null);
@@ -465,7 +489,7 @@ export default function App() {
               setCoopInitialTask(task);
               setCurrentScreen('coopRush');
             }}
-            onBack={() => setCurrentScreen('movementB')}
+            onBack={devScreenProps ? devBack : (() => setCurrentScreen('movementB'))}
           />
         );
 
@@ -497,35 +521,35 @@ export default function App() {
       case 'movementC':
         return (
           <VotingScreen
-            token={token}
-            gameId={gameId}
-            lobbyId={currentLobbyId}
-            groupId={currentGroupId}
-            currentUserId={userId}
-            currentTeam={currentTeam}
-            roundNumber={currentRound}
-            groupMembers={currentGroupMembers}
-            onMovementComplete={handleMovementCComplete}
-            onMovementReady={handleMovementReady}
-            onRoundSummary={handleRoundSummary}
-            onGameOver={handleGameOver}
+            token={dev.token || token}
+            gameId={dev.gameId || gameId}
+            lobbyId={dev.lobbyId || currentLobbyId}
+            groupId={dev.groupId || currentGroupId}
+            currentUserId={dev.currentUserId || userId}
+            currentTeam={dev.currentTeam || currentTeam}
+            roundNumber={dev.roundNumber ?? currentRound}
+            groupMembers={dev.groupMembers || currentGroupMembers}
+            onMovementComplete={devScreenProps ? devBack : handleMovementCComplete}
+            onMovementReady={devScreenProps ? devBack : handleMovementReady}
+            onRoundSummary={devScreenProps ? devBack : handleRoundSummary}
+            onGameOver={devScreenProps ? devBack : handleGameOver}
           />
         );
 
       case 'roundSummary':
         return (
           <RoundSummaryScreen
-            roundNumber={currentRound}
-            totalRounds={totalRounds}
-            summary={roundSummary}
-            isLastRound={currentRound >= totalRounds}
-            isSus={isSus}
-            token={token}
-            lobbyId={currentLobbyId}
-            gameId={gameId}
-            onRoundSetup={handleRoundSetup}
-            onGameOver={handleGameOver}
-            onContinue={handleRoundSummaryContinue}
+            roundNumber={dev.roundNumber ?? currentRound}
+            totalRounds={dev.totalRounds ?? totalRounds}
+            summary={dev.summary || roundSummary}
+            isLastRound={dev.isLastRound ?? (currentRound >= totalRounds)}
+            isSus={dev.isSus ?? isSus}
+            token={dev.token || token}
+            lobbyId={dev.lobbyId || currentLobbyId}
+            gameId={dev.gameId || gameId}
+            onRoundSetup={devScreenProps ? devBack : handleRoundSetup}
+            onGameOver={devScreenProps ? devBack : handleGameOver}
+            onContinue={devScreenProps ? devBack : handleRoundSummaryContinue}
           />
         );
 
@@ -535,13 +559,13 @@ export default function App() {
       case 'gameOver':
         return (
           <GameOverScreen
-            result={gameOverResult}
-            token={token}
-            gameId={gameId}
-            onReturn={() => {
+            result={dev.result || gameOverResult}
+            token={dev.token || token}
+            gameId={dev.gameId || gameId}
+            onReturn={devScreenProps ? devBack : (() => {
               resetGameState();
               setCurrentScreen('lobbyList');
-            }}
+            })}
           />
         );
 
