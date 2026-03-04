@@ -15,7 +15,11 @@ export default function LobbyListScreen({ token, username, onJoinLobby, onLogout
 
   const loadLobbies = useCallback(async () => {
     const res = await fetchLobbies(token)
-    if (res.ok) setLobbies(res.data.lobbies || [])
+    if (res.ok) {
+      setLobbies(res.data.lobbies || [])
+    } else {
+      setError(res.data?.error || 'Failed to load lobbies')
+    }
     setLoading(false)
   }, [token])
 

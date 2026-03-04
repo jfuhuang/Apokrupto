@@ -218,6 +218,9 @@ router.post('/:id/join', async (req, res) => {
       VALUES ($1, $2)
     `, [id, userId]);
     
+    // Broadcast the update to all players in the room
+    await broadcastLobbyUpdate(id);
+    
     res.json({ message: 'Successfully joined lobby', lobbyId: id });
   } catch (err) {
     console.error(err);
@@ -303,10 +306,14 @@ router.post('/:id/leave', async (req, res) => {
       
       if (parseInt(remainingPlayers.rows[0].count) === 0) {
         await client.query(`DELETE FROM lobbies WHERE id = $1`, [id]);
+        await client.query('COMMIT');
+        res.json({ message: 'Successfully left lobby', lobbyClosed: true });
+      } else {
+        await client.query('COMMIT');
+        // Broadcast the update to remaining players
+        await broadcastLobbyUpdate(id);
+        res.json({ message: 'Successfully left lobby' });
       }
-      
-      await client.query('COMMIT');
-      res.json({ message: 'Successfully left lobby' });
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;

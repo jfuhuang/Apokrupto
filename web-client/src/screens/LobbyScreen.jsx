@@ -34,30 +34,39 @@ export default function LobbyScreen({
   }, [loadPlayers])
 
   useEffect(() => {
-    if (!socket) return
+    if (!socket) {
+      console.log('[LobbyScreen] No socket available')
+      return
+    }
 
+    console.log('[LobbyScreen] Socket connected, emitting joinRoom for lobbyId:', lobbyId)
     socket.emit('joinRoom', { lobbyId })
 
     function onLobbyUpdate(data) {
+      console.log('[LobbyScreen] Received lobbyUpdate:', data)
       if (data.players) setPlayers(data.players)
       if (data.hostId) setHostId(data.hostId)
     }
 
     function onRoleAssignedEvent(data) {
+      console.log('[LobbyScreen] Received roleAssigned:', data)
       onRoleAssigned(data)
     }
 
     function onGameStartedEvent(data) {
+      console.log('[LobbyScreen] Received gameStarted:', data)
       onGameStarted(data)
     }
 
     function onPlayerKicked(data) {
+      console.log('[LobbyScreen] Received playerKicked:', data)
       if (String(data.userId) === String(currentUserId)) {
         onLeave()
       }
     }
 
     function onLobbyClosed() {
+      console.log('[LobbyScreen] Received lobbyClosed')
       onLeave()
     }
 

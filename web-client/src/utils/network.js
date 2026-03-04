@@ -1,21 +1,35 @@
 /**
  * Web equivalent of the React Native networkUtils.js.
  *
- * Priority order (matches how the mobile client resolves the server URL):
- *   1. EXPO_PUBLIC_API_URL  — set in .env (shared with the React Native client)
- *   2. VITE_API_URL         — Vite-only override
- *   3. '' (relative paths)  — works with the Vite dev proxy and same-origin production
+ * Priority order for server URL resolution:
+ *   1. ?serverUrl=...       — URL query parameter (highest priority, runtime override)
+ *   2. EXPO_PUBLIC_API_URL  — shared with the React Native client, set in .env
+ *   3. VITE_API_URL         — Vite-only environment variable
+ *   4. '' (relative paths)  — works with the Vite dev proxy and same-origin production
  *
- * In development, set EXPO_PUBLIC_API_URL to your ngrok tunnel URL in server/.env
- * (or a .env file in web-client/) and the Vite dev proxy will forward /api and
- * /socket.io requests there automatically.
+ * For ngrok or remote servers:
+ *   - Set EXPO_PUBLIC_API_URL=https://your-ngrok-url.ngrok-free.dev in web-client/.env
+ *   - Or pass ?serverUrl=https://your-ngrok-url.ngrok-free.dev as a query parameter
  */
+function getBaseUrl() {
+  if (typeof window === 'undefined') return 'http://localhost:3000'
+  
+  // Check query parameter first (?serverUrl=... — highest priority)
+  const params = new URLSearchParams(window.location.search)
+  const queryUrl = params.get('serverUrl')
+  if (queryUrl) return queryUrl
+  
+  // Check environment variables
+  const envUrl = import.meta.env.EXPO_PUBLIC_API_URL || import.meta.env.VITE_API_URL
+  return envUrl || ''
+}
+
 export function getApiUrl() {
-  const url = import.meta.env.EXPO_PUBLIC_API_URL || import.meta.env.VITE_API_URL
-  return url || ''
+  return getBaseUrl()
 }
 
 export function getSocketUrl() {
-  const url = import.meta.env.EXPO_PUBLIC_API_URL || import.meta.env.VITE_API_URL
-  return url || window.location.origin
+  const baseUrl = getBaseUrl()
+  // If baseUrl is empty (relative paths), use window.location.origin
+  return baseUrl || window.location.origin
 }

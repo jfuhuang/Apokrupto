@@ -66,14 +66,28 @@ export default function App() {
     if (socketRef.current) {
       socketRef.current.disconnect()
     }
+    console.log('[Socket] Connecting to:', getSocketUrl())
     const socket = io(getSocketUrl(), {
       auth: { token },
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'], // polling first for better ngrok compatibility
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
     })
     socketRef.current = socket
-    socket.on('connect', () => setSocketConnected(true))
-    socket.on('disconnect', () => setSocketConnected(false))
-    socket.on('connect_error', () => setSocketConnected(false))
+    socket.on('connect', () => {
+      console.log('[Socket] Connected')
+      setSocketConnected(true)
+    })
+    socket.on('disconnect', () => {
+      console.log('[Socket] Disconnected')
+      setSocketConnected(false)
+    })
+    socket.on('connect_error', (error) => {
+      console.log('[Socket] Connection error:', error)
+      setSocketConnected(false)
+    })
     setSocketKey((k) => k + 1)
     return socket
   }, [])

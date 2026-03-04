@@ -1,6 +1,7 @@
 const express = require('express'); // Import Express
 const http = require('http');
 const path = require('path');
+const cors = require('cors');
 const app = express(); // Create an Express application instance
 const port = process.env.PORT || 3000; // Define the port number
 const userRoutes = require('./routes/userRoutes');
@@ -10,6 +11,8 @@ const logRoutes = require('./routes/logRoutes');
 const { setupLobbySocket } = require('./websocket/lobbySocket');
 const { registerCoopHandlers } = require('./websocket/coopSocket');
 
+// Allow all origins (supports ngrok tunnels, local dev, and production)
+app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -21,7 +24,7 @@ app.use('/api', (req, res, next) => {
     const ms = Date.now() - start;
     const userId = req.user?.sub || '-';
     const tag = res.statusCode >= 400 ? '!' : '→';
-    // console.log(`[API] ${tag} ${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms user:${userId}`);
+    console.log(`[API] ${tag} ${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms user:${userId}`);
   });
   next();
 });
