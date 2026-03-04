@@ -771,13 +771,18 @@ async function runStartGame() {
   const hostBot = state.bots[state.hostIdx];
   if (!hostBot?.socket?.connected) { logErr('Host socket not connected.'); setBusy('btn-start-game', false); return; }
 
-  log('Starting game via socket...');
+  // Only expect roleAssigned/gameStarted from bots with connected sockets
+  const connectedBots = state.bots.filter(b => b.socket?.connected);
+  const disconnected = state.bots.length - connectedBots.length;
+  if (disconnected > 0) logWarn(`${disconnected} bots have no connected socket — they won't receive roleAssigned.`);
+
+  log(`Starting game via socket (${connectedBots.length} connected bots)...`);
   const t0 = Date.now();
 
   try {
-    // Set up listeners before emitting
-    const rolePromises = state.bots.map(bot => waitForEvent(bot.socket, 'roleAssigned', 60000));
-    const gameStartedPromises = state.bots.map(bot => waitForEvent(bot.socket, 'gameStarted', 60000));
+    // Set up listeners ONLY on connected sockets, before emitting startGame
+    const rolePromises = connectedBots.map(bot => waitForEvent(bot.socket, 'roleAssigned', 60000));
+    const gameStartedPromises = connectedBots.map(bot => waitForEvent(bot.socket, 'gameStarted', 60000));
 
     const ack = await emitWithAck(hostBot.socket, 'startGame', { lobbyId: state.lobbyId });
     state.gameId = String(ack.gameId);
@@ -785,15 +790,15 @@ async function runStartGame() {
 
     const roles = await Promise.all(rolePromises);
     roles.forEach((role, i) => {
-      state.bots[i].team = role.team;
-      state.bots[i].groupId = role.groupId ? String(role.groupId) : null;
-      state.bots[i].groupMembers = role.groupMembers || [];
-      state.bots[i].isGm = role.isGm || false;
+      connectedBots[i].team = role.team;
+      connectedBots[i].groupId = role.groupId ? String(role.groupId) : null;
+      connectedBots[i].groupMembers = role.groupMembers || [];
+      connectedBots[i].isGm = role.isGm || false;
     });
 
     await Promise.all(gameStartedPromises);
 
-    const players = state.bots.filter(b => !b.isGm);
+    const players = connectedBots.filter(b => !b.isGm);
     const phos = players.filter(b => b.team === 'phos').length;
     const skotia = players.filter(b => b.team === 'skotia').length;
     const groups = new Set(players.map(b => b.groupId)).size;
