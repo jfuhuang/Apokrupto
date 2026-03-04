@@ -638,8 +638,19 @@ function registerCoopHandlers(socket) {
           return;
         }
 
-        const seq = session.simonState.inputSequence || [];
+        let seq = session.simonState.inputSequence || [];
         const seqLen = task.config.sequenceLength;
+
+        // Accept client-provided sequence as fallback if server tracking is out of sync
+        if (seq.length !== seqLen && Array.isArray(data?.sequence) && data.sequence.length === seqLen) {
+          const validColors = task.config.colors;
+          if (data.sequence.every(c => validColors.includes(c))) {
+            seq = data.sequence;
+            session.simonState.inputSequence = seq;
+            console.log(`[Coop] simon_says using client-provided sequence (server had ${(session.simonState.inputSequence || []).length})`);
+          }
+        }
+
         if (seq.length !== seqLen) throw new Error(`Sequence must be ${seqLen} colors, got ${seq.length}`);
 
         session.simonState.resolved = true;

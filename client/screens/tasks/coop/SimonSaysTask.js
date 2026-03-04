@@ -238,7 +238,11 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
     const newSeq = [...inputSeq, color];
     setInputSeq(newSeq);
     onAction('tapColor', { color });
-  }, [inputSeq, submitted, seqLen, onAction]);
+    // Auto-submit when sequence is complete
+    if (newSeq.length === seqLen) {
+      setSubmitted(true);
+      onAction('submitSequence', { sequence: newSeq });
+    }  }, [inputSeq, submitted, seqLen, onAction]);
 
   // ── Player A: clear sequence ────────────────────────────────────
   const handleClear = useCallback(() => {
@@ -251,8 +255,18 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
   const handleSubmit = useCallback(() => {
     if (submitted || inputSeq.length !== seqLen) return;
     setSubmitted(true);
-    onAction('submitSequence', {});
+    onAction('submitSequence', { sequence: inputSeq });
   }, [submitted, inputSeq, seqLen, onAction]);
+
+  // ── Fallback: recover from stuck "Checking..." after 5s ─────
+  useEffect(() => {
+    if (!submitted || update?.phase === 'resolved') return;
+    const timeout = setTimeout(() => {
+      // Re-send submitSequence in case the first one was lost
+      onAction('submitSequence', { sequence: inputSeq });
+    }, 5000);
+    return () => clearTimeout(timeout);
+  }, [submitted, update, inputSeq, onAction]);
 
   // ── RESOLVED STATE (both players) ──────────────────────────────
   if (update?.phase === 'resolved') {
@@ -451,8 +465,8 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
           disabled={isComplete}
         />
 
-        {/* Actions */}
-        <View style={styles.actionRow}>
+        {/* Clear button — only shown while inputting */}
+        {inputSeq.length > 0 && !isComplete && (
           <TouchableOpacity
             style={styles.clearBtn}
             onPress={handleClear}
@@ -460,16 +474,7 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
           >
             <Text style={styles.clearBtnText}>CLEAR</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.submitBtn, !isComplete && styles.submitBtnDisabled]}
-            onPress={handleSubmit}
-            disabled={!isComplete}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.submitBtnText}>SUBMIT</Text>
-          </TouchableOpacity>
-        </View>
+        )}
       </TaskContainer>
     );
   }
@@ -639,38 +644,20 @@ const styles = StyleSheet.create({
   },
 
   // Action buttons
-  actionRow: {
-    flexDirection: 'row',
-    gap: 14,
-    marginTop: 8,
-  },
   clearBtn: {
     paddingVertical: 11,
     paddingHorizontal: 22,
     borderRadius: 10,
     borderWidth: 1.5,
     borderColor: colors.text.muted,
+    alignSelf: 'center',
+    marginTop: 8,
   },
   clearBtnText: {
     fontFamily: fonts.display.bold,
     fontSize: 11,
     letterSpacing: 2,
     color: colors.text.muted,
-  },
-  submitBtn: {
-    paddingVertical: 11,
-    paddingHorizontal: 28,
-    borderRadius: 10,
-    backgroundColor: colors.primary.electricBlue,
-  },
-  submitBtnDisabled: {
-    opacity: 0.35,
-  },
-  submitBtnText: {
-    fontFamily: fonts.display.bold,
-    fontSize: 11,
-    letterSpacing: 2,
-    color: '#0B0C10',
   },
 
   // ── 2×2 Colour Grid ────────────────────────────────────────────
