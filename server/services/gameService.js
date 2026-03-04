@@ -515,6 +515,10 @@ async function advanceMovement(gameId) {
         await client.query("UPDATE rounds SET status = 'completed' WHERE id = $1", [roundId]);
         const gameOverData = await _endGame(client, gameId, 'phos', 'supermajority');
         await client.query('COMMIT');
+        // Clean up after commit so it doesn't deadlock the transaction above
+        cleanupGameData(String(gameId)).catch((err) =>
+          console.error('[endGame supermajority] cleanup error (non-fatal):', err.message)
+        );
         return {
           step:         'gameOver',
           summary:      votingSummary,
@@ -598,6 +602,10 @@ async function advanceMovement(gameId) {
         await client.query("UPDATE rounds SET status = 'completed' WHERE id = $1", [roundId]);
         const gameOverData = await _endGame(client, gameId, winner, 'points');
         await client.query('COMMIT');
+        // Clean up after commit so it doesn't deadlock the transaction above
+        cleanupGameData(String(gameId)).catch((err) =>
+          console.error('[endGame points] cleanup error (non-fatal):', err.message)
+        );
         return {
           step: 'gameOver',
           gameOverData,
@@ -866,10 +874,8 @@ async function _endGame(client, gameId, winner, condition) {
     [winner, condition, gameId]
   );
 
-  // Clean up heavy round/group/submission data. Non-fatal.
-  await cleanupGameData(String(gameId)).catch((err) =>
-    console.error('[_endGame] cleanup error (non-fatal):', err.message)
-  );
+  // NOTE: cleanupGameData is intentionally NOT called here.
+  // It must run AFTER the transaction commits to avoid deadlocking on locked rows.
 
   const skotiaRes = await client.query(
     `SELECT u.id, u.username
