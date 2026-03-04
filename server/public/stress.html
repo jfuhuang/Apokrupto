@@ -1079,14 +1079,31 @@ async function runSubmitVotes() {
   if (!state.gameId) { logErr('No game.'); setBusy('btn-submit-votes', false); return; }
 
   const players = state.bots.filter(b => !b.isGm && b.token);
-  log(`Submitting votes for ${players.length} players...`);
+  log(`Submitting votes for ${players.length} players (fetching fresh group data)...`);
 
   await parallelWithProgress(players, async (bot) => {
-    const others = bot.groupMembers
+    // Fetch fresh game state to get current group members (handles reshuffles)
+    let groupMembers;
+    try {
+      const { status: sStatus, data: sData } = await api('GET', `/api/games/${state.gameId}/state`, null, bot.token);
+      if (sStatus !== 200) throw new Error(`state ${sStatus}: ${JSON.stringify(sData)}`);
+      groupMembers = sData.groupMembers || [];
+      // Also refresh cached data
+      if (sData.groupId) bot.groupId = String(sData.groupId);
+      bot.groupMembers = groupMembers;
+    } catch (err) {
+      logErr(`Vote state fetch ${bot.username}: ${err.message}`);
+      throw err;
+    }
+
+    const others = groupMembers
       .map(m => String(m.id))
       .filter(id => id !== bot.userId);
 
-    if (others.length === 0) return;
+    if (others.length === 0) {
+      logWarn(`Vote ${bot.username}: no group members to vote on`);
+      return;
+    }
 
     const votes = {};
     const targetIdx = Math.floor(Math.random() * others.length);
