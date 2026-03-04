@@ -16,7 +16,7 @@ import * as SecureStore from 'expo-secure-store';
 import logger from '../../utils/logger';
 import { io } from 'socket.io-client';
 import { getApiUrl } from '../../config';
-import { fetchLobbyPlayers, fetchCurrentLobby, leaveLobby as apiLeaveLobby, addDummyPlayer, kickPlayer as apiKickPlayer } from '../../utils/api';
+import { fetchLobbyPlayers, fetchCurrentLobby, leaveLobby as apiLeaveLobby, kickPlayer as apiKickPlayer } from '../../utils/api';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { useGame } from '../../context/GameContext';
@@ -251,15 +251,6 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
     });
   };
 
-  const handleAddDummy = async () => {
-    try {
-      const { ok, data } = await addDummyPlayer(token, lobbyId);
-      if (!ok) Alert.alert('Dev', data?.error || 'Failed to add dummy');
-    } catch (err) {
-      Alert.alert('Dev', 'Network error: ' + err.message);
-    }
-  };
-
   const handleKick = (player) => {
     Alert.alert(
       'Kick Player',
@@ -339,13 +330,6 @@ export default function LobbyScreen({ token, lobbyId, onLogout, onLeaveLobby, on
 
         {/* Player window */}
         <View style={styles.playerWindow}>
-          {__DEV__ && (
-            <View style={styles.devBar}>
-              <TouchableOpacity style={styles.devButton} onPress={handleAddDummy}>
-                <Text style={styles.devButtonText}>+ Dummy</Text>
-              </TouchableOpacity>
-            </View>
-          )}
           <ScrollView
             contentContainerStyle={styles.playerGrid}
             showsVerticalScrollIndicator={false}
@@ -725,25 +709,5 @@ const styles = StyleSheet.create({
   modalCloseText: {
     ...typography.button,
     color: colors.text.tertiary,
-  },
-  devBar: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
-  },
-  devButton: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: colors.accent.amber,
-    borderStyle: 'dashed',
-  },
-  devButtonText: {
-    ...typography.tiny,
-    color: colors.accent.amber,
   },
 });

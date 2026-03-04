@@ -132,8 +132,13 @@ export default function App() {
       return
     }
     patchState({ token, currentUserId: payload.sub, username: payload.username || payload.sub })
-    connectSocket(token)
-    checkCurrentLobby(token)
+    const socket = connectSocket(token)
+    // Defer lobby check until socket confirms the server is up (handles Render cold-start)
+    if (socket.connected) {
+      checkCurrentLobby(token)
+    } else {
+      socket.once('connect', () => checkCurrentLobby(token))
+    }
   }, [connectSocket, checkCurrentLobby])
 
   function handleLoginSuccess(token, username) {

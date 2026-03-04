@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  FlatList,
   RefreshControl,
   useWindowDimensions,
 } from 'react-native';
@@ -28,57 +29,67 @@ const TURN_TIME_LIMIT = 30;
 // ── Sketch carousel component used in deliberation phase ─────────────────────
 function SketchCarousel({ sketches, currentUserId, slideSize, containerWidth }) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const scrollRef = useRef(null);
+  const flatListRef = useRef(null);
 
   const pageWidth = containerWidth || slideSize + 16;
 
-  const handleScroll = (e) => {
-    const index = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
-    setActiveIndex(index);
-  };
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    if (viewableItems.length > 0) {
+      setActiveIndex(viewableItems[0].index);
+    }
+  }).current;
+
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
   if (!sketches || sketches.length === 0) return null;
 
+  const renderItem = ({ item: entry }) => {
+    const isMe = String(entry.userId) === String(currentUserId);
+    return (
+      <View style={[sketchCarouselStyles.page, { width: pageWidth }]}>
+        <View
+          style={[
+            sketchCarouselStyles.slide,
+            { width: slideSize, height: slideSize },
+            isMe && sketchCarouselStyles.slideMine,
+          ]}
+        >
+          <Text style={isMe ? sketchCarouselStyles.authorMe : sketchCarouselStyles.author}>
+            {isMe ? 'You' : entry.username}
+          </Text>
+          <View style={sketchCarouselStyles.thumbnailWrapper}>
+            <SketchThumbnail
+              sketchData={entry.sketchData}
+              size={slideSize - 48}
+              strokeColor={colors.text.primary}
+              strokeWidth={2.5}
+            />
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={sketchCarouselStyles.wrapper}>
-      <ScrollView
-        ref={scrollRef}
+      <FlatList
+        ref={flatListRef}
+        data={sketches}
+        renderItem={renderItem}
+        keyExtractor={(_, i) => String(i)}
         horizontal
-        pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-      >
-        {sketches.map((entry, i) => {
-          const isMe = String(entry.userId) === String(currentUserId);
-          return (
-            <View
-              key={i}
-              style={[sketchCarouselStyles.page, { width: pageWidth }]}
-            >
-              <View
-                style={[
-                  sketchCarouselStyles.slide,
-                  { width: slideSize, height: slideSize },
-                  isMe && sketchCarouselStyles.slideMine,
-                ]}
-              >
-                <Text style={isMe ? sketchCarouselStyles.authorMe : sketchCarouselStyles.author}>
-                  {isMe ? 'You' : entry.username}
-                </Text>
-                <View style={sketchCarouselStyles.thumbnailWrapper}>
-                  <SketchThumbnail
-                    sketchData={entry.sketchData}
-                    size={slideSize - 48}
-                    strokeColor={colors.text.primary}
-                    strokeWidth={2.5}
-                  />
-                </View>
-              </View>
-            </View>
-          );
+        snapToInterval={pageWidth}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        getItemLayout={(_, index) => ({
+          length: pageWidth,
+          offset: pageWidth * index,
+          index,
         })}
-      </ScrollView>
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+      />
 
       {/* Dot indicators */}
       {sketches.length > 1 && (
