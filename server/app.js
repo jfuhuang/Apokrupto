@@ -21,7 +21,7 @@ app.use('/api', (req, res, next) => {
     const ms = Date.now() - start;
     const userId = req.user?.sub || '-';
     const tag = res.statusCode >= 400 ? '!' : '→';
-    console.log(`[API] ${tag} ${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms user:${userId}`);
+    // console.log(`[API] ${tag} ${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms user:${userId}`);
   });
   next();
 });

@@ -203,8 +203,8 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit, tas
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const particles = useParticles(taskId, taps);
 
-  // Overhead: paddingVertical(16) + counter+mb(~68) + barTrack(18) + pct+mt(~22) + button marginTop(8) = ~132
-  const btnSize = containerH ? Math.min(180, Math.max(80, containerH - 132)) : 160;
+  // Overhead: paddingVertical(8*2=16) + counter(~50) + barTrack(18) + pct(~18) + gap*3(48) = ~150
+  const btnSize = containerH ? Math.min(180, Math.max(80, containerH - 156)) : 150;
 
   const handleTap = () => {
     if (done) return;
@@ -233,7 +233,7 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit, tas
   // Per-task button
   const renderButton = () => {
     const wrapped = (children) => (
-      <Animated.View style={{ transform: [{ scale: scaleAnim }], marginTop: 8 }}>
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         <TouchableOpacity onPress={handleTap} activeOpacity={0.8} disabled={done}>
           {children}
         </TouchableOpacity>
@@ -249,7 +249,7 @@ export default function RapidTapTask({ config, onSuccess, onFail, timeLimit, tas
         return wrapped(<RockButton done={done} size={btnSize} />);
       default:
         return (
-          <Animated.View style={{ transform: [{ scale: scaleAnim }], marginTop: 8 }}>
+          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
             <TouchableOpacity
               style={[styles.tapBtn, { width: btnSize, height: btnSize, borderRadius: btnSize / 2 }, done && styles.tapBtnDone]}
               onPress={handleTap}
@@ -307,7 +307,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.accent.bold,
     fontSize: 42,
     color: colors.text.primary,
-    marginBottom: 16,
   },
   barTrack: {
     width: '100%',
@@ -325,7 +324,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.accent.semiBold,
     fontSize: 14,
     color: colors.text.tertiary,
-    marginTop: 8,
   },
   tapBtn: {
     width: 180,

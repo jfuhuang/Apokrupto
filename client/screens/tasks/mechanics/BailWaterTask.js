@@ -144,7 +144,7 @@ let particleSeq = 0;
 
 export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, taskId }) {
   const {
-    cyclesRequired = 6,
+    cyclesRequired = 3,
     fillDurationMs = 600,   // fast passive fill
   } = config || {};
 
@@ -378,7 +378,9 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
             },
           ]}
         >
-          <Text style={styles.centerHintLabel}>DROP HERE</Text>
+          <Text style={styles.centerHintEmoji}>🌊</Text>
+          <Text style={styles.centerHintLabel}>DROP TO FILL</Text>
+          <Text style={styles.centerHintSub}>lower bucket into sea</Text>
         </View>
       )}
 
@@ -386,22 +388,38 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
       {step === 'dump' && (
         <>
           <View style={[styles.dumpHint, {
-            left: 0, width: DUMP_MARGIN, top: H * 0.28, height: H * 0.44,
+            left: 0, width: DUMP_MARGIN, top: H * 0.25, height: H * 0.50,
           }]}>
-            <Text style={styles.dumpArrow}>{'<'}</Text>
+            <Text style={styles.dumpArrow}>{'←'}</Text>
+            <Text style={styles.dumpHintLabel}>TOSS{`\n`}OVER</Text>
           </View>
           <View style={[styles.dumpHint, {
-            right: 0, width: DUMP_MARGIN, top: H * 0.28, height: H * 0.44,
+            right: 0, width: DUMP_MARGIN, top: H * 0.25, height: H * 0.50,
           }]}>
-            <Text style={styles.dumpArrow}>{'>'}</Text>
+            <Text style={styles.dumpArrow}>{'→'}</Text>
+            <Text style={styles.dumpHintLabel}>TOSS{`\n`}OVER</Text>
           </View>
         </>
       )}
 
       {/* ── Cycles counter ── */}
-      <Text style={[styles.cyclesText, { top: H * 0.10 }]}>
+      <Text style={[styles.cyclesText, { top: H * 0.06 }]}>
         {cyclesCompleted} / {cyclesRequired}
       </Text>
+      <Text style={[styles.cyclesSubLabel, { top: H * 0.06 + 28 }]}>BUCKETS BAILED</Text>
+
+      {/* ── Per-step instruction banner ── */}
+      <View style={[styles.instructionBanner, { top: H * 0.10 }]}>
+        {step === 'carry' && (
+          <Text style={styles.instructionText}>🪣 Drag the bucket into the centre</Text>
+        )}
+        {step === 'filling' && (
+          <Text style={[styles.instructionText, styles.instructionFilling]}>💧 Filling — wait for it...</Text>
+        )}
+        {step === 'dump' && (
+          <Text style={[styles.instructionText, styles.instructionDump]}>⚡ Bucket full! Toss it overboard!</Text>
+        )}
+      </View>
 
       {/* ── Draggable bucket ── */}
       <Animated.View
@@ -492,17 +510,27 @@ const styles = StyleSheet.create({
   centerHint: {
     position: 'absolute',
     borderWidth: 1,
-    borderColor: 'rgba(0,212,255,0.35)',
+    borderColor: 'rgba(0,212,255,0.40)',
     borderStyle: 'dashed',
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 2,
+  },
+  centerHintEmoji: {
+    fontSize: 22,
   },
   centerHintLabel: {
     fontFamily: fonts.accent.bold,
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 1.5,
-    color: 'rgba(0,212,255,0.50)',
+    color: 'rgba(0,212,255,0.65)',
+  },
+  centerHintSub: {
+    fontFamily: fonts.body?.regular ?? fonts.accent.bold,
+    fontSize: 9,
+    letterSpacing: 0.5,
+    color: 'rgba(0,212,255,0.40)',
   },
 
   // ── Dump side hints ──────────────────────────────────────────────────────
@@ -510,11 +538,21 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
   },
   dumpArrow: {
     fontFamily: fonts.display.bold,
-    fontSize: 28,
-    color: 'rgba(0,212,255,0.45)',
+    fontSize: 32,
+    color: '#FFD060',
+    opacity: 0.7,
+  },
+  dumpHintLabel: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 9,
+    letterSpacing: 1.5,
+    color: '#FFD060',
+    opacity: 0.55,
+    textAlign: 'center',
   },
 
   // ── Cycles counter ──────────────────────────────────────────────────────
@@ -527,6 +565,39 @@ const styles = StyleSheet.create({
     fontSize: 20,
     letterSpacing: 3,
     color: colors.text.primary,
+  },
+  cyclesSubLabel: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    fontFamily: fonts.accent.bold,
+    fontSize: 8,
+    letterSpacing: 2,
+    color: 'rgba(255,255,255,0.30)',
+  },
+
+  // ── Instruction banner ──────────────────────────────────────────────────
+  instructionBanner: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+  },
+  instructionText: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 13,
+    letterSpacing: 0.5,
+    color: 'rgba(255,255,255,0.75)',
+    textAlign: 'center',
+  },
+  instructionFilling: {
+    color: colors.primary.electricBlue,
+  },
+  instructionDump: {
+    color: '#FFD060',
   },
 
   // ── Bucket ──────────────────────────────────────────────────────────────
