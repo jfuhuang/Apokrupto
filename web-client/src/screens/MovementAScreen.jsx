@@ -190,15 +190,14 @@ export default function MovementAScreen({
 
   const timerColor = timeLeft > 10 ? '#00FF9F' : timeLeft > 5 ? '#FFA63D' : '#FF3366'
 
-  // Sort group members by turn order when available
+  // Sort group members by turn order when available (O(n log n) via index Map)
   const sortedMembers = (() => {
     if (!contextGroupMembers || contextGroupMembers.length === 0) return []
     if (!turnOrder) return contextGroupMembers
+    const indexMap = new Map(turnOrder.map((id, i) => [id, i]))
     return [...contextGroupMembers].sort((a, b) => {
-      const idxA = turnOrder.indexOf(String(a.id))
-      const idxB = turnOrder.indexOf(String(b.id))
-      if (idxA === -1) return 1
-      if (idxB === -1) return -1
+      const idxA = indexMap.has(String(a.id)) ? indexMap.get(String(a.id)) : Infinity
+      const idxB = indexMap.has(String(b.id)) ? indexMap.get(String(b.id)) : Infinity
       return idxA - idxB
     })
   })()

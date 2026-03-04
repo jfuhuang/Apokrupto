@@ -29,19 +29,19 @@ export function GameProvider({ token, gameId, children }) {
     if (!res.ok) return null
     const d = res.data
     setData((prev) => ({
-      team: d.team ?? prev.team,
-      isMarked: d.isMarked ?? prev.isMarked,
-      groupId: d.groupId ?? prev.groupId,
-      groupIndex: d.groupIndex ?? prev.groupIndex,
-      groupMembers: d.groupMembers ?? prev.groupMembers,
-      teamPoints: d.teamPoints ?? prev.teamPoints,
-      currentRound: d.currentRound ?? prev.currentRound,
-      totalRounds: d.totalRounds ?? prev.totalRounds,
-      currentMovement: d.currentMovement ?? prev.currentMovement,
-      gameStatus: d.gameStatus ?? prev.gameStatus,
-      winner: d.winner ?? prev.winner,
-      winCondition: d.winCondition ?? prev.winCondition,
-      movementBEndsAt: d.movementBEndsAt ?? prev.movementBEndsAt,
+      team: d.team !== undefined ? d.team : prev.team,
+      isMarked: d.isMarked !== undefined ? d.isMarked : prev.isMarked,
+      groupId: d.groupId !== undefined ? d.groupId : prev.groupId,
+      groupIndex: d.groupIndex !== undefined ? d.groupIndex : prev.groupIndex,
+      groupMembers: d.groupMembers !== undefined ? d.groupMembers : prev.groupMembers,
+      teamPoints: d.teamPoints !== undefined ? d.teamPoints : prev.teamPoints,
+      currentRound: d.currentRound !== undefined ? d.currentRound : prev.currentRound,
+      totalRounds: d.totalRounds !== undefined ? d.totalRounds : prev.totalRounds,
+      currentMovement: d.currentMovement !== undefined ? d.currentMovement : prev.currentMovement,
+      gameStatus: d.gameStatus !== undefined ? d.gameStatus : prev.gameStatus,
+      winner: d.winner !== undefined ? d.winner : prev.winner,
+      winCondition: d.winCondition !== undefined ? d.winCondition : prev.winCondition,
+      movementBEndsAt: d.movementBEndsAt !== undefined ? d.movementBEndsAt : prev.movementBEndsAt,
     }))
     return d
   }, [token, gameId])

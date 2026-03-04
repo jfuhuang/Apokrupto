@@ -3,10 +3,15 @@ import { useState, useEffect } from 'react'
 export default function TriviaTask({ config, taskId, onSuccess, onFail, timeLimit = 30 }) {
   const question = config?.question ?? 'Who built the ark?'
   const options = config?.options ?? ['Noah', 'Moses', 'Abraham', 'David']
-  // Support both `answerIndex` (task data format) and legacy `answer` string
-  const answer = config?.answerIndex != null
-    ? (config.options ?? options)[config.answerIndex]
-    : (config?.answer ?? 'Noah')
+  // Support both `answerIndex` (task data format) and legacy `answer` string.
+  // Validate that answerIndex is within bounds before using it.
+  const answer = (() => {
+    const opts = config?.options ?? options
+    if (config?.answerIndex != null && config.answerIndex >= 0 && config.answerIndex < opts.length) {
+      return opts[config.answerIndex]
+    }
+    return config?.answer ?? 'Noah'
+  })()
 
   const [timeLeft, setTimeLeft] = useState(timeLimit)
   const [selected, setSelected] = useState(null)

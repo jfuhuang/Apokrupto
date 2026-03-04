@@ -1,4 +1,4 @@
-import { useState, createContext, useContext } from 'react'
+import { useState, useRef } from 'react'
 import AnimatedBackground from '../components/AnimatedBackground.jsx'
 import { GameContext } from '../context/GameContext.jsx'
 import RoundHubScreen from './RoundHubScreen.jsx'
@@ -256,11 +256,10 @@ function ActiveMockScreen({ screenId, onBack }) {
 // ── Mock MovementA with pre-set phase ─────────────────────────────────────────
 
 function MockMovementA({ phase: forcedPhase, promptMode: forcedPromptMode }) {
-  // MovementAScreen relies on socket events and API calls for phase/prompt.
-  // We render it directly; in dev mode the API calls will fail gracefully
-  // but we inject a mock turn via a fake socket that immediately fires events.
-  const [socket] = useState(() => {
-    // Create a minimal fake socket that fires the right events on connect
+  // Use a ref for the fake socket — it's a stable object that doesn't need
+  // React's state lifecycle.
+  const socketRef = useRef(null)
+  if (!socketRef.current) {
     const listeners = {}
     const fakeSocket = {
       on(event, fn) {
@@ -299,12 +298,9 @@ function MockMovementA({ phase: forcedPhase, promptMode: forcedPromptMode }) {
         })
       }
     }, 200)
-    return fakeSocket
-  })
+    socketRef.current = fakeSocket
+  }
 
-  // Provide a fake prompt via a mock fetch override isn't easy here, so we
-  // just render the real screen. The prompt will show "loading" without a
-  // server but the phase will be correct via the fake socket events above.
   return (
     <MovementAScreen
       token="mock"
@@ -312,7 +308,7 @@ function MockMovementA({ phase: forcedPhase, promptMode: forcedPromptMode }) {
       currentUserId={MOCK_USER_ID}
       currentGroupId={MOCK_GROUP_ID}
       lobbyId={MOCK_LOBBY_ID}
-      socket={socket}
+      socket={socketRef.current}
       onMovementEnd={() => {}}
     />
   )
