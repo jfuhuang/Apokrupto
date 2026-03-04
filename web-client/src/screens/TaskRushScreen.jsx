@@ -54,6 +54,10 @@ export default function TaskRushScreen({ token, lobbyId, movementTimeLeft, onBac
   const [sessionPoints, setSessionPoints] = useState(0)
   const [showing, setShowing] = useState(true)
   const taskKey = useRef(0)
+  // Guards against task components double-firing onSuccess/onFail (e.g. stale
+  // state in touch-move event handlers fires the callback multiple times before
+  // React re-renders with done=true).
+  const advancingRef = useRef(false)
 
   const currentTask = queue[taskIndex % queue.length]
   const multiplier = Math.min(2, 1 + streak * 0.25)
@@ -61,6 +65,8 @@ export default function TaskRushScreen({ token, lobbyId, movementTimeLeft, onBac
   const secs = (movementTimeLeft || 0) % 60
 
   function advance(isSuccess) {
+    if (advancingRef.current) return  // drop duplicate fires from same task
+    advancingRef.current = true
     const pts = isSuccess ? Math.round((currentTask.points?.alive || 2) * multiplier) : 0
     setResult(isSuccess ? 'success' : 'fail')
     setStreak(isSuccess ? s => s + 1 : 0)
@@ -74,6 +80,7 @@ export default function TaskRushScreen({ token, lobbyId, movementTimeLeft, onBac
       setTaskIndex(i => i + 1)
       taskKey.current++
       setShowing(true)
+      advancingRef.current = false   // allow next task to fire
     }, 400)
   }
 

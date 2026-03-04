@@ -9,6 +9,7 @@ export default function MarchJerichoTask({ config, onSuccess, onFail, timeLimit 
   const [laps, setLaps] = useState(0)
   const [timeLeft, setTimeLeft] = useState(timeLimit)
   const [done, setDone] = useState(false)
+  const doneRef = useRef(false)  // ref version for event handler stale-state guard
   const isTracking = useRef(false)
 
   useEffect(() => {
@@ -40,7 +41,8 @@ export default function MarchJerichoTask({ config, onSuccess, onFail, timeLimit 
       const completedLaps = Math.floor(totalAngleRef.current / 360)
       setLaps(completedLaps)
       drawProgress(completedLaps)
-      if (completedLaps >= LAPS_REQUIRED && !done) {
+      if (completedLaps >= LAPS_REQUIRED && !doneRef.current) {
+        doneRef.current = true
         setDone(true)
         onSuccess()
       }

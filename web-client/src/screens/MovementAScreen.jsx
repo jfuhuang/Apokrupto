@@ -60,6 +60,8 @@ export default function MovementAScreen({
   const [submitMsg, setSubmitMsg] = useState('')
   // Turn order from server (array of userId strings in turn sequence)
   const [turnOrder, setTurnOrder] = useState(null)
+  const [submittedIds, setSubmittedIds] = useState(new Set())
+  const [submittedWords, setSubmittedWords] = useState([]) // { userId, username, word }
   const timerRef = useRef(null)
   const sketchRef = useRef(null)
 
@@ -130,6 +132,21 @@ export default function MovementAScreen({
       setCompletedCount(data.completedCount || 0)
       // Capture turn order when first received
       if (data.turnOrder) setTurnOrder(data.turnOrder.map(String))
+      // Track the previous player as having submitted (fallback for reconnect)
+      if (data.lastWord !== undefined && data.turnOrder) {
+        const prevIdx = (data.turnIndex || 0) - 1
+        if (prevIdx >= 0) {
+          const prevId = String(data.turnOrder[prevIdx])
+          setSubmittedIds((prev) => new Set([...prev, prevId]))
+          if (data.lastWord && data.lastWord !== '') {
+            const prevMember = contextGroupMembers?.find((m) => String(m.id) === prevId)
+            setSubmittedWords((prev) => {
+              if (prev.some((w) => String(w.userId) === prevId)) return prev
+              return [...prev, { userId: prevId, username: prevMember?.username || '', word: data.lastWord }]
+            })
+          }
+        }
+      }
       // Find name from context group members
       const member = contextGroupMembers?.find((m) => String(m.id) === String(data.currentPlayerId))
       setCurrentPlayerName(member?.username || 'Unknown')
@@ -142,10 +159,27 @@ export default function MovementAScreen({
       }
     }
 
+    function onWordSubmitted(data) {
+      // { userId, username, word } — word may be undefined in sketch mode
+      const uid = String(data.userId)
+      setSubmittedIds((prev) => new Set([...prev, uid]))
+      setCompletedCount((c) => c + 1)
+      if (data.word !== undefined) {
+        setSubmittedWords((prev) => {
+          if (prev.some((w) => String(w.userId) === uid)) return prev
+          return [...prev, { userId: uid, username: data.username, word: data.word }]
+        })
+      }
+    }
+
     function onDeliberationStart(data) {
       setPhase('deliberation')
       setWords(data.words || [])
       setSketches(data.sketches || [])
+      // Mark all members as submitted
+      if (contextGroupMembers) {
+        setSubmittedIds(new Set(contextGroupMembers.map((m) => String(m.id))))
+      }
       clearInterval(timerRef.current)
     }
 
@@ -156,11 +190,13 @@ export default function MovementAScreen({
     }
 
     socket.on('turnStart', onTurnStart)
+    socket.on('wordSubmitted', onWordSubmitted)
     socket.on('deliberationStart', onDeliberationStart)
     socket.on('movementStart', onMovementStart)
 
     return () => {
       socket.off('turnStart', onTurnStart)
+      socket.off('wordSubmitted', onWordSubmitted)
       socket.off('deliberationStart', onDeliberationStart)
       socket.off('movementStart', onMovementStart)
     }
@@ -182,6 +218,14 @@ export default function MovementAScreen({
       setError(res.data?.error || 'Could not submit.')
     } else {
       setSubmitMsg(promptMode === 'sketch' ? 'Sketch submitted! Waiting...' : 'Word submitted! Waiting...')
+      // Track own submission locally immediately
+      setSubmittedIds((prev) => new Set([...prev, String(currentUserId)]))
+      if (promptMode === 'word') {
+        setSubmittedWords((prev) => {
+          if (prev.some((w) => String(w.userId) === String(currentUserId))) return prev
+          return [...prev, { userId: String(currentUserId), username: 'You', word: word.trim() }]
+        })
+      }
       setPhase('waiting')
       setWord('')
       sketchRef.current?.clear()
@@ -275,6 +319,47 @@ export default function MovementAScreen({
             </div>
           </div>
         )}
+
+        {/* Submitted so far */}
+        {phase !== 'deliberation' && submittedIds.size > 0 && (() => {
+          if (promptMode === 'sketch') {
+            const submittedMembers = (contextGroupMembers || []).filter((m) => submittedIds.has(String(m.id)))
+            if (submittedMembers.length === 0) return null
+            return (
+              <div style={styles.submittedSection}>
+                <p style={styles.submittedLabel}>SUBMITTED SO FAR</p>
+                {submittedMembers.map((m) => {
+                  const isMe = String(m.id) === String(currentUserId)
+                  return (
+                    <div key={m.id} style={styles.submittedRow}>
+                      <span style={{ ...styles.submittedName, ...(isMe ? styles.submittedNameMe : {}) }}>
+                        {isMe ? 'You' : m.username}
+                      </span>
+                      <span style={styles.submittedCheck}>✓</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          }
+          if (submittedWords.length === 0) return null
+          return (
+            <div style={styles.submittedSection}>
+              <p style={styles.submittedLabel}>SUBMITTED SO FAR</p>
+              {submittedWords.map((entry, i) => {
+                const isMe = String(entry.userId) === String(currentUserId)
+                return (
+                  <div key={i} style={styles.submittedRow}>
+                    <span style={{ ...styles.submittedName, ...(isMe ? styles.submittedNameMe : {}) }}>
+                      {isMe ? 'You' : entry.username}
+                    </span>
+                    <span style={styles.submittedWord}>{entry.word}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
 
         {/* Turn status */}
         {phase === 'waiting' && !submitMsg && currentPlayerId && (
@@ -376,6 +461,55 @@ export default function MovementAScreen({
 }
 
 const styles = {
+  submittedSection: {
+    background: 'rgba(31,40,51,0.9)',
+    border: '1px solid rgba(0,212,255,0.2)',
+    borderRadius: 8,
+    padding: '12px 16px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  submittedLabel: {
+    fontFamily: 'Rajdhani, sans-serif',
+    fontSize: 11,
+    fontWeight: 700,
+    color: '#6C757D',
+    letterSpacing: '0.12em',
+    margin: 0,
+  },
+  submittedRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingLeft: 4,
+  },
+  submittedName: {
+    fontFamily: 'Exo 2, sans-serif',
+    fontSize: 13,
+    color: '#ADB5BD',
+    flex: 1,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    marginRight: 8,
+  },
+  submittedNameMe: {
+    color: '#00D4FF',
+    fontWeight: 600,
+  },
+  submittedWord: {
+    fontFamily: 'Exo 2, sans-serif',
+    fontSize: 13,
+    color: '#F8F9FA',
+    letterSpacing: '0.05em',
+    textAlign: 'right',
+  },
+  submittedCheck: {
+    color: '#00FF9F',
+    fontSize: 14,
+    fontWeight: 700,
+  },
   container: {
     minHeight: '100vh',
     position: 'relative',

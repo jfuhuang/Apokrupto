@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 
 export default function HoldTask({ config, taskId, onSuccess, onFail, timeLimit = 30 }) {
-  const holdMs = config?.holdMs ?? 3000
+  // Tasks define config.duration in seconds; fall back to config.holdMs (legacy ms)
+  const holdMs = config?.holdMs ?? ((config?.duration ?? 3) * 1000)
   const [timeLeft, setTimeLeft] = useState(timeLimit)
   const [holding, setHolding] = useState(false)
   const [progress, setProgress] = useState(0)

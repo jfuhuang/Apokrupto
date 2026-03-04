@@ -7,6 +7,7 @@ export default function SlingTask({ config, onSuccess, onFail, timeLimit = 8 }) 
   const visitedRef = useRef(new Set())
   const [coverage, setCoverage] = useState(0)
   const [done, setDone] = useState(false)
+  const doneRef = useRef(false)  // ref version for event handler stale-state guard
   const [timeLeft, setTimeLeft] = useState(timeLimit)
   const isTracking = useRef(false)
 
@@ -44,7 +45,8 @@ export default function SlingTask({ config, onSuccess, onFail, timeLimit = 8 }) 
     const pct = (visitedRef.current.size / 12) * 100
     setCoverage(pct)
     drawArc()
-    if (visitedRef.current.size >= 10 && !done) {
+    if (visitedRef.current.size >= 10 && !doneRef.current) {
+      doneRef.current = true
       setDone(true)
       onSuccess()
     }
