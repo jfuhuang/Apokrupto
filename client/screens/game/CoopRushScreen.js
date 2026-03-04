@@ -202,6 +202,9 @@ export default function CoopRushScreen({
   // Render active task
   const renderTask = () => {
     if (!currentTask) return null;
+    // key: taskId forces React to remount the component when the task changes,
+    // even if two consecutive tasks have the same type (e.g. deception → deception).
+    const taskKey = currentTask.taskId;
     const taskProps = {
       task: currentTask,
       role,
@@ -212,15 +215,15 @@ export default function CoopRushScreen({
 
     switch (currentTask.taskType) {
       case 'deception':
-        return <DeceptionTask {...taskProps} />;
+        return <DeceptionTask key={taskKey} {...taskProps} />;
       case 'secret_ballot':
-        return <SecretBallotTask {...taskProps} />;
+        return <SecretBallotTask key={taskKey} {...taskProps} />;
       case 'coop_tap':
-        return <CoopTapTask {...taskProps} />;
+        return <CoopTapTask key={taskKey} {...taskProps} />;
       case 'coop_hold':
-        return <CoopHoldTask {...taskProps} />;
+        return <CoopHoldTask key={taskKey} {...taskProps} />;
       case 'simon_says':
-        return <SimonSaysTask {...taskProps} simonPatterns={simonPatterns} />;
+        return <SimonSaysTask key={taskKey} {...taskProps} simonPatterns={simonPatterns} />;
       default:
         return (
           <View style={styles.unknownTask}>

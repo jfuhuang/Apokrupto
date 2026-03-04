@@ -765,7 +765,7 @@ export const TASKS = [
     difficulty: 'medium',
     timeLimit: 25,           // seconds — slightly generous to allow learning the gesture
     config: {
-      cyclesRequired: 6,     // number of full pick-up→fill→dump cycles to win
+      cyclesRequired: 3,     // number of full pick-up→fill→dump cycles to win
       fillDurationMs: 1500,  // ms the player must hold over water to fill bucket
     },
   },
