@@ -291,18 +291,26 @@ function registerCoopHandlers(socket) {
         session.currentTask._ballotRemaining = remaining;
 
         if (io) {
-          // Find Player B sockets
-          const playerBSockets = findSocketsForUser(io, session.playerB.userId);
-          for (const s of playerBSockets) {
+          // Route updates by effective role, not structural position
+          const effectiveARoleUserId =
+            getPlayerRole(session, session.playerA.userId) === 'A'
+              ? session.playerA.userId
+              : session.playerB.userId;
+          const effectiveBRoleUserId =
+            effectiveARoleUserId === session.playerA.userId
+              ? session.playerB.userId
+              : session.playerA.userId;
+
+          const effectiveBSockets = findSocketsForUser(io, effectiveBRoleUserId);
+          for (const s of effectiveBSockets) {
             s.emit('coopTaskUpdate', {
               sessionId,
               phase: 'playerB',
               remainingDecrees: remaining,
             });
           }
-          // Find Player A sockets
-          const playerASockets = findSocketsForUser(io, session.playerA.userId);
-          for (const s of playerASockets) {
+          const effectiveASockets = findSocketsForUser(io, effectiveARoleUserId);
+          for (const s of effectiveASockets) {
             s.emit('coopTaskUpdate', {
               sessionId,
               phase: 'waitingForB',
