@@ -263,13 +263,19 @@
 </div>
 
 <div class="section">
-  <h2>4️⃣ Movement A — Word Submission</h2>
+  <h2>4️⃣ Movement A — Submissions</h2>
   <div class="btn-row">
     <button id="btn-activate-a" onclick="runActivateA()">GM: Activate Movement A</button>
     <button id="btn-fetch-prompts" onclick="runFetchPrompts()">Fetch Prompts (all)</button>
     <button id="btn-submit-words" onclick="runSubmitWords()">Submit Words (auto-turns)</button>
+    <button id="btn-submit-sketches" onclick="runSubmitSketches()">Submit Sketches (auto-turns)</button>
+    <button id="btn-submit-auto" onclick="runSubmitAuto()">Auto-detect &amp; Submit</button>
     <button id="btn-complete-a" onclick="runCompleteA()">GM: Complete Movement A</button>
   </div>
+  <p style="font-size:0.7rem;color:var(--muted);margin-top:6px;">
+    Auto-detect checks the prompt mode (word/sketch) and uses the correct endpoint.
+    Submit Sketches generates random stroke data for each bot.
+  </p>
 </div>
 
 <div class="section">
@@ -919,6 +925,123 @@ async function runSubmitWords() {
   setBusy('btn-submit-words', false);
 }
 
+// Generate a random sketch with multiple strokes
+function generateRandomSketch() {
+  const strokeCount = 3 + Math.floor(Math.random() * 5); // 3-7 strokes
+  const strokes = [];
+  for (let s = 0; s < strokeCount; s++) {
+    const pointCount = 5 + Math.floor(Math.random() * 15); // 5-19 points per stroke
+    const stroke = [];
+    let x = Math.random() * 300;
+    let y = Math.random() * 300;
+    for (let p = 0; p < pointCount; p++) {
+      x += (Math.random() - 0.5) * 40;
+      y += (Math.random() - 0.5) * 40;
+      stroke.push({ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 });
+    }
+    strokes.push(stroke);
+  }
+  return { strokes };
+}
+
+async function runSubmitSketches() {
+  setBusy('btn-submit-sketches', true);
+  if (!state.gameId) { logErr('No game.'); setBusy('btn-submit-sketches', false); return; }
+
+  const players = state.bots.filter(b => !b.isGm && b.socket?.connected);
+  log(`Submitting sketches for ${players.length} players via turn system...`);
+
+  const groups = new Map();
+  for (const bot of players) {
+    if (!groups.has(bot.groupId)) groups.set(bot.groupId, []);
+    groups.get(bot.groupId).push(bot);
+  }
+
+  const t0 = Date.now();
+  let totalSubmitted = 0;
+
+  const groupPromises = [...groups.entries()].map(async ([groupId, groupBots]) => {
+    const botMap = new Map(groupBots.map(b => [b.userId, b]));
+    let deliberationReceived = false;
+
+    const deliberationPromise = new Promise((resolve) => {
+      for (const bot of groupBots) {
+        bot.socket.on('deliberationStart', () => {
+          deliberationReceived = true;
+          resolve();
+        });
+      }
+    });
+
+    const turnHandler = async () => {
+      while (!deliberationReceived && !state.aborted) {
+        const turnData = await Promise.race([
+          ...groupBots.map(b => waitForEvent(b.socket, 'turnStart', 300000)),
+          deliberationPromise.then(() => null),
+        ]);
+
+        if (!turnData || deliberationReceived) break;
+
+        const currentPlayerId = String(turnData.currentPlayerId);
+        const currentBot = botMap.get(currentPlayerId);
+
+        if (currentBot) {
+          try {
+            const sketchData = generateRandomSketch();
+            await api('POST', `/api/games/${state.gameId}/movement-a/submit/sketch`,
+              { sketchData },
+              currentBot.token
+            );
+            totalSubmitted++;
+          } catch (err) {
+            logErr(`Submit sketch (${currentBot.username}): ${err.message}`);
+          }
+        }
+        await new Promise(r => setTimeout(r, 300));
+      }
+    };
+
+    await Promise.race([turnHandler(), deliberationPromise]);
+
+    for (const bot of groupBots) {
+      bot.socket.removeAllListeners('deliberationStart');
+    }
+  });
+
+  await Promise.all(groupPromises);
+  logOk(`Sketches submitted: ${totalSubmitted} across ${groups.size} groups in ${elapsed(t0)}`);
+
+  setBusy('btn-submit-sketches', false);
+}
+
+async function runSubmitAuto() {
+  setBusy('btn-submit-auto', true);
+  if (!state.gameId) { logErr('No game.'); setBusy('btn-submit-auto', false); return; }
+
+  // Detect prompt mode from one bot
+  const sampleBot = state.bots.find(b => !b.isGm && b.token);
+  if (!sampleBot) { logErr('No player bots available.'); setBusy('btn-submit-auto', false); return; }
+
+  log('Auto-detecting prompt mode...');
+  try {
+    const { status, data } = await api('GET', `/api/games/${state.gameId}/movement-a/prompt`, null, sampleBot.token);
+    if (status !== 200) throw new Error(`${status}: ${JSON.stringify(data)}`);
+
+    const mode = data.promptMode || 'word';
+    logOk(`Detected prompt mode: ${mode}`);
+    setBusy('btn-submit-auto', false);
+
+    if (mode === 'sketch') {
+      await runSubmitSketches();
+    } else {
+      await runSubmitWords();
+    }
+  } catch (err) {
+    logErr(`Auto-detect prompt mode: ${err.message}`);
+    setBusy('btn-submit-auto', false);
+  }
+}
+
 async function runCompleteA() {
   setBusy('btn-complete-a', true);
   await gmAdvance('Complete Movement A');
@@ -1403,7 +1526,7 @@ async function runFullAuto() {
       // Movement A
       await runActivateA(); if (state.aborted) throw new Error('Aborted');
       progress();
-      await runSubmitWords(); if (state.aborted) throw new Error('Aborted');
+      await runSubmitAuto(); if (state.aborted) throw new Error('Aborted');
       progress();
       await runCompleteA(); if (state.aborted) throw new Error('Aborted');
 
