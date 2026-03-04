@@ -134,8 +134,8 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Name and max_players are required' });
     }
     
-    if (max_players < 5 || max_players > 100 || max_players % 5 !== 0) {
-      return res.status(400).json({ error: 'Max players must be a multiple of 5 between 5 and 100' });
+    if (max_players < 5 || max_players > 100) {
+      return res.status(400).json({ error: 'Max players must be between 5 and 100' });
     }
     
     // Create lobby

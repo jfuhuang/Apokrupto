@@ -15,7 +15,7 @@ Added two new tables to support lobby functionality:
 **lobbies table:**
 - `id` - Primary key
 - `name` - Lobby name (max 100 characters)
-- `max_players` - Player limit (5–100, must be multiple of 5)
+- `max_players` - Player limit (5–100)
 - `created_by` - Reference to user who created it
 - `status` - Lobby state (waiting, in_progress, completed)
 - `created_at` - Timestamp

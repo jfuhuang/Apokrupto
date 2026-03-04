@@ -185,9 +185,9 @@ async function setupBots() {
 // Phase 2 — Create lobby & join
 // ---------------------------------------------------------------------------
 async function createAndJoinLobby() {
-  // max_players must be multiple of 5 and >= total bots (players + GM)
+  // max_players must be >= total bots (players + GM) and at least 5
   const totalBots = PLAYER_COUNT + 1;
-  const maxPlayers = Math.ceil(totalBots / 5) * 5;
+  const maxPlayers = Math.max(totalBots, 5);
 
   log(`Host creating lobby (max_players=${maxPlayers})...`);
   const { data } = await api('POST', '/api/lobbies', {

@@ -598,10 +598,10 @@ export const TASKS = [
     category: TASK_CATEGORY.CHALLENGES,
     points: { alive: 6, dead: 4 },
     difficulty: 'hard',
-    timeLimit: 0,
+    timeLimit: 8,
     config: {
       waveDuration: 8000,
-      maxMisses: 3,
+      maxMisses: 1,
     },
   },
   {
@@ -750,7 +750,7 @@ export const TASKS = [
     timeLimit: 0,
     config: {
       waveDuration: 8000,
-      maxMisses: 3,
+      maxMisses: 1,
     },
   },
   {
@@ -801,7 +801,7 @@ export const TASKS = [
     timeLimit: 0,
     config: {
       waveDuration: 8000,
-      maxMisses: 3,
+      maxMisses: 1,
     },
   },
   {

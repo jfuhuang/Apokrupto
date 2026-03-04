@@ -7,14 +7,14 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import Svg, { Path, Circle, Rect, Ellipse, Line, Polygon } from 'react-native-svg';
+import Svg, { Path, Circle, Rect, Ellipse, Line, Polygon, G } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
 import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
 const { width: W } = Dimensions.get('window');
 const STONE_SIZE = 36;
-const ARC_R      = 110;          // radius of the guide ring
+const ARC_R      = 90;           // radius of the guide ring (shrunk to stay on-screen)
 const GX         = W / 2;        // Goliath center X
 const TARGET_W   = 80;
 const TARGET_H   = 140;
@@ -101,6 +101,7 @@ export default function SlingTask({ config, onSuccess }) {
   const visitedRef = useRef(new Set());
   const doneRef    = useRef(false);
   const gYRef      = useRef(0);
+  const layoutRef  = useRef({ width: W, height: 400 });
 
   const stoneX = useRef(new Animated.Value(0)).current;
   const stoneY = useRef(new Animated.Value(0)).current;
@@ -108,7 +109,8 @@ export default function SlingTask({ config, onSuccess }) {
   // Position stone at ring start once layout is measured
   useEffect(() => {
     if (layout) {
-      const gy = layout.height * 0.38;
+      layoutRef.current = { width: layout.width, height: layout.height };
+      const gy = layout.height * 0.52;
       gYRef.current = gy;
       stoneX.setValue(GX + ARC_R - STONE_SIZE / 2);
       stoneY.setValue(gy - STONE_SIZE / 2);
@@ -122,7 +124,10 @@ export default function SlingTask({ config, onSuccess }) {
 
       onPanResponderMove: (evt) => {
         if (doneRef.current) return;
-        const { locationX, locationY } = evt.nativeEvent;
+        const { width: lw, height: lh } = layoutRef.current;
+        // Clamp to view bounds to prevent jump-to-origin when finger leaves the view
+        const locationX = Math.max(0, Math.min(evt.nativeEvent.locationX, lw));
+        const locationY = Math.max(0, Math.min(evt.nativeEvent.locationY, lh));
 
         // Move stone to finger
         stoneX.setValue(locationX - STONE_SIZE / 2);
@@ -159,7 +164,7 @@ export default function SlingTask({ config, onSuccess }) {
     })
   ).current;
 
-  const gY   = layout ? layout.height * 0.38 : 0;
+  const gY   = layout ? layout.height * 0.52 : 0;
   const arcD = buildArcPath(GX, gY, ARC_R, progress);
 
   return (
@@ -196,6 +201,16 @@ export default function SlingTask({ config, onSuccess }) {
                 fill="none"
                 strokeLinecap="round"
               />
+            )}
+            {/* Clockwise direction arrow at 12-o'clock */}
+            {!done && (
+              <G transform={`translate(${GX}, ${gY - ARC_R}) rotate(90)`}>
+                <Polygon
+                  points="-6,-5 6,0 -6,5"
+                  fill={colors.text.tertiary}
+                  opacity={0.6}
+                />
+              </G>
             )}
           </Svg>
 

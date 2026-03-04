@@ -130,7 +130,7 @@ All endpoints require `Authorization: Bearer <token>` unless noted. Admin endpoi
 | GET | `/api/lobbies/current` | Yes | — | `{ lobby: { id, name, status, role, team, isGm, gameId } \| null }` |
 | GET | `/api/lobbies/:id` | Yes | — | `{ lobby: { id, name, max_players, created_by, status, host_username, current_players } }` |
 | GET | `/api/lobbies/:id/players` | Yes | — | `{ players: [{ id, username, isHost }], hostId, lobbyInfo }` |
-| POST | `/api/lobbies` | Yes | `{ name, max_players }` | `{ lobby: { id, name, ... } }` — 5–100 players, multiple of 5 |
+| POST | `/api/lobbies` | Yes | `{ name, max_players }` | `{ lobby: { id, name, ... } }` — 5–100 players |
 | POST | `/api/lobbies/:id/join` | Yes | — | `{ message, lobbyId }` |
 | POST | `/api/lobbies/:id/leave` | Yes | — | `{ message }` |
 | POST | `/api/lobbies/:id/kick/:userId` | Host/Admin | — | `{ ok, lobbyClosed }` |

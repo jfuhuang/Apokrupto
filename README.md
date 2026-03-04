@@ -134,7 +134,7 @@ All endpoints require `Authorization: Bearer <token>` unless noted.
 | GET | `/api/lobbies/current` | Get current user's active lobby |
 | GET | `/api/lobbies/:id` | Get lobby details |
 | GET | `/api/lobbies/:id/players` | Get lobby player list |
-| POST | `/api/lobbies` | Create lobby (5–100 players, multiple of 5) |
+| POST | `/api/lobbies` | Create lobby (5–100 players) |
 | POST | `/api/lobbies/:id/join` | Join a lobby |
 | POST | `/api/lobbies/:id/leave` | Leave a lobby |
 | POST | `/api/lobbies/:id/kick/:userId` | Kick player (host/admin) |

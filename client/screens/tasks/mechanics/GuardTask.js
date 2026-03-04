@@ -22,7 +22,7 @@ import { fonts } from '../../../theme/typography';
 
 const { width: W } = Dimensions.get('window');
 const ENEMY_SIZE    = 56;
-const SPAWN_INTERVAL = 2200;
+const SPAWN_INTERVAL = 1000;
 const ENEMY_DURATION = 5000;
 const CENTER_X = W / 2 - ENEMY_SIZE / 2;
 

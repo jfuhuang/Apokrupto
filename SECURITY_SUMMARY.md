@@ -15,7 +15,7 @@
 ### ✅ Input Validation
 - All user inputs are validated before database operations
 - Lobby names limited to 100 characters
-- Player counts restricted to 5–100 range (must be multiple of 5)
+- Player counts restricted to 5–100 range
 - Movement A word submissions validated (non-empty, turn order enforced)
 - Movement C votes validated (targets must be in same group, valid values only)
 - Numeric IDs validated before queries
