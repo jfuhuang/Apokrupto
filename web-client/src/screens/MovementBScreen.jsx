@@ -70,7 +70,12 @@ export default function MovementBScreen({
 
     function onCoopSessionStart(data) {
       setCoopInvite(null)
-      setCoopSession(data)
+      setCoopSession({
+        sessionId: data.sessionId,
+        role: data.role,
+        partnerUsername: data.partner?.username || 'Partner',
+        initialTask: data.task,
+      })
       setMode('coopRush')
     }
 
