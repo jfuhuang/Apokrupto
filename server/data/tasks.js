@@ -3,33 +3,12 @@
 // and determine canonical point values independently of the client.
 
 const TASKS = [
-  // Scripture memory
-  { id: 'scripture_memory',      points: { alive: 3, dead: 2 } },
-  { id: 'john_3_16',             points: { alive: 2, dead: 1 } },
-  { id: 'psalm_23',              points: { alive: 3, dead: 2 } },
-  { id: 'romans_8_28',           points: { alive: 2, dead: 1 } },
-  { id: 'philippians_4_13',      points: { alive: 1, dead: 1 } },
-  { id: 'isaiah_40_31',          points: { alive: 3, dead: 2 } },
-  { id: 'hebrews_11_1',          points: { alive: 1, dead: 1 } },
-
   // Fill-in-the-blank scripture
   { id: 'blank_philippians_4_13', points: { alive: 3, dead: 2 } },
   { id: 'blank_john_3_16',        points: { alive: 3, dead: 2 } },
   { id: 'blank_psalm_23',         points: { alive: 4, dead: 2 } },
   { id: 'blank_isaiah_40_31',     points: { alive: 5, dead: 3 } },
   { id: 'blank_hebrews_11_1',     points: { alive: 4, dead: 2 } },
-
-  // Matching / ordering
-  { id: 'ten_commandments',      points: { alive: 2, dead: 1 } },
-  { id: 'fruits_of_spirit',      points: { alive: 2, dead: 1 } },
-  { id: 'noahs_animals',         points: { alive: 1, dead: 1 } },
-  { id: 'rebuilding_wall',       points: { alive: 2, dead: 1 } },
-
-  // Trivia (multi-question)
-  { id: 'jesus_miracles',        points: { alive: 3, dead: 2 } },
-  { id: 'prophets_quiz',         points: { alive: 3, dead: 2 } },
-  { id: 'parables_quiz',         points: { alive: 2, dead: 1 } },
-  { id: 'acts_quiz',             points: { alive: 3, dead: 2 } },
 
   // Single-question trivia
   { id: 'trivia_psalms_author',  points: { alive: 2, dead: 1 } },
@@ -39,6 +18,30 @@ const TASKS = [
   { id: 'trivia_baptism_river',  points: { alive: 2, dead: 1 } },
   { id: 'trivia_first_book',     points: { alive: 2, dead: 1 } },
   { id: 'trivia_goliath_weapon', points: { alive: 3, dead: 2 } },
+
+  // Single-question trivia — Biblical
+  { id: 'trivia_burning_bush',    points: { alive: 2, dead: 1 } },
+  { id: 'trivia_garden_eden',     points: { alive: 2, dead: 1 } },
+  { id: 'trivia_red_sea',         points: { alive: 2, dead: 1 } },
+  { id: 'trivia_samson_strength', points: { alive: 2, dead: 1 } },
+  { id: 'trivia_ark_builder',     points: { alive: 2, dead: 1 } },
+  { id: 'trivia_den_of_lions',    points: { alive: 2, dead: 1 } },
+  { id: 'trivia_oldest_man',      points: { alive: 3, dead: 2 } },
+  { id: 'trivia_pauls_letters',   points: { alive: 3, dead: 2 } },
+  { id: 'trivia_plagues_egypt',   points: { alive: 3, dead: 2 } },
+  { id: 'trivia_beatitudes',      points: { alive: 3, dead: 2 } },
+
+  // Single-question trivia — Iowa State
+  { id: 'trivia_isu_mascot',      points: { alive: 2, dead: 1 } },
+  { id: 'trivia_isu_colors',      points: { alive: 2, dead: 1 } },
+  { id: 'trivia_isu_city',        points: { alive: 2, dead: 1 } },
+  { id: 'trivia_isu_conference',  points: { alive: 2, dead: 1 } },
+  { id: 'trivia_isu_founded',     points: { alive: 3, dead: 2 } },
+  { id: 'trivia_isu_rivalry',     points: { alive: 2, dead: 1 } },
+  { id: 'trivia_isu_hilton',      points: { alive: 2, dead: 1 } },
+  { id: 'trivia_isu_jack_trice',  points: { alive: 3, dead: 2 } },
+  { id: 'trivia_isu_land_grant',  points: { alive: 3, dead: 2 } },
+  { id: 'trivia_isu_campanile',   points: { alive: 3, dead: 2 } },
 
   // Action / skill
   { id: 'david_and_goliath',     points: { alive: 2, dead: 1 } },

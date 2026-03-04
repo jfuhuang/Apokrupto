@@ -272,47 +272,26 @@ export default function SimonSaysTask({ task, role, onAction, update, simonPatte
   if (update?.phase === 'resolved') {
     const {
       success,
-      benefitTeam,
       pointsAwarded,
-      phosPattern,
-      skotiaPattern,
       inputSequence,
-      chosenTeam,
     } = update;
 
-    const winColor =
-      benefitTeam === 'phos'   ? colors.primary.electricBlue :
-      benefitTeam === 'skotia' ? colors.primary.neonRed :
-                                  colors.text.muted;
+    // Keep result ambiguous — don't reveal which team benefited
+    const neutralColor = colors.primary.electricBlue;
 
     return (
       <TaskContainer style={{ padding: 20 }}>
-        <Text style={[styles.resolvedTitle, { color: success ? winColor : colors.state.error }]}>
-          {success ? '✓  CORRECT!' : '✕  NO MATCH'}
+        <Text style={[styles.resolvedTitle, { color: success ? neutralColor : colors.state.error }]}>
+          {success ? '✓  PATTERN MATCHED!' : '✕  NO MATCH'}
         </Text>
 
         {success ? (
-          <Text style={[styles.resolvedPoints, { color: winColor }]}>+{pointsAwarded} pts</Text>
+          <Text style={[styles.resolvedPoints, { color: neutralColor }]}>+{pointsAwarded} pts</Text>
         ) : (
           <Text style={styles.resolvedZero}>0 points — no pattern matched</Text>
         )}
 
-        {/* Pattern reveal — only shown to Player B */}
-        {role === 'B' && (
-          <View style={styles.revealBox}>
-            <View style={styles.revealTeam}>
-              <Text style={[styles.revealTeamLabel, { color: colors.primary.electricBlue }]}>ΦΩΣ</Text>
-              <PatternDots pattern={phosPattern} />
-            </View>
-            <View style={styles.revealDivider} />
-            <View style={styles.revealTeam}>
-              <Text style={[styles.revealTeamLabel, { color: colors.primary.neonRed }]}>ΣΚΟΤΊΑ</Text>
-              <PatternDots pattern={skotiaPattern} />
-            </View>
-          </View>
-        )}
-
-        {/* Input reveal — only shown to Player A */}
+        {/* Show what Player A tapped */}
         {role === 'A' && (
           <>
             <Text style={styles.youTappedLabel}>You tapped:</Text>
@@ -712,33 +691,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.muted,
     textAlign: 'center',
-  },
-  revealBox: {
-    flexDirection: 'row',
-    width: '100%',
-    backgroundColor: colors.background.void,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    padding: 14,
-    gap: 12,
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  revealTeam: {
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  revealTeamLabel: {
-    fontFamily: fonts.display.bold,
-    fontSize: 12,
-    letterSpacing: 2,
-  },
-  revealDivider: {
-    width: 1,
-    height: '80%',
-    backgroundColor: colors.border.subtle,
   },
   youTappedLabel: {
     fontFamily: fonts.ui.regular,
