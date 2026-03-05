@@ -797,7 +797,7 @@ export default function MovementAScreen({
             </View>
           </View>
 
-          {renderSubmittedSoFar()}
+          {/* {renderSubmittedSoFar()} */}
         </View>
       );
     }
@@ -838,7 +838,7 @@ export default function MovementAScreen({
           {myTurnHeader}
           {promptDisplay}
 
-          {renderSubmittedSoFar()}
+          {/* {renderSubmittedSoFar()} */}
 
           <TextInput
             style={styles.wordInput}
