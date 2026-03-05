@@ -180,9 +180,37 @@ function ScriptureBlankTaskInner({ config, onSuccess, onFail, areaW, areaH }) {
           { useNativeDriver: false }
         ),
 
-        onPanResponderRelease: () => {
+        onPanResponderRelease: (_, gestureState) => {
           pan.flattenOffset();
           setDraggingTileIdx(null);
+
+          // small movement = tap → auto-place in next open slot
+          const isTap = Math.abs(gestureState.dx) < 8 && Math.abs(gestureState.dy) < 8;
+          if (isTap) {
+            const nextSlot = [0, 1, 2].find(si => !occupiedRef.current.has(si));
+            if (nextSlot !== undefined) {
+              occupiedRef.current.add(nextSlot);
+              Animated.spring(pan, {
+                toValue: { x: slotPositions[nextSlot].x, y: slotPositions[nextSlot].y },
+                friction: 7,
+                useNativeDriver: false,
+              }).start(() => {
+                const newPlaced = [...placedSlotsRef.current];
+                newPlaced[tileIdx] = nextSlot;
+                placedSlotsRef.current = newPlaced;
+                setPlacedSlots([...newPlaced]);
+                checkCompletion(newPlaced);
+              });
+            } else {
+              // all slots filled; bounce back
+              Animated.spring(pan, {
+                toValue: tileSourcePositions[tileIdx],
+                friction: 5,
+                useNativeDriver: false,
+              }).start();
+            }
+            return;
+          }
 
           const cx = pan.x._value + TILE_W / 2;
           const cy = pan.y._value + TILE_H / 2;
@@ -387,6 +415,7 @@ function ScriptureBlankTaskInner({ config, onSuccess, onFail, areaW, areaH }) {
         return (
           <Animated.View
             key={tilePool[i].id}
+            pointerEvents={isPlaced ? 'none' : 'auto'}
             style={[
               styles.tile,
               {

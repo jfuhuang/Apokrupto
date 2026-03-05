@@ -134,14 +134,15 @@ function BuildTaskInner({ config, onSuccess, taskId, areaW, areaH }) {
           });
 
           if (bestSlot >= 0 && bestDist <= snapTolerance) {
+            // Mark occupied immediately to prevent race conditions with simultaneous drags
+            occupiedRef.current = new Set([...occupiedRef.current, bestSlot]);
+            placedRef.current   = new Set([...placedRef.current, i]);
             // Snap into slot
             Animated.spring(pan, {
               toValue: { x: slots[bestSlot].x, y: slots[bestSlot].y },
               friction: 6,
               useNativeDriver: false,
             }).start(() => {
-              occupiedRef.current = new Set([...occupiedRef.current, bestSlot]);
-              placedRef.current   = new Set([...placedRef.current, i]);
               setPlacedCount(prev => {
                 const next = prev + 1;
                 if (next === brickCount && !doneRef.current) {

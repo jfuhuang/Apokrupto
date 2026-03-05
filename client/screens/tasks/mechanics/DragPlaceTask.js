@@ -13,8 +13,8 @@ import { colors } from '../../../theme/colors';
 import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
 
-const DRAG_SIZE   = 80;
-const TARGET_SIZE = 90;
+const MAX_DRAG_SIZE   = 80;
+const MAX_TARGET_SIZE = 90;
 
 // ── Task-specific hint text ──────────────────────────────────────────────
 
@@ -26,9 +26,9 @@ const TASK_HINTS = {
 
 // ── Lamp on Lampstand ────────────────────────────────────────────────────
 
-function LampstandSvg({ snapped }) {
+function LampstandSvg({ snapped, size = MAX_TARGET_SIZE }) {
   return (
-    <Svg width={TARGET_SIZE} height={TARGET_SIZE} viewBox="0 0 90 90">
+    <Svg width={size} height={size} viewBox="0 0 90 90">
       {/* Glow when shade is placed */}
       {snapped && (
         <G>
@@ -58,9 +58,9 @@ function LampstandSvg({ snapped }) {
   );
 }
 
-function LampSvg() {
+function LampSvg({ size = MAX_DRAG_SIZE }) {
   return (
-    <Svg width={DRAG_SIZE} height={DRAG_SIZE} viewBox="0 0 80 80">
+    <Svg width={size} height={size} viewBox="0 0 80 80">
       {/* Finial / top knob */}
       <Circle cx="40" cy="11" r="5" fill="#8B6914" />
       {/* Top rim */}
@@ -83,9 +83,9 @@ function LampSvg() {
 
 // ── Ark of the Covenant ──────────────────────────────────────────────────
 
-function ArkTargetSvg() {
+function ArkTargetSvg({ size = MAX_TARGET_SIZE }) {
   return (
-    <Svg width={TARGET_SIZE} height={TARGET_SIZE} viewBox="0 0 90 90">
+    <Svg width={size} height={size} viewBox="0 0 90 90">
       {/* Top curtain rod */}
       <Rect x="0" y="4" width="90" height="5" rx="2" fill="#C09030" />
       {/* Left curtain panel */}
@@ -111,9 +111,9 @@ function ArkTargetSvg() {
   );
 }
 
-function ArkDraggableSvg() {
+function ArkDraggableSvg({ size = MAX_DRAG_SIZE }) {
   return (
-    <Svg width={DRAG_SIZE} height={DRAG_SIZE} viewBox="0 0 80 80">
+    <Svg width={size} height={size} viewBox="0 0 80 80">
       {/* Main chest body */}
       <Rect x="10" y="30" width="60" height="36" rx="4" fill="#C09030" />
       {/* Body decorative overlay */}
@@ -137,9 +137,9 @@ function ArkDraggableSvg() {
 
 // ── Solomon's Temple ─────────────────────────────────────────────────────
 
-function TempleTargetSvg() {
+function TempleTargetSvg({ size = MAX_TARGET_SIZE }) {
   return (
-    <Svg width={TARGET_SIZE} height={TARGET_SIZE} viewBox="0 0 90 90">
+    <Svg width={size} height={size} viewBox="0 0 90 90">
       {/* Pediment / triangular roof */}
       <Polygon points="8,30 45,5 82,30" fill="#C09030" />
       {/* Entablature beam */}
@@ -166,9 +166,9 @@ function TempleTargetSvg() {
   );
 }
 
-function VesselSvg() {
+function VesselSvg({ size = MAX_DRAG_SIZE }) {
   return (
-    <Svg width={DRAG_SIZE} height={DRAG_SIZE} viewBox="0 0 80 80">
+    <Svg width={size} height={size} viewBox="0 0 80 80">
       {/* Foot base */}
       <Ellipse cx="40" cy="74" rx="16" ry="5" fill="#C09030" />
       {/* Pedestal stem */}
@@ -217,11 +217,13 @@ export default function DragPlaceTask({ config, onSuccess, onFail, taskId }) {
     setLayout(l);
   };
 
-  // Positions computed relative to the container, not the window
+  // Responsive sizes — cap at originals, scale down on small containers
   const cW = layout?.width || 300;
   const cH = layout?.height || 250;
+  const dragSize   = Math.min(MAX_DRAG_SIZE,   Math.floor(cW * 0.22));
+  const targetSize = Math.min(MAX_TARGET_SIZE, Math.round(dragSize * (MAX_TARGET_SIZE / MAX_DRAG_SIZE)));
 
-  const targetX = cW / 2 - TARGET_SIZE / 2;
+  const targetX = cW / 2 - targetSize / 2;
   const targetY = cH * 0.45;
   const startX = cW * 0.12;
   const startY = cH * 0.08;
@@ -229,11 +231,13 @@ export default function DragPlaceTask({ config, onSuccess, onFail, taskId }) {
   // Helper to compute positions from latest layout (avoids stale closures in PanResponder)
   const getPositions = () => {
     const l = layoutRef.current || { width: 300, height: 250 };
-    const tx = l.width / 2 - TARGET_SIZE / 2;
+    const dSize = Math.min(MAX_DRAG_SIZE,   Math.floor(l.width * 0.22));
+    const tSize = Math.min(MAX_TARGET_SIZE, Math.round(dSize * (MAX_TARGET_SIZE / MAX_DRAG_SIZE)));
+    const tx = l.width / 2 - tSize / 2;
     const ty = l.height * 0.45;
     const sx = l.width * 0.12;
     const sy = l.height * 0.08;
-    return { tx, ty, sx, sy };
+    return { tx, ty, sx, sy, dragSize: dSize, targetSize: tSize };
   };
 
   const panResponder = useRef(
@@ -244,16 +248,16 @@ export default function DragPlaceTask({ config, onSuccess, onFail, taskId }) {
         { useNativeDriver: false }
       ),
       onPanResponderRelease: (_, gesture) => {
-        const { tx, ty, sx, sy } = getPositions();
-        const cx = sx + gesture.dx + DRAG_SIZE / 2;
-        const cy = sy + gesture.dy + DRAG_SIZE / 2;
-        const tcx = tx + TARGET_SIZE / 2;
-        const tcy = ty + TARGET_SIZE / 2;
+        const { tx, ty, sx, sy, dragSize: dSize, targetSize: tSize } = getPositions();
+        const cx = sx + gesture.dx + dSize / 2;
+        const cy = sy + gesture.dy + dSize / 2;
+        const tcx = tx + tSize / 2;
+        const tcy = ty + tSize / 2;
         const dist = Math.sqrt((cx - tcx) ** 2 + (cy - tcy) ** 2);
 
         if (dist <= snapTolerance) {
-          const snapX = tx + TARGET_SIZE / 2 - DRAG_SIZE / 2;
-          const snapY = ty + TARGET_SIZE / 2 - DRAG_SIZE / 2;
+          const snapX = tx + tSize / 2 - dSize / 2;
+          const snapY = ty + tSize / 2 - dSize / 2;
           snappedRef.current = true;
           Animated.spring(pan, {
             toValue: { x: snapX - sx, y: snapY - sy },
@@ -278,17 +282,17 @@ export default function DragPlaceTask({ config, onSuccess, onFail, taskId }) {
 
   const renderTarget = () => {
     switch (taskId) {
-      case 'ark_of_covenant': return <ArkTargetSvg />;
-      case 'solomons_temple': return <TempleTargetSvg />;
-      default:                return <LampstandSvg snapped={snapped} />;
+      case 'ark_of_covenant': return <ArkTargetSvg size={targetSize} />;
+      case 'solomons_temple': return <TempleTargetSvg size={targetSize} />;
+      default:                return <LampstandSvg snapped={snapped} size={targetSize} />;
     }
   };
 
   const renderDraggable = () => {
     switch (taskId) {
-      case 'ark_of_covenant': return <ArkDraggableSvg />;
-      case 'solomons_temple': return <VesselSvg />;
-      default:                return <LampSvg />;
+      case 'ark_of_covenant': return <ArkDraggableSvg size={dragSize} />;
+      case 'solomons_temple': return <VesselSvg size={dragSize} />;
+      default:                return <LampSvg size={dragSize} />;
     }
   };
 
@@ -301,13 +305,13 @@ export default function DragPlaceTask({ config, onSuccess, onFail, taskId }) {
       {layout && (
         <>
           {/* Target zone */}
-          <View style={[styles.target, { left: targetX, top: targetY }]}>
+          <View style={[styles.target, { left: targetX, top: targetY, width: targetSize, height: targetSize }]}>
             {renderTarget()}
           </View>
 
           {/* Draggable object */}
           <Animated.View
-            style={[styles.draggable, { left: startX, top: startY }, { transform: pan.getTranslateTransform() }]}
+            style={[styles.draggable, { left: startX, top: startY, width: dragSize, height: dragSize }, { transform: pan.getTranslateTransform() }]}
             {...panResponder.panHandlers}
           >
             {renderDraggable()}
@@ -328,13 +332,9 @@ const styles = StyleSheet.create({
   },
   target: {
     position: 'absolute',
-    width: TARGET_SIZE,
-    height: TARGET_SIZE,
   },
   draggable: {
     position: 'absolute',
-    width: DRAG_SIZE,
-    height: DRAG_SIZE,
     justifyContent: 'center',
     alignItems: 'center',
   },
