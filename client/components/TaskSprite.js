@@ -20,8 +20,8 @@
  * manna_wilderness       manna_wilderness             Decorated clay storage jar
  * walls_of_jericho       walls_of_jericho             Crumbling crenellated wall
  * ark_of_covenant        ark_of_covenant              Ornate chest with carrying poles and wings
- * gideons_torch          gideons_torch                Torch inside a clay jar (half-broken)
- * fiery_furnace          fiery_furnace                Domed furnace with three figures in flames
+ * gideons_torch          gideons_torch                Cracked clay jar with torch erupting in layered flame
+ * fiery_furnace          fiery_furnace                Stone-brick kiln with arch opening, three figures in flames erupting from top
  * solomons_temple        solomons_temple              Temple columned facade with pediment
  * water_from_rock        water_from_rock              Jagged rock with water gushing from crack
  * the_lost_sheep         the_lost_sheep               Figure carrying sheep across shoulders
@@ -35,7 +35,7 @@
  * bucket                 jonah_storm (via TASK_SPRITE) Wooden water bucket with handle — bail task
  *
  * still_waters           still_waters                 Calm oval lake with concentric ripples
- * be_still               be_still                     Two open upturned palms — peace
+ * be_still               be_still                     Two open upturned palms side by side with peace rays rising above
  * wait_on_the_lord       wait_on_the_lord             Eagle silhouette gliding on thermals
  *
  * _fallback              (any unknown key)            Bold question mark placeholder
@@ -197,29 +197,79 @@ const SPRITES = {
     </G>
   ),
 
-  // Burning torch held inside a clay jar, jar visibly cracked // AI-generated
+  // Burning torch erupting from a cracked clay jar — Gideon's army // AI-generated
   gideons_torch: (c) => (
     <G>
-      <Path d="M10 28 Q9 22 10 17 L22 17 Q23 22 22 28Z" fill={c} opacity="0.85" />
-      <Ellipse cx="16" cy="17" rx="6" ry="2.5" fill={c} />
-      <Ellipse cx="16" cy="28" rx="6" ry="2.5" fill={c} opacity="0.8" />
-      <Line x1="10" y1="21" x2="22" y2="21" stroke={BG} strokeWidth="0.8" />
-      <Path d="M18 17 L21 10 L24 28" stroke={BG} strokeWidth="1.5" fill="none" />
-      <Line x1="16" y1="17" x2="16" y2="5"  stroke={c} strokeWidth="2" />
-      <Path d="M16 5 C13 2 12 0 15 0 C15 3 17 3 16 0 C18 3 20 2 17 5Z" fill={FIRE} />
+      {/* Flame outer glow */}
+      <Ellipse cx="16" cy="8" rx="6" ry="7" fill={FIRE} opacity="0.15" />
+      {/* Outer flame */}
+      <Path d="M12 12 C9 8 10 3 13 1 C12 4 14 4 13 1 C14 3 16 2 15 0 C16 3 18 2 17 0 C18 3 20 4 19 1 C22 3 23 8 20 12Z" fill={FIRE} />
+      {/* Mid flame */}
+      <Path d="M13 12 C11 9 12 5 15 3 C17 5 18 9 17 12Z" fill={FIRE} opacity="0.85" />
+      {/* White-hot inner core */}
+      <Path d="M14.5 12 C13.5 9 14.5 6 16 4 C17.5 6 18.5 9 17.5 12Z" fill={OUT} opacity="0.60" />
+      {/* Torch handle — wood shaft visible above jar rim */}
+      <Rect x="14.5" y="11" width="3" height="6" rx="1.5" fill="#7A4E1A" />
+      <Line x1="15" y1="13" x2="17" y2="13" stroke="#A06828" strokeWidth="0.8" opacity="0.5" />
+      {/* Jar rim */}
+      <Ellipse cx="16" cy="14" rx="6.5" ry="2.5" fill={c} />
+      {/* Jar neck */}
+      <Rect x="11.5" y="14" width="9" height="3" rx="0" fill={c} opacity="0.95" />
+      {/* Jar body */}
+      <Path d="M11 17 Q8 20 8.5 24 Q9 29 16 30 Q23 29 23.5 24 Q24 20 21 17Z" fill={c} opacity="0.92" />
+      {/* Jar base */}
+      <Ellipse cx="16" cy="30" rx="6.5" ry="2" fill={c} opacity="0.75" />
+      {/* Jar highlight — left-edge sheen */}
+      <Path d="M9.5 18 Q8.5 22 9 26" stroke={OUT} strokeWidth="1.5" fill="none" opacity="0.18" strokeLinecap="round" />
+      {/* Main crack */}
+      <Path d="M20 18 L22 23 L19 27" stroke={BG} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Secondary hairline crack */}
+      <Path d="M19 27 L21 30" stroke={BG} strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.6" />
+      {/* Orange glow leaking through crack */}
+      <Path d="M20 19 L22 23 L19 26" stroke={FIRE} strokeWidth="0.9" fill="none" opacity="0.55" strokeLinecap="round" />
+      {/* Jar band detail */}
+      <Line x1="11" y1="20" x2="21" y2="20" stroke={BG} strokeWidth="0.8" opacity="0.5" />
+      <Line x1="10" y1="24" x2="22" y2="24" stroke={BG} strokeWidth="0.8" opacity="0.4" />
     </G>
   ),
 
-  // Domed kiln furnace with three standing figures silhouetted in flame // AI-generated
+  // Domed stone furnace with three silhouetted figures standing in the flames // AI-generated
   fiery_furnace: (c) => (
     <G>
-      <Path d="M4 28 L4 16 Q4 7 16 7 Q28 7 28 16 L28 28Z" fill={c} />
-      <Path d="M10 28 L10 18 Q10 13 16 13 Q22 13 22 18 L22 28Z" fill={BG} />
-      <Path d="M16 28 C13 23 12 19 14 16 C14 19 16 19 15 16 C16 18 18 18 17 16 C19 19 20 23 16 28Z" fill={FIRE} />
-      <Path d="M16 26 C15 23 15 20 16 18 C17 20 17 23 16 26Z" fill={OUT} opacity="0.5" />
-      <Line x1="11" y1="7" x2="9"  y2="3" stroke={c} strokeWidth="2" strokeLinecap="round" />
-      <Line x1="16" y1="7" x2="16" y2="3" stroke={c} strokeWidth="2" strokeLinecap="round" />
-      <Line x1="21" y1="7" x2="23" y2="3" stroke={c} strokeWidth="2" strokeLinecap="round" />
+      {/* Outer glow emanating from furnace */}
+      <Ellipse cx="16" cy="17" rx="14" ry="13" fill={FIRE} opacity="0.10" />
+      {/* Furnace body — barrel-arched kiln */}
+      <Path d="M3 31 L3 15 Q3 5 16 5 Q29 5 29 15 L29 31Z" fill={c} />
+      {/* Stone block / brick rows */}
+      <Line x1="3"  y1="19" x2="29" y2="19" stroke={BG} strokeWidth="0.75" opacity="0.45" />
+      <Line x1="3"  y1="23" x2="29" y2="23" stroke={BG} strokeWidth="0.75" opacity="0.45" />
+      <Line x1="3"  y1="27" x2="29" y2="27" stroke={BG} strokeWidth="0.75" opacity="0.45" />
+      {/* Staggered vertical joints */}
+      <Line x1="10" y1="19" x2="10" y2="23" stroke={BG} strokeWidth="0.65" opacity="0.35" />
+      <Line x1="22" y1="19" x2="22" y2="23" stroke={BG} strokeWidth="0.65" opacity="0.35" />
+      <Line x1="7"  y1="23" x2="7"  y2="27" stroke={BG} strokeWidth="0.65" opacity="0.35" />
+      <Line x1="19" y1="23" x2="19" y2="27" stroke={BG} strokeWidth="0.65" opacity="0.35" />
+      <Line x1="14" y1="27" x2="14" y2="31" stroke={BG} strokeWidth="0.65" opacity="0.35" />
+      <Line x1="24" y1="27" x2="24" y2="31" stroke={BG} strokeWidth="0.65" opacity="0.35" />
+      {/* Arch opening — fiery interior */}
+      <Path d="M7 31 L7 21 Q7 13 16 13 Q25 13 25 21 L25 31Z" fill={FIRE} opacity="0.80" />
+      {/* Interior glow — brighter center hot-spot */}
+      <Path d="M10 31 L10 23 Q10 18 16 18 Q22 18 22 23 L22 31Z" fill={FIRE} opacity="0.55" />
+      <Ellipse cx="16" cy="21" rx="5" ry="4" fill={OUT} opacity="0.18" />
+      {/* Three figures silhouetted inside */}
+      {/* Figure 1 — left */}
+      <Rect   x="9"    y="22" width="3"   height="9"  rx="1.5" fill={BG} opacity="0.72" />
+      <Circle cx="10.5" cy="21" r="2.2"                        fill={BG} opacity="0.72" />
+      {/* Figure 2 — center, slightly taller (the fourth?) */}
+      <Rect   x="14.5" y="20" width="3"   height="11" rx="1.5" fill={BG} opacity="0.80" />
+      <Circle cx="16"   cy="19" r="2.4"                        fill={BG} opacity="0.80" />
+      {/* Figure 3 — right */}
+      <Rect   x="20"   y="22" width="3"   height="9"  rx="1.5" fill={BG} opacity="0.72" />
+      <Circle cx="21.5" cy="21" r="2.2"                        fill={BG} opacity="0.72" />
+      {/* Flames erupting from furnace top — multi-layer */}
+      <Path d="M9 5 C7 1 8 0 10 0 C9 3 11 2 10 0 C11 2 13 1 12 0 C13 2 15 1 14 0 C15 3 17 2 16 0 C17 3 19 2 18 0 C19 2 21 2 20 0 C21 2 23 1 22 0 C24 2 25 1 23 5Z" fill={FIRE} />
+      {/* Inner flame highlight running up through the eruption */}
+      <Path d="M11 5 C10 2 12 1 12 0 C13 2 15 1 14 0 C15 3 17 2 16 0 C17 3 19 2 18 0 C19 2 21 2 21 5Z" fill={OUT} opacity="0.35" />
     </G>
   ),
 
@@ -458,20 +508,56 @@ const SPRITES = {
     </G>
   ),
 
-  // Two upturned open palms — a gesture of peaceful surrender // AI-generated
+  // Two open upturned palms side by side — peaceful offering gesture // AI-generated
   be_still: (c) => (
     <G>
+      {/* === Left hand === */}
+      {/* Palm + four fingers */}
       <Path
-        d="M5 20 Q4 16 5 13 Q6 11 8 11 L9 18
-           Q11 15 11 11 Q12 9 14 10 L14 18
-           Q15 14 15 10 Q16 8 18 9 L18 17
-           Q19 13 20 10 Q21 9 23 10 L22 18
-           Q24 14 25 12 Q26 11 27 12 Q28 14 27 18
-           Q26 22 22 24 L10 24 Q6 23 5 20Z"
+        d="M2 23 Q1 19 2 16 Q3 14 5 14 L5 20
+           Q6 17 6 14 Q7 12 9 13 L9 20
+           Q10 16 10 13 Q11 11 12 12 L12 20
+           Q13 16 14 14 Q15 13 16 14 L15 21
+           Q15 23 13 26 Q9 27 5 26 Q2 25 2 23Z"
         fill={c}
       />
-      <Path d="M10 24 Q8 27 9 30 L23 30 Q24 27 22 24Z" fill={c} opacity="0.7" />
-      <Line x1="10" y1="24" x2="22" y2="24" stroke={BG} strokeWidth="1" />
+      {/* Left thumb */}
+      <Path d="M2 22 Q0 20 1 17 Q2 16 3 17 L3 22Z" fill={c} opacity="0.85" />
+      {/* Finger dividers */}
+      <Line x1="5"  y1="20" x2="5"  y2="26" stroke={BG} strokeWidth="0.85" opacity="0.4" />
+      <Line x1="9"  y1="20" x2="9"  y2="27" stroke={BG} strokeWidth="0.85" opacity="0.4" />
+      <Line x1="12" y1="20" x2="12" y2="27" stroke={BG} strokeWidth="0.85" opacity="0.4" />
+      {/* Palm crease */}
+      <Path d="M3 23 Q8 25 14 22" stroke={BG} strokeWidth="0.7" fill="none" opacity="0.30" />
+      {/* Palm highlight sheen */}
+      <Ellipse cx="8" cy="22" rx="3.5" ry="1.5" fill={OUT} opacity="0.13" />
+
+      {/* === Right hand (mirrored) === */}
+      <Path
+        d="M30 23 Q31 19 30 16 Q29 14 27 14 L27 20
+           Q26 17 26 14 Q25 12 23 13 L23 20
+           Q22 16 22 13 Q21 11 20 12 L20 20
+           Q19 16 18 14 Q17 13 16 14 L17 21
+           Q17 23 19 26 Q23 27 27 26 Q30 25 30 23Z"
+        fill={c}
+      />
+      {/* Right thumb */}
+      <Path d="M30 22 Q32 20 31 17 Q30 16 29 17 L29 22Z" fill={c} opacity="0.85" />
+      {/* Finger dividers */}
+      <Line x1="27" y1="20" x2="27" y2="26" stroke={BG} strokeWidth="0.85" opacity="0.4" />
+      <Line x1="23" y1="20" x2="23" y2="27" stroke={BG} strokeWidth="0.85" opacity="0.4" />
+      <Line x1="20" y1="20" x2="20" y2="27" stroke={BG} strokeWidth="0.85" opacity="0.4" />
+      {/* Palm crease */}
+      <Path d="M29 23 Q24 25 18 22" stroke={BG} strokeWidth="0.7" fill="none" opacity="0.30" />
+      {/* Palm highlight sheen */}
+      <Ellipse cx="24" cy="22" rx="3.5" ry="1.5" fill={OUT} opacity="0.13" />
+
+      {/* Peace rays rising above the open hands */}
+      <Line x1="16" y1="12" x2="16" y2="6"  stroke={FIRE} strokeWidth="1.5" opacity="0.45" strokeLinecap="round" />
+      <Line x1="12" y1="13" x2="9"  y2="8"  stroke={FIRE} strokeWidth="1.2" opacity="0.35" strokeLinecap="round" />
+      <Line x1="20" y1="13" x2="23" y2="8"  stroke={FIRE} strokeWidth="1.2" opacity="0.35" strokeLinecap="round" />
+      <Line x1="9"  y1="15" x2="6"  y2="11" stroke={FIRE} strokeWidth="1"   opacity="0.22" strokeLinecap="round" />
+      <Line x1="23" y1="15" x2="26" y2="11" stroke={FIRE} strokeWidth="1"   opacity="0.22" strokeLinecap="round" />
     </G>
   ),
 
