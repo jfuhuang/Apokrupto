@@ -97,18 +97,40 @@ const SPRITES = {
     </G>
   ),
 
-  // Cloud-shaped fluffy sheep with a shepherd's crook beside it // AI-generated
+  // Fluffy sheep with shepherd's crook standing guard beside it // AI-generated
   protect_the_sheep: (c) => (
     <G>
-      <Circle cx="12" cy="18" r="4.5" fill={c} />
-      <Circle cx="18" cy="18" r="4.5" fill={c} />
-      <Circle cx="15" cy="15" r="3.5" fill={c} />
-      <Circle cx="15" cy="21" r="4.5" fill={c} />
-      <Circle cx="14" cy="13" r="2"   fill={c} />
-      <Circle cx="17" cy="12.5" r="1.5" fill={BG} opacity="0.5" />
-      <Line x1="11" y1="26" x2="11" y2="30" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
-      <Line x1="15" y1="26" x2="15" y2="30" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
+      {/* Shepherd crook — curved hook + long staff */}
       <Path d="M25 4 Q27 4 27 6 Q27 9 25 9 L25 15" stroke={c} strokeWidth="2" fill="none" strokeLinecap="round" />
+      {/* Sheep shadow */}
+      <Ellipse cx="14" cy="27" rx="9" ry="2" fill={c} opacity="0.15" />
+      {/* Sheep wool body — layered puffs */}
+      <Circle cx="10" cy="20" r="5.5" fill={OUT} opacity="0.88" />
+      <Circle cx="16" cy="20" r="5.5" fill={OUT} opacity="0.88" />
+      <Circle cx="13" cy="16" r="5"   fill={OUT} opacity="0.95" />
+      <Circle cx="9"  cy="17" r="4"   fill={OUT} opacity="0.82" />
+      <Circle cx="17" cy="17" r="4"   fill={OUT} opacity="0.82" />
+      {/* Wool top highlight */}
+      <Circle cx="13" cy="15" r="2.5" fill="#FFFFFF" opacity="0.30" />
+      {/* Legs */}
+      <Line x1="9"  y1="25" x2="8"  y2="30" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+      <Line x1="12" y1="26" x2="12" y2="30" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+      <Line x1="16" y1="26" x2="16" y2="30" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+      <Line x1="19" y1="25" x2="20" y2="30" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+      {/* Hooves */}
+      <Rect x="7"  y="29" width="2.5" height="2" rx="1" fill={c} opacity="0.7" />
+      <Rect x="11" y="29" width="2.5" height="2" rx="1" fill={c} opacity="0.7" />
+      <Rect x="15" y="29" width="2.5" height="2" rx="1" fill={c} opacity="0.7" />
+      <Rect x="19" y="29" width="2.5" height="2" rx="1" fill={c} opacity="0.7" />
+      {/* Head */}
+      <Ellipse cx="20" cy="16" rx="4.5" ry="4" fill={c} opacity="0.85" />
+      {/* Snout */}
+      <Ellipse cx="22" cy="18" rx="2.5" ry="2" fill={c} opacity="0.65" />
+      {/* Eye */}
+      <Circle cx="19.5" cy="14.5" r="1.2" fill={BG} />
+      <Circle cx="20"   cy="14"   r="0.5" fill="#FFF" opacity="0.6" />
+      {/* Ear */}
+      <Ellipse cx="17" cy="13" rx="2" ry="3" fill={c} opacity="0.7" transform="rotate(15, 17, 13)" />
     </G>
   ),
 
@@ -228,20 +250,38 @@ const SPRITES = {
     </G>
   ),
 
-  // Shepherd figure silhouette carrying a woolly sheep draped across shoulders // AI-generated
+  // Shepherd carrying a fluffy sheep across shoulders, with crook in hand // AI-generated
   the_lost_sheep: (c) => (
     <G>
-      <Circle cx="21" cy="5"  r="3"    fill={c} />
-      <Line   x1="21" y1="8"  x2="21" y2="17" stroke={c} strokeWidth="2.5" />
-      <Line   x1="21" y1="12" x2="16" y2="16" stroke={c} strokeWidth="2" />
-      <Line   x1="21" y1="17" x2="17" y2="23" stroke={c} strokeWidth="2" />
-      <Line   x1="21" y1="17" x2="25" y2="23" stroke={c} strokeWidth="2" />
-      <Circle cx="9"  cy="17" r="4.5" fill={c} opacity="0.9" />
-      <Circle cx="9"  cy="13" r="3"   fill={c} opacity="0.9" />
-      <Circle cx="13" cy="15" r="3.5" fill={c} opacity="0.8" />
-      <Circle cx="7"  cy="21" r="3"   fill={c} opacity="0.8" />
-      <Line   x1="7"  y1="24" x2="7"  y2="29" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
-      <Line   x1="11" y1="24" x2="11" y2="29" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
+      {/* Shepherd's crook — curved top, long shaft */}
+      <Path d="M6 30 L6 12 Q6 6 10 6 Q14 6 14 10 Q14 14 10 14" stroke={c} strokeWidth="2" fill="none" strokeLinecap="round" />
+      {/* Shepherd body — robe flowing shape */}
+      <Path d="M17 10 Q14 10 13 14 L11 30 L23 30 L21 14 Q20 10 17 10Z" fill={c} opacity="0.9" />
+      {/* Shepherd arm extending left to hold sheep */}
+      <Line x1="14" y1="15" x2="8" y2="16" stroke={c} strokeWidth="2" strokeLinecap="round" />
+      {/* Shepherd head */}
+      <Circle cx="17" cy="7" r="3.5" fill={c} />
+      {/* Head scarf drape */}
+      <Path d="M13.5 6 Q13 9 14 11" stroke={c} strokeWidth="1.5" fill="none" opacity="0.65" strokeLinecap="round" />
+      {/* ── Sheep draped across shoulders ── */}
+      {/* Sheep body wool — fluffy puffs */}
+      <Circle cx="21" cy="13" r="5"   fill={OUT} opacity="0.92" />
+      <Circle cx="26" cy="12" r="4.5" fill={OUT} opacity="0.88" />
+      <Circle cx="23" cy="10" r="4"   fill={OUT} opacity="0.95" />
+      <Circle cx="19" cy="11" r="3.5" fill={OUT} opacity="0.80" />
+      {/* Wool highlight */}
+      <Circle cx="23" cy="10" r="2"   fill="#FFFFFF" opacity="0.30" />
+      {/* Sheep head poking out right */}
+      <Ellipse cx="29" cy="11" rx="3.5" ry="3" fill={c} opacity="0.75" />
+      {/* Sheep eye */}
+      <Circle  cx="30" cy="10" r="0.9" fill={BG} />
+      {/* Sheep ear */}
+      <Ellipse cx="28" cy="8.5" rx="1.5" ry="2" fill={c} opacity="0.65" transform="rotate(-15, 28, 8.5)" />
+      {/* Sheep dangling legs over shoulder */}
+      <Line x1="19" y1="17" x2="17" y2="22" stroke={c} strokeWidth="1.5" opacity="0.7" strokeLinecap="round" />
+      <Line x1="22" y1="18" x2="21" y2="22" stroke={c} strokeWidth="1.5" opacity="0.7" strokeLinecap="round" />
+      {/* Ground shadow */}
+      <Ellipse cx="17" cy="31" rx="7" ry="1.5" fill={c} opacity="0.18" />
     </G>
   ),
 

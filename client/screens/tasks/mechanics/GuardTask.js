@@ -15,6 +15,10 @@ import Svg, {
   Line,
   Path,
   G,
+  Defs,
+  RadialGradient,
+  LinearGradient,
+  Stop,
 } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
 import TaskContainer from '../../../components/TaskContainer';
@@ -122,40 +126,211 @@ function SoldierSvg() {
   );
 }
 
-// ── Sheep pen SVG (static background) ────────────────────────────────────
+// ── Detailed sheep SVG component (reusable) ───────────────────────────────
+
+// A single detailed sheep at position (cx, cy) with a given scale.
+// Facing right by default. flipX=true mirrors it.
+function SheepSvg({ cx, cy, scale = 1, flipX = false }) {
+  const sx = flipX ? -scale : scale;
+  // Body: layered wool puffs + legs + head
+  return (
+    <G transform={`translate(${cx}, ${cy}) scale(${sx}, ${scale})`}>
+      {/* Shadow beneath sheep */}
+      <Ellipse cx="0" cy="16" rx="22" ry="5" fill="#000" opacity="0.22" />
+      {/* Back leg pair */}
+      <Rect x="-12" y="8"  width="5" height="12" rx="2.5" fill="#C8C0A8" />
+      <Rect x="-6"  y="8"  width="5" height="12" rx="2.5" fill="#C8C0A8" />
+      {/* Front leg pair */}
+      <Rect x="4"   y="8"  width="5" height="12" rx="2.5" fill="#C8C0A8" />
+      <Rect x="10"  y="8"  width="5" height="12" rx="2.5" fill="#C8C0A8" />
+      {/* Hooves */}
+      <Rect x="-12" y="18" width="5" height="4"  rx="2"   fill="#6B5B3E" />
+      <Rect x="-6"  y="18" width="5" height="4"  rx="2"   fill="#6B5B3E" />
+      <Rect x="4"   y="18" width="5" height="4"  rx="2"   fill="#6B5B3E" />
+      <Rect x="10"  y="18" width="5" height="4"  rx="2"   fill="#6B5B3E" />
+      {/* Main wool body — layered fluffy puffs */}
+      <Ellipse cx="0"   cy="4"  rx="18" ry="12" fill="#F2F0E8" />
+      <Circle  cx="-12" cy="3"  r="9"            fill="#ECEAE2" />
+      <Circle  cx="0"   cy="-3" r="10"           fill="#F5F3EC" />
+      <Circle  cx="13"  cy="2"  r="9"            fill="#ECEAE2" />
+      <Circle  cx="-6"  cy="7"  r="9"            fill="#F2F0E8" />
+      <Circle  cx="7"   cy="6"  r="9"            fill="#ECEAE2" />
+      {/* Wool highlight — top sheen */}
+      <Ellipse cx="0"   cy="-4" rx="10" ry="5" fill="#FAFAF5" opacity="0.55" />
+      {/* Neck */}
+      <Ellipse cx="16" cy="2" rx="6" ry="8" fill="#D8D4C4" />
+      {/* Head */}
+      <Ellipse cx="22" cy="-2" rx="8" ry="7" fill="#D8D4C4" />
+      {/* Face details */}
+      {/* Snout */}
+      <Ellipse cx="27" cy="1"  rx="4.5" ry="3.5" fill="#C8C0A8" />
+      {/* Nostril dots */}
+      <Circle cx="26" cy="2"   r="1"   fill="#9A8878" />
+      <Circle cx="29" cy="2"   r="1"   fill="#9A8878" />
+      {/* Eye */}
+      <Circle cx="22" cy="-5"  r="2.5" fill="#2A2010" />
+      <Circle cx="23" cy="-6"  r="0.9" fill="#FFF"    opacity="0.7" />
+      {/* Ear */}
+      <Ellipse cx="16" cy="-7" rx="3" ry="4.5" fill="#C8C0A8" transform="rotate(-20, 16, -7)" />
+      <Ellipse cx="16" cy="-7" rx="1.5" ry="2.5" fill="#E8BABA" opacity="0.6" transform="rotate(-20, 16, -7)" />
+      {/* Small tail nub */}
+      <Circle cx="-19" cy="3" r="4" fill="#ECEAE2" />
+    </G>
+  );
+}
+
+// ── Sheep pen SVG (full atmospheric nighttime pastoral scene) ─────────────
+
+// Star positions for pasture sky (fraction of width × height in sky band)
+const SHEEP_STARS = [
+  [0.04, 0.03], [0.13, 0.01], [0.24, 0.07], [0.36, 0.02], [0.50, 0.05],
+  [0.62, 0.01], [0.73, 0.08], [0.84, 0.03], [0.94, 0.06],
+  [0.09, 0.14], [0.31, 0.12], [0.52, 0.16], [0.71, 0.11], [0.88, 0.17],
+  [0.18, 0.22], [0.43, 0.20], [0.65, 0.24], [0.82, 0.19],
+];
 
 function SheepPenBg({ areaH }) {
-  const penTop    = areaH * 0.32;
-  const penBottom = areaH * 0.52;
-  const postCount = Math.ceil(W / 35);
+  const skyBottom = areaH * 0.42;   // where sky transitions to ground
+  const groundY   = areaH * 0.55;   // base of hills / ground
+  const penY      = areaH * 0.44;   // fence sits here
+  const postCount = Math.ceil(W / 42) + 1;
+  const moonX     = W * 0.82;
+  const moonY     = areaH * 0.10;
 
   return (
-    <Svg
-      style={StyleSheet.absoluteFill}
-      pointerEvents="none"
-    >
-      {/* Green pasture */}
-      <Rect x="0" y={penTop} width={W} height={penBottom - penTop} fill="#1A3A1A" opacity="0.6" />
-      {/* Fence posts */}
-      {Array.from({ length: postCount }).map((_, i) => (
-        <Rect key={i} x={i * 35} y={penTop - 14} width="6" height={28} rx="2" fill="#8B6914" />
+    <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Defs>
+        {/* Sky gradient — deep indigo to near-black */}
+        <LinearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#06051A" stopOpacity="1" />
+          <Stop offset="0.6" stopColor="#0B0D2B" stopOpacity="1" />
+          <Stop offset="1" stopColor="#121834" stopOpacity="1" />
+        </LinearGradient>
+        {/* Pasture ground gradient */}
+        <LinearGradient id="groundGrad" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#102A12" stopOpacity="1" />
+          <Stop offset="1" stopColor="#091507" stopOpacity="1" />
+        </LinearGradient>
+        {/* Moon glow radial */}
+        <RadialGradient id="moonGlow" cx="50%" cy="50%" r="50%">
+          <Stop offset="0"   stopColor="#FEFDE0" stopOpacity="0.22" />
+          <Stop offset="0.5" stopColor="#D4D090" stopOpacity="0.08" />
+          <Stop offset="1"   stopColor="#888870" stopOpacity="0"    />
+        </RadialGradient>
+        {/* Grass highlight */}
+        <LinearGradient id="grassSheen" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#2A5C2A" stopOpacity="0.55" />
+          <Stop offset="1" stopColor="#0A1A0A" stopOpacity="0"    />
+        </LinearGradient>
+      </Defs>
+
+      {/* ── Sky ── */}
+      <Rect x="0" y="0" width={W} height={skyBottom} fill="url(#skyGrad)" />
+
+      {/* Stars */}
+      {SHEEP_STARS.map(([fx, fy], i) => (
+        <Circle
+          key={i}
+          cx={W * fx}
+          cy={areaH * 0.30 * fy}
+          r={i % 4 === 0 ? 1.6 : 1.0}
+          fill="#FFFFFF"
+          opacity={0.30 + (i % 5) * 0.12}
+        />
       ))}
-      {/* Two horizontal rails */}
-      <Line x1="0" y1={penTop + 4}  x2={W} y2={penTop + 4}  stroke="#8B6914" strokeWidth="3" />
-      <Line x1="0" y1={penTop + 12} x2={W} y2={penTop + 12} stroke="#8B6914" strokeWidth="2" />
-      {/* Fluffy sheep inside pen */}
-      {/* Sheep 1 */}
-      <Circle cx={W * 0.25}      cy={penTop + 28} r="14" fill="#E8E8E8" />
-      <Circle cx={W * 0.25 + 10} cy={penTop + 28} r="14" fill="#E8E8E8" />
-      <Circle cx={W * 0.25 + 5}  cy={penTop + 16} r="11" fill="#E8E8E8" />
-      <Ellipse cx={W * 0.25 + 17} cy={penTop + 12} rx="7" ry="6" fill="#DCDCDC" />
-      <Circle  cx={W * 0.25 + 20} cy={penTop + 9}  r="1.5" fill="#555" />
-      {/* Sheep 2 */}
-      <Circle cx={W * 0.65}      cy={penTop + 28} r="14" fill="#E8E8E8" />
-      <Circle cx={W * 0.65 + 10} cy={penTop + 28} r="14" fill="#E8E8E8" />
-      <Circle cx={W * 0.65 + 5}  cy={penTop + 16} r="11" fill="#E8E8E8" />
-      <Ellipse cx={W * 0.65 + 17} cy={penTop + 12} rx="7" ry="6" fill="#DCDCDC" />
-      <Circle  cx={W * 0.65 + 20} cy={penTop + 9}  r="1.5" fill="#555" />
+
+      {/* Moon glow halo */}
+      <Circle cx={moonX} cy={moonY} r={55} fill="url(#moonGlow)" />
+      {/* Moon disc */}
+      <Circle cx={moonX} cy={moonY} r={16} fill="#FEFDE4" opacity="0.92" />
+      {/* Moon craters — subtle */}
+      <Circle cx={moonX - 5} cy={moonY + 4} r="3.5" fill="#E8E4C0" opacity="0.45" />
+      <Circle cx={moonX + 6} cy={moonY - 5} r="2.5" fill="#E8E4C0" opacity="0.35" />
+      <Circle cx={moonX + 2} cy={moonY + 7} r="2"   fill="#E8E4C0" opacity="0.30" />
+
+      {/* ── Rolling hills silhouette ── */}
+      <Path
+        d={`M0 ${skyBottom}
+            Q${W * 0.15} ${skyBottom - 28} ${W * 0.30} ${skyBottom - 8}
+            Q${W * 0.45} ${skyBottom + 10} ${W * 0.60} ${skyBottom - 20}
+            Q${W * 0.75} ${skyBottom - 35} ${W * 0.88} ${skyBottom - 12}
+            Q${W * 0.95} ${skyBottom - 4}  ${W} ${skyBottom}
+            L${W} ${groundY} L0 ${groundY} Z`}
+        fill="#122A14"
+      />
+      <Path
+        d={`M0 ${skyBottom + 8}
+            Q${W * 0.20} ${skyBottom - 10} ${W * 0.38} ${skyBottom + 4}
+            Q${W * 0.55} ${skyBottom + 18} ${W * 0.72} ${skyBottom - 6}
+            Q${W * 0.85} ${skyBottom - 18} ${W} ${skyBottom + 2}
+            L${W} ${groundY} L0 ${groundY} Z`}
+        fill="#0E2010"
+      />
+
+      {/* ── Ground / Pasture ── */}
+      <Rect x="0" y={groundY} width={W} height={areaH - groundY} fill="url(#groundGrad)" />
+
+      {/* Grass sheen strip at ground line */}
+      <Rect x="0" y={groundY - 10} width={W} height={22} fill="url(#grassSheen)" />
+
+      {/* Grass tufts — subtle texture */}
+      {[0.06, 0.14, 0.28, 0.38, 0.52, 0.61, 0.74, 0.85, 0.93].map((fx, i) => (
+        <G key={i}>
+          <Path d={`M${W * fx} ${groundY + 2} Q${W * fx - 4} ${groundY - 7} ${W * fx - 2} ${groundY + 2}`}
+                stroke="#2A5C2A" strokeWidth="1.5" fill="none" opacity="0.6" />
+          <Path d={`M${W * fx + 5} ${groundY + 2} Q${W * fx + 7} ${groundY - 9} ${W * fx + 9} ${groundY + 2}`}
+                stroke="#204820" strokeWidth="1.5" fill="none" opacity="0.5" />
+        </G>
+      ))}
+
+      {/* ── Fence ── */}
+      {/* Shadow beneath fence */}
+      <Ellipse cx={W / 2} cy={penY + 12} rx={W * 0.52} ry="5" fill="#000" opacity="0.18" />
+
+      {/* Fence posts — rounded tops, wood grain implied by two-tone */}
+      {Array.from({ length: postCount }).map((_, i) => {
+        const px = i * 42 - 6;
+        return (
+          <G key={i}>
+            {/* Post shadow */}
+            <Rect x={px + 3} y={penY - 22} width="7" height="38" rx="3" fill="#000" opacity="0.25" />
+            {/* Post body — light wood */}
+            <Rect x={px}     y={penY - 24} width="7" height="38" rx="3" fill="#A07830" />
+            {/* Post highlight — left edge */}
+            <Rect x={px}     y={penY - 24} width="2" height="38" rx="1" fill="#C8A050" opacity="0.6" />
+            {/* Post dark grain */}
+            <Line x1={px + 4} y1={penY - 18} x2={px + 4} y2={penY + 12} stroke="#7A5820" strokeWidth="1" opacity="0.4" />
+            {/* Rounded cap */}
+            <Circle cx={px + 3.5} cy={penY - 24} r="3.5" fill="#A07830" />
+            <Circle cx={px + 3.5} cy={penY - 24} r="1.5" fill="#C8A050" opacity="0.5" />
+          </G>
+        );
+      })}
+
+      {/* Fence rails — three rails with depth shading */}
+      {/* Bottom rail */}
+      <Rect x="0" y={penY + 6}  width={W} height="6"  rx="2" fill="#7A5820" />
+      <Rect x="0" y={penY + 6}  width={W} height="2"  rx="1" fill="#C8A050" opacity="0.4" />
+      {/* Middle rail */}
+      <Rect x="0" y={penY - 4}  width={W} height="6"  rx="2" fill="#8B6428" />
+      <Rect x="0" y={penY - 4}  width={W} height="2"  rx="1" fill="#C8A050" opacity="0.35" />
+      {/* Top rail */}
+      <Rect x="0" y={penY - 14} width={W} height="5"  rx="2" fill="#9A7030" />
+      <Rect x="0" y={penY - 14} width={W} height="1.5" rx="1" fill="#E0B860" opacity="0.30" />
+
+      {/* ── Moonlit ground behind fence ── */}
+      <Ellipse cx={W / 2} cy={groundY + 10} rx={W * 0.45} ry="18" fill="#FEFDE4" opacity="0.04" />
+
+      {/* ── Sheep in pen ─ two detailed sheep ── */}
+      {/* Sheep 1 — left, facing right */}
+      <SheepSvg cx={W * 0.22} cy={penY + 42} scale={0.92} />
+      {/* Sheep 2 — right, facing left (mirrored) */}
+      <SheepSvg cx={W * 0.68} cy={penY + 38} scale={0.88} flipX />
+      {/* Sheep 3 — small, partially behind pen at center-right */}
+      <SheepSvg cx={W * 0.46} cy={penY + 52} scale={0.72} />
+
+      {/* Moon reflection shimmer on ground */}
+      <Ellipse cx={moonX} cy={groundY + 18} rx="22" ry="5" fill="#FEFDE4" opacity="0.07" />
     </Svg>
   );
 }
@@ -428,11 +603,15 @@ function GuardTaskInner({ config, onSuccess, onFail, taskId, areaW, areaH }) {
         ))}
       </View>
 
-      {/* Center target: SVG fire column for pillar, sheep emoji for sheep tasks */}
+      {/* Center target: SVG fire column for pillar, detailed sheep SVG for sheep tasks */}
       <View style={[styles.center, { left: CENTER_X, top: centerY }]}>
         {isPillar
           ? <PillarFireIcon />
-          : <Text style={styles.centerIcon}>🐑</Text>
+          : (
+            <Svg width={ENEMY_SIZE} height={ENEMY_SIZE} viewBox="-28 -20 56 46">
+              <SheepSvg cx={0} cy={4} scale={1.0} />
+            </Svg>
+          )
         }
       </View>
 
@@ -478,9 +657,6 @@ const styles = StyleSheet.create({
     height: ENEMY_SIZE,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  centerIcon: {
-    fontSize: 36,
   },
   enemy: {
     position: 'absolute',
