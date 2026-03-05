@@ -25,8 +25,8 @@ const prompts = [
   // ── Sketch prompts ────────────────────────────────────────────────────────
   { id: 16, phos_prompt: 'A lighthouse', skotia_prompt: 'A lake', prompt_mode: 'sketch' },
   { id: 17, phos_prompt: 'A shepherd', skotia_prompt: 'An old man', prompt_mode: 'sketch' },
-  { id: 18, phos_prompt: 'A cross', skotia_prompt: 'A crown', prompt_mode: 'sketch' },
-  { id: 19, phos_prompt: 'A garden', skotia_prompt: 'A forest', prompt_mode: 'sketch' },
+  { id: 18, phos_prompt: 'A complex polygon', skotia_prompt: 'Any shape', prompt_mode: 'sketch' },
+  { id: 19, phos_prompt: 'A teacher', skotia_prompt: 'A school', prompt_mode: 'sketch' },
   { id: 20, phos_prompt: 'A telephone', skotia_prompt: 'A cellphone', prompt_mode: 'sketch' },
   { id: 21, phos_prompt: 'Your favorite animal', skotia_prompt: 'Your least favorite animal', prompt_mode: 'sketch' },
   { id: 22, phos_prompt: 'A sunrise', skotia_prompt: 'A shadow', prompt_mode: 'sketch' },
