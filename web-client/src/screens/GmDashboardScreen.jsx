@@ -31,6 +31,8 @@ export default function GmDashboardScreen({
     return () => clearInterval(interval)
   }, [loadState])
 
+  const [turnUpdate, setTurnUpdate] = useState(null) // { turnIndex, totalTurns, phase, slotStartedAt }
+
   useEffect(() => {
     if (!socket) return
 
@@ -38,9 +40,24 @@ export default function GmDashboardScreen({
       onGameOver(data)
     }
 
+    function onGameStateUpdate() {
+      // Trigger a fresh GM state poll so the dashboard reflects the new state
+      loadState()
+    }
+
+    function onMovementATurnUpdate(data) {
+      setTurnUpdate(data)
+    }
+
     socket.on('gameOver', onGameOverEvent)
-    return () => socket.off('gameOver', onGameOverEvent)
-  }, [socket, onGameOver])
+    socket.on('gameStateUpdate', onGameStateUpdate)
+    socket.on('movementATurnUpdate', onMovementATurnUpdate)
+    return () => {
+      socket.off('gameOver', onGameOverEvent)
+      socket.off('gameStateUpdate', onGameStateUpdate)
+      socket.off('movementATurnUpdate', onMovementATurnUpdate)
+    }
+  }, [socket, onGameOver, loadState])
 
   function handleAdvance() {
     setError('')
@@ -127,6 +144,18 @@ export default function GmDashboardScreen({
             <span style={{ ...styles.teamPoints, color: '#FF3366' }}>{teamPoints.skotia ?? 0}</span>
           </div>
         </div>
+
+        {/* Movement A turn progress */}
+        {turnUpdate && game?.movement === 'A' && (
+          <div style={{ background: 'rgba(0,212,255,0.06)', border: '1px solid rgba(0,212,255,0.2)', borderRadius: 8, padding: '10px 16px' }}>
+            <p style={{ fontFamily: 'Rajdhani, sans-serif', fontSize: 11, fontWeight: 700, color: '#6C757D', letterSpacing: '0.12em', margin: '0 0 4px' }}>MOVEMENT A TURNS</p>
+            <p style={{ fontFamily: 'Exo 2, sans-serif', fontSize: 13, color: '#ADB5BD', margin: 0 }}>
+              {turnUpdate.phase === 'deliberation'
+                ? 'Deliberation in progress'
+                : `Turn ${turnUpdate.turnIndex + 1} of ${turnUpdate.totalTurns}`}
+            </p>
+          </div>
+        )}
 
         {/* Advance button */}
         <button

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import AnimatedBackground from '../components/AnimatedBackground.jsx'
 import { fetchGameState, submitVotes } from '../utils/api.js'
 import { useGameContext } from '../context/GameContext.jsx'
@@ -18,6 +18,8 @@ export default function VotingScreen({
   const [error, setError] = useState('')
   const [results, setResults] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [votingTimeLeft, setVotingTimeLeft] = useState(null) // null until votingReady
+  const votingTimerRef = useRef(null)
 
   const members = (contextGroupMembers || []).filter(
     (m) => String(m.id) !== String(currentUserId)
@@ -50,12 +52,26 @@ export default function VotingScreen({
       setResults(data)
     }
 
+    function onVotingReady(data) {
+      clearInterval(votingTimerRef.current)
+      const tick = () => {
+        const secsLeft = Math.max(0, Math.round((data.votingEndsAt - Date.now()) / 1000))
+        setVotingTimeLeft(secsLeft)
+        if (secsLeft <= 0) clearInterval(votingTimerRef.current)
+      }
+      tick()
+      votingTimerRef.current = setInterval(tick, 1000)
+    }
+
     socket.on('movementStart', onMovementStart)
     socket.on('votingComplete', onVotingComplete)
+    socket.on('votingReady', onVotingReady)
 
     return () => {
       socket.off('movementStart', onMovementStart)
       socket.off('votingComplete', onVotingComplete)
+      socket.off('votingReady', onVotingReady)
+      clearInterval(votingTimerRef.current)
     }
   }, [socket, onMovementEnd])
 
@@ -98,7 +114,14 @@ export default function VotingScreen({
       <div style={styles.inner}>
         <div style={styles.header}>
           <h2 style={styles.title}>MOVEMENT C</h2>
-          <span style={styles.movLabel}>Voting</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {votingTimeLeft !== null && (
+              <span style={{ fontFamily: 'Orbitron, sans-serif', fontSize: 14, fontWeight: 700, color: votingTimeLeft <= 30 ? '#FF3366' : '#FFA63D', letterSpacing: '0.1em' }}>
+                {Math.floor(votingTimeLeft / 60)}:{String(votingTimeLeft % 60).padStart(2, '0')}
+              </span>
+            )}
+            <span style={styles.movLabel}>Voting</span>
+          </div>
         </div>
 
         {!submitted ? (

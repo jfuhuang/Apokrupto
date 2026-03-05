@@ -77,14 +77,31 @@ export default function RoundHubScreen({
       setTimeout(() => setAnnouncement(null), 5000)
     }
 
+    function onGameStateUpdate(data) {
+      if (data.teamPoints) setState((prev) => ({ ...prev, teamPoints: data.teamPoints }))
+      if (data.gameState) {
+        setState((prev) => ({
+          ...prev,
+          round: data.gameState.round ?? prev.round,
+          totalRounds: data.gameState.totalRounds ?? prev.totalRounds,
+        }))
+        if (data.gameState.status === 'completed') {
+          onGameOver({ teamPoints: data.teamPoints })
+        }
+        if (data.gameState.movement) onNavigateMovement(data.gameState.movement)
+      }
+    }
+
     socket.on('movementStart', onMovementStart)
     socket.on('gameOver', onGameOverEvent)
     socket.on('announcement', onAnnouncement)
+    socket.on('gameStateUpdate', onGameStateUpdate)
 
     return () => {
       socket.off('movementStart', onMovementStart)
       socket.off('gameOver', onGameOverEvent)
       socket.off('announcement', onAnnouncement)
+      socket.off('gameStateUpdate', onGameStateUpdate)
     }
   }, [socket, lobbyId, onNavigateMovement, onGameOver])
 

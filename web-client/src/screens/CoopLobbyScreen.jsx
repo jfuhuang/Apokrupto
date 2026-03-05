@@ -30,6 +30,11 @@ export default function CoopLobbyScreen({ token, gameId, currentUserId, groupMem
       setStatus('Invite expired.')
     }
 
+    function onInviteDeclined() {
+      setSentInvite(null)
+      setStatus('Partner declined your invite.')
+    }
+
     function handleSessionStart(data) {
       onSessionStart(data)
     }
@@ -37,12 +42,14 @@ export default function CoopLobbyScreen({ token, gameId, currentUserId, groupMem
     socket.on('coopInviteSent', onInviteSent)
     socket.on('coopInviteCancelled', onInviteCancelled)
     socket.on('coopInviteExpired', onInviteExpired)
+    socket.on('coopInviteDeclined', onInviteDeclined)
     socket.on('coopSessionStart', handleSessionStart)
 
     return () => {
       socket.off('coopInviteSent', onInviteSent)
       socket.off('coopInviteCancelled', onInviteCancelled)
       socket.off('coopInviteExpired', onInviteExpired)
+      socket.off('coopInviteDeclined', onInviteDeclined)
       socket.off('coopSessionStart', handleSessionStart)
     }
   }, [socket, onSessionStart])

@@ -52,12 +52,31 @@ export default function MovementBScreen({
     return () => clearTimeout(t)
   }, [timeLeft])
 
+  // Re-join the lobby room in case the socket reconnected since RoundHub
+  useEffect(() => {
+    if (!socket || !lobbyId) return
+    socket.emit('joinRoom', { lobbyId })
+  }, [socket, lobbyId])
+
   useEffect(() => {
     if (!socket) return
 
     function onMovementStart(data) {
       if (data.movement && data.movement !== 'B') {
         onMovementEnd(data.movement)
+      }
+    }
+
+    function onMovementComplete(data) {
+      if (data.movement === 'B') {
+        // B is done; movementStart for the next movement will follow shortly,
+        // but navigate via the safety-net poll as a fallback.
+      }
+    }
+
+    function onGameStateUpdate(data) {
+      if (data.gameState?.movement && data.gameState.movement !== 'B') {
+        onMovementEnd(data.gameState.movement)
       }
     }
 
@@ -81,12 +100,16 @@ export default function MovementBScreen({
     }
 
     socket.on('movementStart', onMovementStart)
+    socket.on('movementComplete', onMovementComplete)
+    socket.on('gameStateUpdate', onGameStateUpdate)
     socket.on('coopInviteReceived', onCoopInviteReceived)
     socket.on('coopInviteCancelled', onCoopInviteCancelled)
     socket.on('coopSessionStart', onCoopSessionStart)
 
     return () => {
       socket.off('movementStart', onMovementStart)
+      socket.off('movementComplete', onMovementComplete)
+      socket.off('gameStateUpdate', onGameStateUpdate)
       socket.off('coopInviteReceived', onCoopInviteReceived)
       socket.off('coopInviteCancelled', onCoopInviteCancelled)
       socket.off('coopSessionStart', onCoopSessionStart)

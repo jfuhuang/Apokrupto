@@ -62,7 +62,9 @@ export default function MovementAScreen({
   const [turnOrder, setTurnOrder] = useState(null)
   const [submittedIds, setSubmittedIds] = useState(new Set())
   const [submittedWords, setSubmittedWords] = useState([]) // { userId, username, word }
+  const [deliberationTimeLeft, setDeliberationTimeLeft] = useState(null) // null until deliberationReady
   const timerRef = useRef(null)
+  const deliberationTimerRef = useRef(null)
   const sketchRef = useRef(null)
 
   const loadPrompt = useCallback(async () => {
@@ -185,20 +187,45 @@ export default function MovementAScreen({
 
     function onMovementStart(data) {
       if (data.movement && data.movement !== 'A') {
+        clearInterval(deliberationTimerRef.current)
         onMovementEnd(data.movement)
       }
+    }
+
+    function onMovementComplete(data) {
+      if (data.movement === 'A') {
+        clearInterval(timerRef.current)
+        clearInterval(deliberationTimerRef.current)
+        onMovementEnd('hub')
+      }
+    }
+
+    function onDeliberationReady(data) {
+      clearInterval(deliberationTimerRef.current)
+      const tick = () => {
+        const secsLeft = Math.max(0, Math.round((data.deliberationEndsAt - Date.now()) / 1000))
+        setDeliberationTimeLeft(secsLeft)
+        if (secsLeft <= 0) clearInterval(deliberationTimerRef.current)
+      }
+      tick()
+      deliberationTimerRef.current = setInterval(tick, 1000)
     }
 
     socket.on('turnStart', onTurnStart)
     socket.on('wordSubmitted', onWordSubmitted)
     socket.on('deliberationStart', onDeliberationStart)
+    socket.on('deliberationReady', onDeliberationReady)
+    socket.on('movementComplete', onMovementComplete)
     socket.on('movementStart', onMovementStart)
 
     return () => {
       socket.off('turnStart', onTurnStart)
       socket.off('wordSubmitted', onWordSubmitted)
       socket.off('deliberationStart', onDeliberationStart)
+      socket.off('deliberationReady', onDeliberationReady)
+      socket.off('movementComplete', onMovementComplete)
       socket.off('movementStart', onMovementStart)
+      clearInterval(deliberationTimerRef.current)
     }
   }, [socket, currentGroupId, lobbyId, currentUserId, contextGroupMembers, onMovementEnd])
 
@@ -425,6 +452,11 @@ export default function MovementAScreen({
           <div style={styles.deliberationCard}>
             <p style={styles.deliberationTitle}>DELIBERATION</p>
             <p style={styles.deliberationSub}>Discuss with your group — who is ΣΚΟΤΊΑ?</p>
+            {deliberationTimeLeft !== null && (
+              <p style={{ fontFamily: 'Orbitron, sans-serif', fontSize: 13, color: deliberationTimeLeft <= 10 ? '#FF3366' : '#FFA63D', letterSpacing: '0.1em', textAlign: 'center', margin: 0 }}>
+                {Math.floor(deliberationTimeLeft / 60)}:{String(deliberationTimeLeft % 60).padStart(2, '0')}
+              </p>
+            )}
             {sketches.length > 0 ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 8, justifyContent: 'center' }}>
                 {sketches.map((s, i) => {
