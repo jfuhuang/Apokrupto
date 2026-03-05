@@ -111,11 +111,19 @@ export default function CoopRushScreen({
       }
     }
 
+    function onMovementComplete(data) {
+      if (data.movement !== 'B') return
+      if (sessionEndedRef.current) return
+      sessionEndedRef.current = true
+      onEnd({ reason: 'movementEnd', sessionPoints: sessionPointsRef.current, teamPoints: null })
+    }
+
     socket.on('coopTaskUpdate', onTaskUpdate)
     socket.on('coopSimonPatterns', onSimonPatterns)
     socket.on('coopNextTask', onNextTask)
     socket.on('coopSessionEnd', onSessionEnd)
     socket.on('movementStart', onMovementStart)
+    socket.on('movementComplete', onMovementComplete)
 
     return () => {
       socket.off('coopTaskUpdate', onTaskUpdate)
@@ -123,6 +131,7 @@ export default function CoopRushScreen({
       socket.off('coopNextTask', onNextTask)
       socket.off('coopSessionEnd', onSessionEnd)
       socket.off('movementStart', onMovementStart)
+      socket.off('movementComplete', onMovementComplete)
     }
   }, [socket, sessionId, onEnd])
 

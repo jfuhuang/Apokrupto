@@ -1,6 +1,6 @@
 const ioModule = require('./io');
 const coopService = require('../services/coopService');
-const { generateCoopTask, COOP_MULTIPLIER, COOP_BASE_POINTS } = require('../data/coopTasks');
+const { COOP_MULTIPLIER, COOP_BASE_POINTS, generateCoopTaskOfType, makeCoopTypeQueue } = require('../data/coopTasks');
 const pool = require('../db');
 
 // userId → timeout ID for deferred session-end after disconnect
@@ -172,7 +172,11 @@ function registerCoopHandlers(socket) {
   socket.on('coopAccept', async ({ inviteId }, callback) => {
     try {
       const session = coopService.acceptInvite(inviteId, socket.userId, socket.username);
-      const task = generateCoopTask();
+      // Pop first task from the session's type queue (already shuffled in acceptInvite)
+      if (!session.typeQueue || session.typeQueue.length === 0) {
+        session.typeQueue = makeCoopTypeQueue();
+      }
+      const task = generateCoopTaskOfType(session.typeQueue.shift());
       session.currentTask = task;
 
       const io = ioModule.getIO();

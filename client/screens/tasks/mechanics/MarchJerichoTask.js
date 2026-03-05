@@ -7,7 +7,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import Svg, { Path, Circle, Rect, Line, G, Polygon } from 'react-native-svg';
+import Svg, { Path, Circle, Rect, Line, G, Polygon, Ellipse, Defs, LinearGradient, RadialGradient, Stop } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
 import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
@@ -71,16 +71,45 @@ function JerichoWallSvg({ collapsed }) {
   );
 }
 
-// ── Simple marcher figure ─────────────────────────────────────────────────
+// ── Detailed marcher figure with staff and helmet ───────────────────────
 
 function MarcherSvg() {
+  const robeColor   = colors.accent.amber;
+  const darkShade   = '#7A5010';
+  const lightShade  = '#FFD080';
+
   return (
     <Svg width={MARCHER_W} height={MARCHER_H} viewBox="0 0 24 32">
-      <Circle cx={12} cy={5} r={4} fill={colors.accent.amber} />
-      <Line x1={12} y1={9}  x2={12} y2={22} stroke={colors.accent.amber} strokeWidth={2.5} strokeLinecap="round" />
-      <Line x1={5}  y1={14} x2={19} y2={14} stroke={colors.accent.amber} strokeWidth={2}   strokeLinecap="round" />
-      <Line x1={12} y1={22} x2={6}  y2={31} stroke={colors.accent.amber} strokeWidth={2}   strokeLinecap="round" />
-      <Line x1={12} y1={22} x2={18} y2={31} stroke={colors.accent.amber} strokeWidth={2}   strokeLinecap="round" />
+      {/* Staff — held in right hand */}
+      <Rect x={18} y={4} width={2.5} height={24} rx={1.2} fill={darkShade} />
+      <Ellipse cx={19} cy={4} rx={2} ry={1} fill={lightShade} opacity="0.6" />
+
+      {/* Robe — flowing hem */}
+      <Path d="M8 14 Q6 20 5 28 L12 28 L12 16Z" fill={robeColor} opacity="0.9" />
+      <Path d="M12 14 Q13 20 14 28 L19 28 L16 16Z" fill={robeColor} opacity="0.85" />
+      {/* Robe center highlight */}
+      <Line x1={12} y1={14} x2={11} y2={28} stroke={lightShade} strokeWidth="0.8" opacity="0.35" />
+
+      {/* Left arm swinging */}
+      <Line x1={9} y1={11} x2={5}  y2={17} stroke={robeColor} strokeWidth="2.2" strokeLinecap="round" />
+      {/* Right arm (holding staff) */}
+      <Line x1={13} y1={11} x2={17} y2={9}  stroke={robeColor} strokeWidth="2.2" strokeLinecap="round" />
+
+      {/* Body */}
+      <Rect x={9} y={10} width={6} height={8} rx={2} fill={robeColor} />
+
+      {/* Belt */}
+      <Rect x={8} y={16} width={8} height={2} rx={1} fill={darkShade} opacity="0.55" />
+
+      {/* Head */}
+      <Circle cx={12} cy={6} r={4.5} fill={robeColor} />
+      {/* Helmet — rounded cap */}
+      <Path d="M7.5 6 Q7.5 1 12 1 Q16.5 1 16.5 6Z" fill={darkShade} opacity="0.85" />
+      {/* Helmet sheen */}
+      <Path d="M8.5 5 Q9 2 12 1.5" stroke={lightShade} strokeWidth="0.8" fill="none" opacity="0.40" strokeLinecap="round" />
+      {/* Face */}
+      <Circle cx={11} cy={7} r={1.2} fill={darkShade} opacity="0.55" />
+      <Circle cx={13} cy={7} r={1.2} fill={darkShade} opacity="0.55" />
     </Svg>
   );
 }

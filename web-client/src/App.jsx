@@ -270,13 +270,36 @@ export default function App() {
       patchState({ currentScreen: 'gameOver', gameOverResult: data })
     }
 
+    // Per-socket: server sends new group assignments at the start of each new round
+    function onRoundSetup(data) {
+      patchState({
+        currentRound: data.roundNumber,
+        totalRounds: data.totalRounds,
+        currentGroupId: data.groupId,
+        currentGroupMembers: data.groupMembers || [],
+        teamPoints: data.teamPoints || { phos: 0, skotia: 0 },
+        currentMovement: null,
+        currentScreen: 'roundHub',
+        roundSummary: null,
+      })
+    }
+
+    // Lobby was closed mid-game (host disconnected) — return to lobby list
+    function onLobbyClosed() {
+      patchState({ currentScreen: 'lobbyList', currentLobbyId: null, gameId: null, roundSummary: null, gameOverResult: null, currentMovement: null })
+    }
+
     socket.on('roundSummary', onRoundSummary)
     socket.on('movementStart', onMovementStart)
     socket.on('gameOver', onGameOver)
+    socket.on('roundSetup', onRoundSetup)
+    socket.on('lobbyClosed', onLobbyClosed)
     return () => {
       socket.off('roundSummary', onRoundSummary)
       socket.off('movementStart', onMovementStart)
       socket.off('gameOver', onGameOver)
+      socket.off('roundSetup', onRoundSetup)
+      socket.off('lobbyClosed', onLobbyClosed)
     }
   }, [socketKey])
 

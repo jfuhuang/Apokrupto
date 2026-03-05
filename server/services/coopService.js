@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { generateCoopTask } = require('../data/coopTasks');
+const { generateCoopTask, generateCoopTaskOfType, makeCoopTypeQueue } = require('../data/coopTasks');
 const ioModule = require('../websocket/io');
 
 // inviteId → { id, gameId, fromUserId, fromUsername, targetUserId, createdAt }
@@ -86,6 +86,7 @@ function acceptInvite(inviteId, acceptorId, acceptorUsername) {
     holdState: null,
     tapState: null,
     taskRoleSwap: Math.random() < 0.5,
+    typeQueue: makeCoopTypeQueue(),
   };
 
   _sessions.set(sessionId, session);
@@ -145,7 +146,12 @@ function advanceTask(sessionId) {
 
   session.taskIndex += 1;
   session.taskRoleSwap = Math.random() < 0.5;
-  const task = generateCoopTask();
+  // Refill queue when exhausted so every type appears once per round
+  if (!session.typeQueue || session.typeQueue.length === 0) {
+    session.typeQueue = makeCoopTypeQueue();
+  }
+  const taskType = session.typeQueue.shift();
+  const task = generateCoopTaskOfType(taskType);
   session.currentTask = task;
   session.holdState = null;
   session.tapState = null;

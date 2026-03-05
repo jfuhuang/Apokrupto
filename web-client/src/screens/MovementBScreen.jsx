@@ -74,6 +74,14 @@ export default function MovementBScreen({
       }
     }
 
+    // Sent per-socket when a player reconnects mid-Movement-B to resync timer
+    function onMovementBInfo(data) {
+      if (data.movementBEndsAt) {
+        const remaining = Math.max(0, Math.round((data.movementBEndsAt - Date.now()) / 1000))
+        setTimeLeft(remaining)
+      }
+    }
+
     function onGameStateUpdate(data) {
       if (data.gameState?.movement && data.gameState.movement !== 'B') {
         onMovementEnd(data.gameState.movement)
@@ -101,6 +109,7 @@ export default function MovementBScreen({
 
     socket.on('movementStart', onMovementStart)
     socket.on('movementComplete', onMovementComplete)
+    socket.on('movementBInfo', onMovementBInfo)
     socket.on('gameStateUpdate', onGameStateUpdate)
     socket.on('coopInviteReceived', onCoopInviteReceived)
     socket.on('coopInviteCancelled', onCoopInviteCancelled)
@@ -109,6 +118,7 @@ export default function MovementBScreen({
     return () => {
       socket.off('movementStart', onMovementStart)
       socket.off('movementComplete', onMovementComplete)
+      socket.off('movementBInfo', onMovementBInfo)
       socket.off('gameStateUpdate', onGameStateUpdate)
       socket.off('coopInviteReceived', onCoopInviteReceived)
       socket.off('coopInviteCancelled', onCoopInviteCancelled)

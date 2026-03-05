@@ -55,19 +55,32 @@ export default function GmDashboardScreen({
       setTurnUpdate(data)
     }
 
+    function onMovementStart() {
+      setTurnUpdate(null)
+      loadState()
+    }
+
     function onMovementComplete() {
       loadState()
+    }
+
+    function onLobbyClosed() {
+      onGameOver({ lobbyClosed: true })
     }
 
     socket.on('gameOver', onGameOverEvent)
     socket.on('gameStateUpdate', onGameStateUpdate)
     socket.on('movementATurnUpdate', onMovementATurnUpdate)
     socket.on('movementComplete', onMovementComplete)
+    socket.on('movementStart', onMovementStart)
+    socket.on('lobbyClosed', onLobbyClosed)
     return () => {
       socket.off('gameOver', onGameOverEvent)
       socket.off('gameStateUpdate', onGameStateUpdate)
       socket.off('movementATurnUpdate', onMovementATurnUpdate)
       socket.off('movementComplete', onMovementComplete)
+      socket.off('movementStart', onMovementStart)
+      socket.off('lobbyClosed', onLobbyClosed)
     }
   }, [socket, onGameOver, loadState])
 

@@ -28,8 +28,13 @@ export default function RoundSummaryScreen({
       }
     }
 
+    // Per-socket: new round group assignments — navigate to roundHub for the new round
+    function onRoundSetup(data) {
+      onNextRound(data)
+    }
+
     function onMovementComplete() {
-      // Movement done; next movementStart will drive navigation
+      // Movement done; next movementStart/roundSetup will drive navigation
     }
 
     function onGameStateUpdate(data) {
@@ -47,6 +52,7 @@ export default function RoundSummaryScreen({
     }
 
     socket.on('movementStart', onMovementStart)
+    socket.on('roundSetup', onRoundSetup)
     socket.on('movementComplete', onMovementComplete)
     socket.on('gameStateUpdate', onGameStateUpdate)
     socket.on('susStatusUpdate', onSusStatusUpdate)
@@ -54,6 +60,7 @@ export default function RoundSummaryScreen({
 
     return () => {
       socket.off('movementStart', onMovementStart)
+      socket.off('roundSetup', onRoundSetup)
       socket.off('movementComplete', onMovementComplete)
       socket.off('gameStateUpdate', onGameStateUpdate)
       socket.off('susStatusUpdate', onSusStatusUpdate)

@@ -7,7 +7,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import Svg, { Path, Circle, Rect, Ellipse, Line, Polygon, G } from 'react-native-svg';
+import Svg, { Path, Circle, Rect, Ellipse, Line, Polygon, G, Defs, LinearGradient, RadialGradient, Stop } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
 import TaskContainer from '../../../components/TaskContainer';
 import { fonts } from '../../../theme/typography';
@@ -23,37 +23,187 @@ const TOLERANCE      = 45;  // how far from ring the finger can be (px)
 const TOTAL_SECTORS  = 36;  // ring divided into 36 sectors (10° each)
 const REQUIRED_SECTORS = 30; // need 30/36 ≈ 83% coverage to win
 
-// ── Goliath SVG silhouette ───────────────────────────────────────────────
+// ── Arid desert hillside background behind Goliath ────────────────────────
+
+function SlingshotBg({ w, h }) {
+  const groundY = h * 0.68;
+  return (
+    <Svg style={{ position: 'absolute', left: 0, top: 0 }} width={w} height={h}>
+      <Defs>
+        <LinearGradient id="slingSky" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0"   stopColor="#120810" stopOpacity="1" />
+          <Stop offset="0.5" stopColor="#1C0E1A" stopOpacity="1" />
+          <Stop offset="1"   stopColor="#2A1A10" stopOpacity="1" />
+        </LinearGradient>
+        <LinearGradient id="slingGround" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#3A2408" stopOpacity="1" />
+          <Stop offset="1" stopColor="#1A0E04" stopOpacity="1" />
+        </LinearGradient>
+        <RadialGradient id="sunsetGlow" cx="50%" cy="50%" r="50%">
+          <Stop offset="0"   stopColor="#FF6A00" stopOpacity="0.18" />
+          <Stop offset="0.6" stopColor="#CC3300" stopOpacity="0.07" />
+          <Stop offset="1"   stopColor="#550000" stopOpacity="0"    />
+        </RadialGradient>
+      </Defs>
+
+      {/* Sky */}
+      <Rect x="0" y="0" width={w} height={groundY} fill="url(#slingSky)" />
+
+      {/* Sunset glow on the horizon */}
+      <Ellipse cx={w / 2} cy={groundY} rx={w * 0.55} ry={h * 0.25} fill="url(#sunsetGlow)" />
+
+      {/* Distant ridge / rocky hills */}
+      <Path
+        d={`M0 ${groundY}
+            Q${w*0.10} ${groundY-55} ${w*0.22} ${groundY-30}
+            Q${w*0.35} ${groundY-70} ${w*0.50} ${groundY-38}
+            Q${w*0.65} ${groundY-62} ${w*0.78} ${groundY-28}
+            Q${w*0.90} ${groundY-45} ${w} ${groundY}
+            L${w} ${groundY} L0 ${groundY} Z`}
+        fill="#2A1608"
+      />
+      <Path
+        d={`M0 ${groundY}
+            Q${w*0.15} ${groundY-35} ${w*0.30} ${groundY-18}
+            Q${w*0.48} ${groundY-42} ${w*0.62} ${groundY-20}
+            Q${w*0.80} ${groundY-32} ${w} ${groundY-10}
+            L${w} ${groundY} L0 ${groundY} Z`}
+        fill="#3A2010"
+      />
+
+      {/* Ground */}
+      <Rect x="0" y={groundY} width={w} height={h - groundY} fill="url(#slingGround)" />
+
+      {/* Ground crack lines */}
+      <Line x1={w*0.08} y1={groundY+8}  x2={w*0.18} y2={groundY+22} stroke="#1A0A00" strokeWidth="1.2" opacity="0.5" />
+      <Line x1={w*0.55} y1={groundY+5}  x2={w*0.70} y2={groundY+18} stroke="#1A0A00" strokeWidth="1"   opacity="0.4" />
+      <Line x1={w*0.30} y1={groundY+14} x2={w*0.40} y2={groundY+28} stroke="#1A0A00" strokeWidth="1"   opacity="0.35" />
+
+      {/* Scattered rocks */}
+      <Ellipse cx={w*0.12} cy={groundY+18} rx="10" ry="7" fill="#2A1A08" />
+      <Ellipse cx={w*0.85} cy={groundY+22} rx="14" ry="9" fill="#251608" />
+      <Ellipse cx={w*0.45} cy={groundY+30} rx="8"  ry="5" fill="#2A1A08" />
+
+      {/* Distant Philistine army silhouette — row of tiny figures on the ridge */}
+      {[0.08, 0.16, 0.22, 0.30, 0.38, 0.62, 0.70, 0.78, 0.85, 0.92].map((fx, i) => (
+        <G key={i}>
+          <Rect x={w*fx - 2} y={groundY - 45} width="5" height="18" rx="2" fill="#1A0A04" opacity="0.6" />
+          <Circle cx={w*fx}  cy={groundY - 49} r="4"                       fill="#1A0A04" opacity="0.6" />
+          {/* Tiny spear */}
+          <Line x1={w*fx + 3} y1={groundY - 60} x2={w*fx + 3} y2={groundY - 28} stroke="#3A2410" strokeWidth="1.5" opacity="0.5" />
+        </G>
+      ))}
+    </Svg>
+  );
+}
+
+// ── Goliath SVG — fully armored Philistine giant ─────────────────────────
 
 function GoliathSvg({ hit }) {
-  const bodyColor  = hit ? colors.accent.neonGreen : '#8B0000';
-  const armorColor = hit ? colors.accent.neonGreen : '#555555';
-  const spearColor = '#A07820';
+  const skin  = hit ? '#88FF88' : '#6B3A1A';
+  const armor = hit ? '#44BB44' : '#4A4030';
+  const shine = hit ? '#AAFFAA' : '#8A7850';
+  const dark  = hit ? '#228822' : '#1A1408';
+
   return (
     <Svg width={TARGET_W} height={TARGET_H} viewBox="0 0 80 140">
-      <Rect x="26" y="100" width="12" height="36" rx="4" fill={armorColor} />
-      <Rect x="42" y="100" width="12" height="36" rx="4" fill={armorColor} />
-      <Rect x="24" y="130" width="16" height="10" rx="3" fill="#333" />
-      <Rect x="40" y="130" width="16" height="10" rx="3" fill="#333" />
-      <Rect x="20" y="55" width="40" height="50" rx="6" fill={armorColor} />
-      <Rect x="22" y="58" width="16" height="20" rx="3" fill={bodyColor} opacity="0.6" />
-      <Rect x="42" y="58" width="16" height="20" rx="3" fill={bodyColor} opacity="0.6" />
-      <Rect x="5"  y="58" width="16" height="35" rx="5" fill={armorColor} />
-      <Rect x="59" y="58" width="16" height="35" rx="5" fill={armorColor} />
-      <Ellipse cx="20" cy="60" rx="10" ry="8" fill={bodyColor} />
-      <Ellipse cx="60" cy="60" rx="10" ry="8" fill={bodyColor} />
-      <Rect x="32" y="38" width="16" height="18" rx="4" fill={armorColor} />
-      <Ellipse cx="40" cy="30" rx="18" ry="20" fill={bodyColor} />
-      <Path d="M28 16 Q40 2 52 16 Q46 10 40 8 Q34 10 28 16Z" fill={bodyColor} opacity="0.8" />
-      <Rect x="36" y="2" width="8" height="14" rx="2" fill={bodyColor} />
-      <Ellipse cx="33" cy="28" rx="4" ry="4" fill="#1A0000" />
-      <Ellipse cx="47" cy="28" rx="4" ry="4" fill="#1A0000" />
-      <Rect x="3" y="55" width="3" height="80" rx="1" fill={spearColor} />
-      <Polygon points="4.5,55 0,45 9,45" fill="#C0C0C0" />
-      <Ellipse cx="68" cy="78" rx="9" ry="14" fill={armorColor} opacity="0.9" />
-      <Ellipse cx="68" cy="78" rx="6" ry="10" fill={bodyColor} opacity="0.5" />
+
+      {/* Spear — behind body */}
+      <Rect  x="6"  y="10" width="4"  height="118" rx="2" fill="#7A5018" />
+      <Line  x1="7" y1="10" x2="9" y2="10" stroke="#A07028" strokeWidth="1.5" opacity="0.6" />
+      {/* Spearhead */}
+      <Polygon points="8,10 4,1 12,1" fill="#C8C0A0" />
+      <Rect x="5" y="9" width="6" height="4" rx="1" fill="#8B7030" />
+      {/* Spear butt cap */}
+      <Ellipse cx="8" cy="128" rx="3" ry="2" fill="#5A3A10" />
+
+      {/* ── Legs ── */}
+      {/* Greaves (lower leg armor) */}
+      <Rect x="24" y="100" width="13" height="34" rx="4" fill={armor} />
+      <Rect x="43" y="100" width="13" height="34" rx="4" fill={armor} />
+      {/* Greave sheen */}
+      <Rect x="25" y="101" width="4"  height="32" rx="2" fill={shine} opacity="0.22" />
+      <Rect x="44" y="101" width="4"  height="32" rx="2" fill={shine} opacity="0.22" />
+      {/* Sandals */}
+      <Rect x="22" y="131" width="17" height="8" rx="3" fill={dark} />
+      <Rect x="41" y="131" width="17" height="8" rx="3" fill={dark} />
+      <Line x1="26" y1="131" x2="26" y2="139" stroke={shine} strokeWidth="1" opacity="0.35" />
+      <Line x1="45" y1="131" x2="45" y2="139" stroke={shine} strokeWidth="1" opacity="0.35" />
+      {/* Knee guards */}
+      <Ellipse cx="30" cy="102" rx="7" ry="5" fill={shine} opacity="0.55" />
+      <Ellipse cx="49" cy="102" rx="7" ry="5" fill={shine} opacity="0.55" />
+
+      {/* ── Torso armor — scale mail breastplate ── */}
+      <Rect x="21" y="55" width="38" height="47" rx="5" fill={armor} />
+      {/* Scale rows */}
+      {[0, 1, 2, 3, 4].map(row => (
+        [0, 1, 2, 3].map(col => {
+          const ox = 24 + col * 9 + (row % 2) * 4.5;
+          const oy = 60 + row * 8;
+          return <Path key={`${row}-${col}`} d={`M${ox} ${oy} Q${ox+4} ${oy} ${ox+4} ${oy+5} Q${ox+4} ${oy+8} ${ox+2} ${oy+8} Q${ox} ${oy+8} ${ox} ${oy+5} Q${ox} ${oy} ${ox} ${oy}Z`} fill={shine} opacity="0.30" />;
+        })
+      ))}
+      {/* Breastplate edge highlight */}
+      <Path d="M21 60 Q21 55 26 55 L54 55 Q59 55 59 60" stroke={shine} strokeWidth="1.5" fill="none" opacity="0.50" />
+
+      {/* ── Shield — large oval on left arm ── */}
+      <Ellipse cx="15" cy="75" rx="12" ry="28" fill={armor} />
+      <Ellipse cx="15" cy="75" rx="9"  ry="22" fill={skin}  opacity="0.25" />
+      {/* Shield boss (center boss) */}
+      <Circle  cx="15" cy="75" r="5"   fill={shine} opacity="0.70" />
+      <Circle  cx="15" cy="75" r="2.5" fill="#E0D090" opacity="0.85" />
+      {/* Shield rim */}
+      <Ellipse cx="15" cy="75" rx="12" ry="28" fill="none" stroke={shine} strokeWidth="1.5" opacity="0.40" />
+
+      {/* ── Arms ── */}
+      {/* Left arm (behind shield) */}
+      <Rect x="17" y="60" width="10" height="30" rx="5" fill={skin} />
+      {/* Right arm — raised, holding spear */}
+      <Rect x="57" y="55" width="11" height="36" rx="5" fill={skin} />
+      {/* Right hand gripping spear */}
+      <Ellipse cx="61" cy="58" rx="6" ry="5" fill={skin} opacity="0.85" />
+      {/* Pauldrons (shoulder guards) */}
+      <Ellipse cx="25" cy="57" rx="9" ry="6" fill={shine} opacity="0.60" />
+      <Ellipse cx="55" cy="57" rx="9" ry="6" fill={shine} opacity="0.60" />
+
+      {/* ── Neck ── */}
+      <Rect x="33" y="40" width="14" height="16" rx="4" fill={skin} />
+
+      {/* ── Head — Philistine feathered helmet ── */}
+      <Ellipse cx="40" cy="30" rx="17" ry="18" fill={skin} />
+      {/* Helmet cheek guards */}
+      <Path d="M23 30 Q21 40 24 46" stroke={armor} strokeWidth="6" fill="none" strokeLinecap="round" />
+      <Path d="M57 30 Q59 40 56 46" stroke={armor} strokeWidth="6" fill="none" strokeLinecap="round" />
+      {/* Helmet cap */}
+      <Path d="M23 28 Q23 10 40 7 Q57 10 57 28Z" fill={armor} />
+      {/* Helmet sheen */}
+      <Path d="M27 24 Q27 13 40 11 Q46 12 50 18" stroke={shine} strokeWidth="1.5" fill="none" opacity="0.45" strokeLinecap="round" />
+      {/* Feathered plume — Philistine crests */}
+      {[-6, -2, 2, 6].map((ox, i) => (
+        <Path key={i} d={`M${40 + ox} 7 C${38 + ox} 0 ${40 + ox - 2} -4 ${40 + ox} -6 C${40 + ox + 2} -4 ${42 + ox} 0 ${40 + ox} 7Z`}
+          fill="#A02020" opacity={0.7 - i * 0.05} />
+      ))}
+      {/* Face */}
+      <Ellipse cx="40" cy="32" rx="12" ry="14" fill={skin} />
+      {/* Brow ridge shadow */}
+      <Path d="M28 26 Q40 22 52 26" fill={dark} opacity="0.25" />
+      {/* Deep-set eyes */}
+      <Ellipse cx="34" cy="28" rx="4" ry="3.5" fill={dark} />
+      <Ellipse cx="46" cy="28" rx="4" ry="3.5" fill={dark} />
+      <Circle  cx="34" cy="28" r="2.2"         fill="#3A0000" />
+      <Circle  cx="46" cy="28" r="2.2"         fill="#3A0000" />
+      <Circle  cx="35" cy="27" r="0.9"         fill="#FF2020" opacity="0.55" />
+      <Circle  cx="47" cy="27" r="0.9"         fill="#FF2020" opacity="0.55" />
+      {/* Nose & mouth */}
+      <Path d="M38 32 Q40 35 42 32" stroke={dark} strokeWidth="1.2" fill="none" opacity="0.6" />
+      <Path d="M35 37 Q40 40 45 37" stroke={dark} strokeWidth="1.5" fill="none" opacity="0.55" strokeLinecap="round" />
+      {/* Beard */}
+      <Path d="M28 38 Q28 46 40 47 Q52 46 52 38" fill={dark} opacity="0.55" />
+      <Path d="M30 42 Q40 48 50 42" stroke={dark} strokeWidth="0.8" fill="none" opacity="0.35" />
+
+      {/* Hit flash — lightning bolt */}
       {hit && (
-        <Path d="M10 10 L30 5 L20 20 L40 15 L25 30 L50 22" stroke="#FFE082" strokeWidth="4" fill="none" strokeLinecap="round" />
+        <Path d="M15 8 L22 18 L17 18 L26 32 L20 32 L30 46" stroke="#FFE082" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       )}
     </Svg>
   );
@@ -176,6 +326,8 @@ export default function SlingTask({ config, onSuccess }) {
     >
       {layout && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          {/* Atmospheric desert battle background */}
+          <SlingshotBg w={layout.width} h={layout.height} />
           <Text style={styles.hint}>
             {done ? 'Goliath falls!' : 'Trace the ring around Goliath!'}
           </Text>

@@ -52,19 +52,55 @@ const OUT  = '#E0E0E0'; // outline / light stroke
 const SPRITES = {
   // ── CHALLENGES ─────────────────────────────────────────────────────────
 
-  // Sling with leather pouch and a spinning stone trajectory // AI-generated
+  // Armored Philistine giant (helmet plume, spear, shield) facing a tiny shepherd // AI-generated
   david_and_goliath: (c) => (
     <G>
-      <Circle cx="16" cy="16" r="3" fill={c} />
-      <Path d="M16 19 Q10 22 8 28" stroke={c} strokeWidth="1.5" fill="none" strokeLinecap="round" />
-      <Path d="M16 19 Q22 22 24 28" stroke={c} strokeWidth="1.5" fill="none" strokeLinecap="round" />
-      <Circle cx="8"  cy="29" r="2" fill={c} />
-      <Circle cx="24" cy="29" r="2" fill={c} />
-      <Path
-        d="M16 13 Q22 8 26 4"
-        stroke={c} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeDasharray="2,2"
-      />
-      <Circle cx="27" cy="3" r="2.5" fill={FIRE} />
+      {/* ── Goliath — left side, large ── */}
+      {/* Spear */}
+      <Rect x="3" y="2" width="2.5" height="24" rx="1.2" fill={FIRE} opacity="0.8" />
+      <Polygon points="4,2 2,0 6,0" fill={OUT} opacity="0.85" />
+      {/* Shield — large oval */}
+      <Ellipse cx="6" cy="18" rx="4" ry="8" fill={c} opacity="0.85" />
+      <Circle cx="6" cy="18" r="2" fill={FIRE} opacity="0.55" />
+      {/* Body armor */}
+      <Rect x="7" y="12" width="9" height="12" rx="2" fill={c} />
+      {/* Scale rows */}
+      <Line x1="8"  y1="15" x2="15" y2="15" stroke={BG} strokeWidth="0.7" opacity="0.5" />
+      <Line x1="8"  y1="18" x2="15" y2="18" stroke={BG} strokeWidth="0.7" opacity="0.5" />
+      <Line x1="8"  y1="21" x2="15" y2="21" stroke={BG} strokeWidth="0.7" opacity="0.5" />
+      {/* Head */}
+      <Circle cx="11" cy="9" r="5" fill={c} opacity="0.9" />
+      {/* Feathered plume */}
+      <Path d="M9 4 C8 1 9 0 10 0 C10 2 11 1 11 0 C11 2 12 1 12 0 C12 2 13 1 13 4Z" fill="#A02020" opacity="0.80" />
+      {/* Helmet cap */}
+      <Path d="M6.5 8 Q6.5 4 11 4 Q15.5 4 15.5 8Z" fill={c} opacity="0.75" />
+      {/* Eyes (menacing) */}
+      <Circle cx="9.5" cy="9.5" r="1.2" fill={BG} />
+      <Circle cx="12.5" cy="9.5" r="1.2" fill={BG} />
+      <Circle cx="9.5" cy="9.5" r="0.5" fill="#AA0000" />
+      <Circle cx="12.5" cy="9.5" r="0.5" fill="#AA0000" />
+      {/* Legs */}
+      <Rect x="8"  y="24" width="4" height="7" rx="2" fill={c} opacity="0.85" />
+      <Rect x="13" y="24" width="4" height="7" rx="2" fill={c} opacity="0.85" />
+
+      {/* ── Divider — distance gap ── */}
+      <Line x1="20" y1="4" x2="20" y2="28" stroke={c} strokeWidth="0.6" strokeDasharray="2,2" opacity="0.25" />
+
+      {/* ── David — right side, small ── */}
+      {/* Sling cord */}
+      <Path d="M27 12 Q24 8 22 5" stroke={c} strokeWidth="1.2" fill="none" strokeLinecap="round" />
+      <Path d="M27 12 Q30 10 32 8" stroke={c} strokeWidth="1.2" fill="none" strokeLinecap="round" />
+      {/* Stone in sling */}
+      <Circle cx="22" cy="4" r="2" fill={FIRE} />
+      {/* David body */}
+      <Rect x="25" y="18" width="4" height="8" rx="2" fill={c} opacity="0.85" />
+      {/* David head */}
+      <Circle cx="27" cy="14" r="3.5" fill={c} opacity="0.9" />
+      {/* David arm raised */}
+      <Line x1="27" y1="17" x2="27" y2="12" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+      {/* David legs */}
+      <Line x1="26" y1="26" x2="24" y2="31" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+      <Line x1="28" y1="26" x2="30" y2="31" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
     </G>
   ),
 
@@ -165,19 +201,41 @@ const SPRITES = {
     </G>
   ),
 
-  // Castle battlements with heavy cracks and a crumbling section // AI-generated
+  // Top-down view of circular Jericho city wall with towers, gates, and collapse cracks // AI-generated
   walls_of_jericho: (c) => (
     <G>
-      <Rect x="4"  y="10" width="24" height="18" rx="1" fill={c} />
-      <Rect x="4"  y="6"  width="4"  height="5"  rx="1" fill={c} />
-      <Rect x="11" y="6"  width="4"  height="5"  rx="1" fill={c} />
-      <Rect x="18" y="6"  width="4"  height="5"  rx="1" fill={c} />
-      <Rect x="25" y="6"  width="3"  height="5"  rx="1" fill={c} />
-      <Line x1="4"  y1="16" x2="28" y2="16" stroke={BG} strokeWidth="0.8" />
-      <Line x1="4"  y1="22" x2="28" y2="22" stroke={BG} strokeWidth="0.8" />
-      <Path d="M18 10 L22 28" stroke={BG} strokeWidth="2" fill="none" strokeLinecap="round" />
-      <Path d="M22 12 L26 28" stroke={BG} strokeWidth="1.5" fill="none" opacity="0.6" />
-      <Polygon points="26,14 30,18 28,28 24,23" fill={FIRE} opacity="0.4" />
+      {/* City ground */}
+      <Circle cx="16" cy="16" r="11" fill={c} opacity="0.30" />
+      {/* Inner streets */}
+      <Line x1="8"  y1="16" x2="24" y2="16" stroke={c} strokeWidth="1.2" opacity="0.35" />
+      <Line x1="16" y1="8"  x2="16" y2="24" stroke={c} strokeWidth="1.2" opacity="0.35" />
+      {/* Interior buildings */}
+      <Rect x="9"  y="9"  width="5" height="4" rx="1" fill={c} opacity="0.50" />
+      <Rect x="18" y="9"  width="5" height="4" rx="1" fill={c} opacity="0.50" />
+      <Rect x="9"  y="19" width="5" height="4" rx="1" fill={c} opacity="0.50" />
+      <Rect x="18" y="19" width="5" height="4" rx="1" fill={c} opacity="0.50" />
+      {/* Well at center */}
+      <Circle cx="16" cy="16" r="2.5" fill={BG} opacity="0.6" />
+      <Circle cx="16" cy="16" r="1.2" fill={c}  opacity="0.40" />
+      {/* Outer wall ring */}
+      <Circle cx="16" cy="16" r="14" fill={c}          opacity="0.85" />
+      <Circle cx="16" cy="16" r="11" fill={BG}          opacity="0.70" />
+      <Circle cx="16" cy="16" r="14" fill="none" stroke={c} strokeWidth="1" opacity="0.40" />
+      {/* Wall coursing rings */}
+      <Circle cx="16" cy="16" r="13" fill="none" stroke={BG} strokeWidth="0.7" opacity="0.40" />
+      {/* Towers at 4 cardinal positions */}
+      {[[16,2],[30,16],[16,30],[2,16]].map(([tx,ty],i) => (
+        <Rect key={i} x={tx-3} y={ty-3} width={6} height={6} rx={1}
+          fill={c} opacity="0.95" />
+      ))}
+      {/* Gate (south) */}
+      <Rect x="13" y="28" width="6" height="4" rx="1" fill={BG} opacity="0.65" />
+      {/* Collapse cracks */}
+      <Path d="M22 5 L19 10 L24 14" stroke={FIRE} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" opacity="0.70" />
+      <Path d="M5 20 L9 18 L7 23"  stroke={FIRE} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" opacity="0.60" />
+      {/* Dust/debris at crack */}
+      <Circle cx="23" cy="6"  r="3" fill={FIRE} opacity="0.18" />
+      <Circle cx="6"  cy="22" r="2.5" fill={FIRE} opacity="0.15" />
     </G>
   ),
 

@@ -169,8 +169,7 @@ function generateSimonSays() {
   };
 }
 
-function generateCoopTask() {
-  const type = pick(COOP_TASK_TYPES);
+function generateCoopTaskOfType(type) {
   switch (type) {
     case 'deception':     return generateDeception();
     case 'secret_ballot': return generateSecretBallot();
@@ -181,4 +180,18 @@ function generateCoopTask() {
   }
 }
 
-module.exports = { COOP_MULTIPLIER, COOP_TASK_TYPES, COOP_BASE_POINTS, generateCoopTask };
+/**
+ * Returns a freshly shuffled copy of all co-op task type names.
+ * Use as a round-robin queue per session so every type appears once
+ * before any type repeats.
+ */
+function makeCoopTypeQueue() {
+  return shuffleArray([...COOP_TASK_TYPES]);
+}
+
+// Legacy single-call random picker (no queue — kept for back-compat).
+function generateCoopTask() {
+  return generateCoopTaskOfType(pick(COOP_TASK_TYPES));
+}
+
+module.exports = { COOP_MULTIPLIER, COOP_TASK_TYPES, COOP_BASE_POINTS, generateCoopTask, generateCoopTaskOfType, makeCoopTypeQueue };
