@@ -419,6 +419,7 @@ export default function App() {
             <VotingScreen
               token={state.token}
               gameId={state.gameId}
+              lobbyId={state.currentLobbyId}
               currentUserId={state.currentUserId}
               socket={socketRef.current}
               onMovementEnd={handleMovementEnd}

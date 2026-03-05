@@ -6,6 +6,7 @@ import { useGameContext } from '../context/GameContext.jsx'
 export default function VotingScreen({
   token,
   gameId,
+  lobbyId,
   currentUserId,
   socket,
   onMovementEnd,
@@ -39,6 +40,12 @@ export default function VotingScreen({
     return () => clearInterval(interval)
   }, [checkState])
 
+  // Re-join lobby room in case socket reconnected
+  useEffect(() => {
+    if (!socket || !lobbyId) return
+    socket.emit('joinRoom', { lobbyId })
+  }, [socket, lobbyId])
+
   useEffect(() => {
     if (!socket) return
 
@@ -46,6 +53,21 @@ export default function VotingScreen({
       if (data.movement && data.movement !== 'C') {
         onMovementEnd(data.movement)
       }
+    }
+
+    function onMovementComplete(data) {
+      // C is done; movementStart for next movement follows shortly.
+      // Navigation handled by onMovementStart / safety-net poll.
+    }
+
+    function onGameStateUpdate(data) {
+      if (data.gameState?.movement && data.gameState.movement !== 'C') {
+        onMovementEnd(data.gameState.movement)
+      }
+    }
+
+    function onSusStatusUpdate(data) {
+      // Optionally surface mark status to the player (future use)
     }
 
     function onVotingComplete(data) {
@@ -64,11 +86,17 @@ export default function VotingScreen({
     }
 
     socket.on('movementStart', onMovementStart)
+    socket.on('movementComplete', onMovementComplete)
+    socket.on('gameStateUpdate', onGameStateUpdate)
+    socket.on('susStatusUpdate', onSusStatusUpdate)
     socket.on('votingComplete', onVotingComplete)
     socket.on('votingReady', onVotingReady)
 
     return () => {
       socket.off('movementStart', onMovementStart)
+      socket.off('movementComplete', onMovementComplete)
+      socket.off('gameStateUpdate', onGameStateUpdate)
+      socket.off('susStatusUpdate', onSusStatusUpdate)
       socket.off('votingComplete', onVotingComplete)
       socket.off('votingReady', onVotingReady)
       clearInterval(votingTimerRef.current)
