@@ -388,7 +388,6 @@ router.get('/:gameId/movement-a/prompt', auth, async (req, res) => {
 
     res.json({
       prompt:          promptText,
-      themeLabel:      prompt.theme_label,
       promptMode:      turnState.promptMode || 'word',
       currentPlayerId: String(turnState.turnOrder[turnState.currentIndex]),
       completedCount:  turnState.completedCount,
@@ -397,6 +396,132 @@ router.get('/:gameId/movement-a/prompt', auth, async (req, res) => {
     });
   } catch (err) {
     console.error('[GET movement-a/prompt]', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/games/:gameId/movement-a/state
+// Returns full Movement A turn state for the calling player's group.
+// Used by the client to restore screen state after a disconnect/reconnect.
+// ---------------------------------------------------------------------------
+router.get('/:gameId/movement-a/state', auth, async (req, res) => {
+  const { gameId } = req.params;
+  const userId = req.user.sub;
+
+  try {
+    // Player's team
+    const playerRes = await db.query(
+      'SELECT team FROM game_players WHERE game_id = $1 AND user_id = $2',
+      [gameId, userId]
+    );
+    if (playerRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Player not found in this game' });
+    }
+    const { team } = playerRes.rows[0];
+
+    // Player's current group
+    const groupRes = await db.query(
+      `SELECT gg.id AS group_id
+       FROM game_group_members ggm
+       JOIN game_groups gg ON gg.id = ggm.group_id
+       JOIN games g ON g.id = gg.game_id
+       WHERE gg.game_id = $1 AND ggm.user_id = $2 AND gg.round_number = g.current_round`,
+      [gameId, userId]
+    );
+    if (groupRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Group not found for current round' });
+    }
+    const groupId = String(groupRes.rows[0].group_id);
+
+    const turnState = getGroupTurnState(groupId);
+    if (!turnState) {
+      return res.status(404).json({ error: 'Movement A is not active for this group' });
+    }
+
+    const prompt = prompts.find((p) => p.id === turnState.promptId);
+    if (!prompt) {
+      return res.status(404).json({ error: 'Prompt not found' });
+    }
+    const promptText = team === 'skotia' ? prompt.skotia_prompt : prompt.phos_prompt;
+
+    const isDeliberation = turnState.completedCount >= turnState.turnOrder.length;
+    const movementId = await _getActiveMovementAId(gameId);
+
+    let submittedWords = [];
+    let allWords = [];
+    let allSketches = [];
+
+    if (movementId) {
+      if (isDeliberation) {
+        if (turnState.promptMode === 'sketch') {
+          const sketchRes = await db.query(
+            `SELECT mas.sketch_data, mas.user_id, u.username
+             FROM movement_a_submissions mas
+             JOIN users u ON u.id = mas.user_id
+             WHERE mas.movement_id = $1 AND mas.group_id = $2
+             ORDER BY mas.submitted_at ASC`,
+            [movementId, groupId]
+          );
+          allSketches = sketchRes.rows.map((r) => ({
+            userId:     String(r.user_id),
+            username:   r.username,
+            sketchData: r.sketch_data,
+          }));
+        } else {
+          const wordsRes = await db.query(
+            `SELECT mas.word, mas.user_id, u.username
+             FROM movement_a_submissions mas
+             JOIN users u ON u.id = mas.user_id
+             WHERE mas.movement_id = $1 AND mas.group_id = $2
+             ORDER BY mas.submitted_at ASC`,
+            [movementId, groupId]
+          );
+          allWords = wordsRes.rows.map((r) => ({
+            userId:   String(r.user_id),
+            username: r.username,
+            word:     r.word,
+          }));
+        }
+      } else if (turnState.promptMode === 'word') {
+        // Active turns — fetch submitted words so far for live reveal
+        const wordsRes = await db.query(
+          `SELECT mas.word, mas.user_id, u.username
+           FROM movement_a_submissions mas
+           JOIN users u ON u.id = mas.user_id
+           WHERE mas.movement_id = $1 AND mas.group_id = $2
+           ORDER BY mas.submitted_at ASC`,
+          [movementId, groupId]
+        );
+        submittedWords = wordsRes.rows.map((r) => ({
+          userId:   String(r.user_id),
+          username: r.username,
+          word:     r.word,
+        }));
+      }
+    }
+
+    // Seconds remaining on the current turn (computed from server-tracked start time)
+    const turnSecondsLeft = turnState.turnStartedAt
+      ? Math.max(0, Math.round(30 - (Date.now() - turnState.turnStartedAt) / 1000))
+      : 30;
+
+    res.json({
+      phase:             isDeliberation ? 'deliberation' : 'active',
+      prompt:            promptText,
+      promptMode:        turnState.promptMode || 'word',
+      currentPlayerId:   String(turnState.turnOrder[turnState.currentIndex]),
+      turnOrder:         turnState.turnOrder.map(String),
+      completedCount:    turnState.completedCount,
+      totalCount:        turnState.turnOrder.length,
+      turnSecondsLeft,
+      submittedWords,
+      allWords,
+      allSketches,
+      deliberationEndsAt: isDeliberation ? getDeliberationEndsAt(gameId) : null,
+    });
+  } catch (err) {
+    console.error('[GET movement-a/state]', err.message);
     res.status(500).json({ error: 'Server error' });
   }
 });

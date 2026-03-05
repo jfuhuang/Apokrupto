@@ -10,6 +10,7 @@ import {
   ScrollView,
   FlatList,
   RefreshControl,
+  Animated,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -211,6 +212,12 @@ export default function MovementAScreen({
   const [turnOrder, setTurnOrder] = useState(null); // [userId, ...] from server
   const [refreshing, setRefreshing] = useState(false);
 
+  // Scroll indicator state
+  const [scrollViewHeight, setScrollViewHeight] = useState(0);
+  const [scrollContentHeight, setScrollContentHeight] = useState(0);
+  const [isScrolledToBottom, setIsScrolledToBottom] = useState(false);
+  const scrollArrowOpacity = useRef(new Animated.Value(0)).current;
+
   const socketRef = useRef(null);
   const turnTimerRef = useRef(null);
   const deliberationTimerRef = useRef(null);
@@ -220,11 +227,22 @@ export default function MovementAScreen({
   const sketchCanvasRef = useRef(null); // ref to SketchCanvas for getSketchData() on auto-submit
   const promptModeRef = useRef(promptMode); // mirror for stale closure in timer
   const sketchDataRef = useRef(null); // mirror of sketchData for stale closure fallback
+  const hasConnectedRef = useRef(false); // tracks whether socket has connected at least once
 
   // Keep refs in sync with state so interval/timer callbacks always have the latest value
   useEffect(() => { wordInputRef.current = wordInput; }, [wordInput]);
   useEffect(() => { promptModeRef.current = promptMode; }, [promptMode]);
   useEffect(() => { sketchDataRef.current = sketchData; }, [sketchData]);
+
+  // Animate the scroll-down arrow in/out whenever overflow or scroll position changes
+  useEffect(() => {
+    const shouldShow = scrollContentHeight > scrollViewHeight + 10 && !isScrolledToBottom;
+    Animated.timing(scrollArrowOpacity, {
+      toValue: shouldShow ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [scrollContentHeight, scrollViewHeight, isScrolledToBottom]);
 
   // Unlock orientation while the player is actively drawing so they can freely
   // rotate to portrait or landscape. Lock back to landscape on any other phase.
@@ -288,6 +306,94 @@ export default function MovementAScreen({
     setRefreshing(false);
   };
 
+  // Restore full screen state after a disconnect/reconnect by querying the server.
+  const fetchMovementAState = async () => {
+    try {
+      const baseUrl = await getApiUrl();
+      const res = await fetch(`${baseUrl}/api/games/${gameId}/movement-a/state`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+
+      if (data.prompt) setPrompt(data.prompt);
+      if (data.promptMode) setPromptMode(data.promptMode);
+      if (data.turnOrder) setTurnOrder(data.turnOrder);
+
+      setCompletedCount(data.completedCount);
+
+      if (data.phase === 'deliberation') {
+        clearInterval(turnTimerRef.current);
+        setPhase('deliberation');
+        setSubmittedIds(new Set((groupMembers || []).map((m) => String(m.id))));
+        if (data.promptMode === 'sketch') {
+          setAllSketches(data.allSketches);
+        } else {
+          setAllWords(data.allWords);
+        }
+        if (data.deliberationEndsAt) {
+          clearInterval(deliberationTimerRef.current);
+          const tick = () => {
+            const secsLeft = Math.max(0, Math.round((data.deliberationEndsAt - Date.now()) / 1000));
+            setDeliberationSecondsLeft(secsLeft);
+            if (secsLeft <= 0) clearInterval(deliberationTimerRef.current);
+          };
+          tick();
+          deliberationTimerRef.current = setInterval(tick, 1000);
+        }
+      } else {
+        // Active turns phase
+        const newSubmittedIds = new Set(data.submittedWords.map((w) => String(w.userId)));
+        setSubmittedIds(newSubmittedIds);
+        if (data.promptMode === 'word') {
+          setSubmittedWords(data.submittedWords);
+        }
+
+        const currentPId = data.currentPlayerId;
+        const name = groupMembers?.find((m) => String(m.id) === String(currentPId))?.username || 'Someone';
+        setCurrentTurnPlayerId(currentPId);
+        setCurrentTurnPlayerName(name);
+        prevTurnPlayerIdRef.current = currentPId;
+
+        const secsLeft = data.turnSecondsLeft;
+        setTurnSecondsLeft(secsLeft);
+
+        const amCurrentPlayer = String(currentPId) === String(currentUserId);
+        const iAlreadySubmitted = newSubmittedIds.has(String(currentUserId));
+
+        if (amCurrentPlayer && !iAlreadySubmitted) {
+          setPhase('my_turn');
+          submittedRef.current = false;
+        } else if (iAlreadySubmitted) {
+          setPhase('waiting_others');
+        } else {
+          setPhase('waiting_turn');
+        }
+
+        // Restart countdown from server-reported remaining seconds
+        clearInterval(turnTimerRef.current);
+        let secs = secsLeft;
+        turnTimerRef.current = setInterval(() => {
+          secs -= 1;
+          setTurnSecondsLeft(secs);
+          if (secs <= 0) {
+            clearInterval(turnTimerRef.current);
+            if (amCurrentPlayer && !submittedRef.current) {
+              if (promptModeRef.current === 'sketch') {
+                handleSubmit();
+              } else {
+                handleSubmit(wordInputRef.current.trim() || '—');
+              }
+            }
+          }
+        }, 1000);
+      }
+      logger.game('MovementA', 'state restored after reconnect');
+    } catch (err) {
+      logger.error('MovementA', 'reconnect state fetch failed', err);
+    }
+  };
+
   // Socket connection
   useEffect(() => {
     let socket;
@@ -303,10 +409,22 @@ export default function MovementAScreen({
 
       socket.on('connect', () => {
         logger.socket('MovementA', 'connected');
+        setSocketConnected(true);
         // Join group room for turn-level events (turnStart, deliberationStart)
         socket.emit('joinRoom', { lobbyId: groupId });
         // Join lobby room to receive GM advance signals (movementStart)
         if (lobbyId) socket.emit('joinRoom', { lobbyId });
+
+        if (hasConnectedRef.current) {
+          // Reconnect — restore screen state from server
+          logger.game('MovementA', 'reconnected — fetching state');
+          fetchMovementAState();
+        }
+        hasConnectedRef.current = true;
+      });
+
+      socket.on('disconnect', () => {
+        setSocketConnected(false);
       });
 
       // Server announces whose turn it is
@@ -918,23 +1036,42 @@ export default function MovementAScreen({
           <Text style={styles.headerRound}>ROUND {roundNumber}</Text>
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefreshPrompt}
-              tintColor={colors.primary.electricBlue}
-              colors={[colors.primary.electricBlue]}
-            />
-          }
-        >
-          {renderGroupRoster()}
-          <View style={styles.divider} />
-          {renderPhase()}
-        </ScrollView>
+        <View style={styles.scrollWrapper}>
+          <ScrollView
+            contentContainerStyle={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            onLayout={(e) => setScrollViewHeight(e.nativeEvent.layout.height)}
+            onContentSizeChange={(_, h) => setScrollContentHeight(h)}
+            onScroll={(e) => {
+              const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+              setIsScrolledToBottom(
+                contentOffset.y + layoutMeasurement.height >= contentSize.height - 20
+              );
+            }}
+            scrollEventThrottle={100}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefreshPrompt}
+                tintColor={colors.primary.electricBlue}
+                colors={[colors.primary.electricBlue]}
+              />
+            }
+          >
+            {renderGroupRoster()}
+            <View style={styles.divider} />
+            {renderPhase()}
+          </ScrollView>
+
+          {/* Scroll-down indicator */}
+          <Animated.View
+            style={[styles.scrollArrow, { opacity: scrollArrowOpacity }]}
+            pointerEvents="none"
+          >
+            <Text style={styles.scrollArrowText}>{'↓'}</Text>
+          </Animated.View>
+        </View>
       </SafeAreaView>
     </View>
   );
@@ -969,9 +1106,29 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     letterSpacing: 1,
   },
+  scrollWrapper: {
+    flex: 1,
+    position: 'relative',
+  },
   scroll: {
     flexGrow: 1,
-    paddingBottom: 32,
+    paddingBottom: 48, // extra room so content clears the arrow
+  },
+  scrollArrow: {
+    position: 'absolute',
+    bottom: 8,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    pointerEvents: 'none',
+  },
+  scrollArrowText: {
+    fontFamily: fonts.accent.bold,
+    fontSize: 22,
+    color: colors.primary.electricBlue,
+    textShadowColor: colors.shadow.electricBlue,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
 
   // ── Group Roster ──────────────────────────────────────────────────────────
