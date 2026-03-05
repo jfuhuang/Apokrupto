@@ -6,11 +6,18 @@ export default function RoundSummaryScreen({
   currentRound,
   totalRounds,
   isMarked,
+  lobbyId,
   socket,
   onNextRound,
   onGameOver,
 }) {
   const s = roundSummary || {}
+
+  // Re-join lobby room in case socket reconnected
+  useEffect(() => {
+    if (!socket || !lobbyId) return
+    socket.emit('joinRoom', { lobbyId })
+  }, [socket, lobbyId])
 
   useEffect(() => {
     if (!socket) return
@@ -21,18 +28,38 @@ export default function RoundSummaryScreen({
       }
     }
 
+    function onMovementComplete() {
+      // Movement done; next movementStart will drive navigation
+    }
+
+    function onGameStateUpdate(data) {
+      if (data.gameState?.status === 'completed') {
+        onGameOver({ teamPoints: data.teamPoints })
+      }
+    }
+
+    function onSusStatusUpdate() {
+      // Mark status updated — parent App.jsx polls will reflect this
+    }
+
     function onGameOverEvent(data) {
       onGameOver(data)
     }
 
     socket.on('movementStart', onMovementStart)
+    socket.on('movementComplete', onMovementComplete)
+    socket.on('gameStateUpdate', onGameStateUpdate)
+    socket.on('susStatusUpdate', onSusStatusUpdate)
     socket.on('gameOver', onGameOverEvent)
 
     return () => {
       socket.off('movementStart', onMovementStart)
+      socket.off('movementComplete', onMovementComplete)
+      socket.off('gameStateUpdate', onGameStateUpdate)
+      socket.off('susStatusUpdate', onSusStatusUpdate)
       socket.off('gameOver', onGameOverEvent)
     }
-  }, [socket, onNextRound, onGameOver])
+  }, [socket, lobbyId, onNextRound, onGameOver])
 
   return (
     <div style={styles.container}>

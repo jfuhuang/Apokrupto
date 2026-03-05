@@ -33,6 +33,12 @@ export default function GmDashboardScreen({
 
   const [turnUpdate, setTurnUpdate] = useState(null) // { turnIndex, totalTurns, phase, slotStartedAt }
 
+  // Re-join lobby room in case socket reconnected
+  useEffect(() => {
+    if (!socket || !lobbyId) return
+    socket.emit('joinRoom', { lobbyId })
+  }, [socket, lobbyId])
+
   useEffect(() => {
     if (!socket) return
 
@@ -49,13 +55,19 @@ export default function GmDashboardScreen({
       setTurnUpdate(data)
     }
 
+    function onMovementComplete() {
+      loadState()
+    }
+
     socket.on('gameOver', onGameOverEvent)
     socket.on('gameStateUpdate', onGameStateUpdate)
     socket.on('movementATurnUpdate', onMovementATurnUpdate)
+    socket.on('movementComplete', onMovementComplete)
     return () => {
       socket.off('gameOver', onGameOverEvent)
       socket.off('gameStateUpdate', onGameStateUpdate)
       socket.off('movementATurnUpdate', onMovementATurnUpdate)
+      socket.off('movementComplete', onMovementComplete)
     }
   }, [socket, onGameOver, loadState])
 

@@ -434,6 +434,7 @@ export default function App() {
             currentRound={state.currentRound}
             totalRounds={state.totalRounds}
             isMarked={state.isMarked}
+            lobbyId={state.currentLobbyId}
             socket={socketRef.current}
             onNextRound={handleNextRound}
             onGameOver={handleGameOver}

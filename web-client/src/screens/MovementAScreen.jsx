@@ -194,10 +194,22 @@ export default function MovementAScreen({
 
     function onMovementComplete(data) {
       if (data.movement === 'A') {
+        // A is done; clear local timers and wait for movementStart {B/C} to navigate
         clearInterval(timerRef.current)
         clearInterval(deliberationTimerRef.current)
-        onMovementEnd('hub')
       }
+    }
+
+    function onGameStateUpdate(data) {
+      if (data.gameState?.movement && data.gameState.movement !== 'A') {
+        clearInterval(timerRef.current)
+        clearInterval(deliberationTimerRef.current)
+        onMovementEnd(data.gameState.movement)
+      }
+    }
+
+    function onSusStatusUpdate() {
+      // Player's marked status updated — reflected via next game state poll
     }
 
     function onDeliberationReady(data) {
@@ -217,6 +229,8 @@ export default function MovementAScreen({
     socket.on('deliberationReady', onDeliberationReady)
     socket.on('movementComplete', onMovementComplete)
     socket.on('movementStart', onMovementStart)
+    socket.on('gameStateUpdate', onGameStateUpdate)
+    socket.on('susStatusUpdate', onSusStatusUpdate)
 
     return () => {
       socket.off('turnStart', onTurnStart)
@@ -225,6 +239,8 @@ export default function MovementAScreen({
       socket.off('deliberationReady', onDeliberationReady)
       socket.off('movementComplete', onMovementComplete)
       socket.off('movementStart', onMovementStart)
+      socket.off('gameStateUpdate', onGameStateUpdate)
+      socket.off('susStatusUpdate', onSusStatusUpdate)
       clearInterval(deliberationTimerRef.current)
     }
   }, [socket, currentGroupId, lobbyId, currentUserId, contextGroupMembers, onMovementEnd])

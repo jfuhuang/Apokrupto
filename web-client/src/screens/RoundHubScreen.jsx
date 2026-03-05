@@ -92,16 +92,28 @@ export default function RoundHubScreen({
       }
     }
 
+    function onMovementComplete() {
+      // Movement done; movementStart or gameStateUpdate will drive navigation
+    }
+
+    function onSusStatusUpdate() {
+      // Mark status updated — reflected via next game state poll
+    }
+
     socket.on('movementStart', onMovementStart)
     socket.on('gameOver', onGameOverEvent)
     socket.on('announcement', onAnnouncement)
     socket.on('gameStateUpdate', onGameStateUpdate)
+    socket.on('movementComplete', onMovementComplete)
+    socket.on('susStatusUpdate', onSusStatusUpdate)
 
     return () => {
       socket.off('movementStart', onMovementStart)
       socket.off('gameOver', onGameOverEvent)
       socket.off('announcement', onAnnouncement)
       socket.off('gameStateUpdate', onGameStateUpdate)
+      socket.off('movementComplete', onMovementComplete)
+      socket.off('susStatusUpdate', onSusStatusUpdate)
     }
   }, [socket, lobbyId, onNavigateMovement, onGameOver])
 
