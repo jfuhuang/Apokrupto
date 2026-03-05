@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import AnimatedBackground from '../components/AnimatedBackground.jsx'
 import SketchCanvas from '../components/SketchCanvas.jsx'
 import { fetchMovementAPrompt, submitMovementAWord, submitMovementASketch, fetchGameState } from '../utils/api.js'
@@ -66,10 +66,17 @@ export default function MovementAScreen({
   const timerRef = useRef(null)
   const deliberationTimerRef = useRef(null)
   const sketchRef = useRef(null)
+  const hasSubmittedRef = useRef(false)
+  // Keep a ref to contextGroupMembers so loadPrompt can read it without being a dependency
+  const contextGroupMembersRef = useRef(contextGroupMembers)
+  useEffect(() => { contextGroupMembersRef.current = contextGroupMembers }, [contextGroupMembers])
 
-  const loadPrompt = useCallback(async () => {
-    const res = await fetchMovementAPrompt(token, gameId)
-    if (res.ok) {
+  // Load prompt once on mount (not re-triggered by contextGroupMembers changing)
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      const res = await fetchMovementAPrompt(token, gameId)
+      if (cancelled || !res.ok) return
       setPrompt(res.data.prompt)
       setPromptMode(res.data.promptMode || 'word')
       setTotalCount(res.data.totalCount || 0)
@@ -81,16 +88,15 @@ export default function MovementAScreen({
           setPhase('my_turn')
           setWord('')
         } else {
-          const member = contextGroupMembers?.find((m) => String(m.id) === String(res.data.currentPlayerId))
+          const members = contextGroupMembersRef.current
+          const member = members?.find((m) => String(m.id) === String(res.data.currentPlayerId))
           setCurrentPlayerName(member?.username || 'Unknown')
         }
       }
     }
-  }, [token, gameId, currentUserId, contextGroupMembers])
-
-  useEffect(() => {
-    loadPrompt()
-  }, [loadPrompt])
+    load()
+    return () => { cancelled = true }
+  }, [token, gameId, currentUserId])
 
   // Safety-net poll
   useEffect(() => {
@@ -141,7 +147,8 @@ export default function MovementAScreen({
           const prevId = String(data.turnOrder[prevIdx])
           setSubmittedIds((prev) => new Set([...prev, prevId]))
           if (data.lastWord && data.lastWord !== '') {
-            const prevMember = contextGroupMembers?.find((m) => String(m.id) === prevId)
+            const members = contextGroupMembersRef.current
+            const prevMember = members?.find((m) => String(m.id) === prevId)
             setSubmittedWords((prev) => {
               if (prev.some((w) => String(w.userId) === prevId)) return prev
               return [...prev, { userId: prevId, username: prevMember?.username || '', word: data.lastWord }]
@@ -150,10 +157,12 @@ export default function MovementAScreen({
         }
       }
       // Find name from context group members
-      const member = contextGroupMembers?.find((m) => String(m.id) === String(data.currentPlayerId))
+      const members = contextGroupMembersRef.current
+      const member = members?.find((m) => String(m.id) === String(data.currentPlayerId))
       setCurrentPlayerName(member?.username || 'Unknown')
 
       if (String(data.currentPlayerId) === String(currentUserId)) {
+        hasSubmittedRef.current = false  // Reset for new turn
         setPhase('my_turn')
         setWord('')
       } else {
@@ -179,8 +188,9 @@ export default function MovementAScreen({
       setWords(data.words || [])
       setSketches(data.sketches || [])
       // Mark all members as submitted
-      if (contextGroupMembers) {
-        setSubmittedIds(new Set(contextGroupMembers.map((m) => String(m.id))))
+      const members = contextGroupMembersRef.current
+      if (members) {
+        setSubmittedIds(new Set(members.map((m) => String(m.id))))
       }
       clearInterval(timerRef.current)
     }
@@ -243,9 +253,10 @@ export default function MovementAScreen({
       socket.off('susStatusUpdate', onSusStatusUpdate)
       clearInterval(deliberationTimerRef.current)
     }
-  }, [socket, currentGroupId, lobbyId, currentUserId, contextGroupMembers, onMovementEnd])
+  }, [socket, currentGroupId, lobbyId, currentUserId, onMovementEnd])
 
   async function handleSubmit() {
+    if (hasSubmittedRef.current) return  // Already submitted this turn
     setSubmitting(true)
     setError('')
     let res
@@ -256,10 +267,11 @@ export default function MovementAScreen({
       if (!word.trim()) { setSubmitting(false); return }
       res = await submitMovementAWord(token, gameId, word.trim())
     }
-    setSubmitting(false)
     if (!res.ok) {
+      setSubmitting(false)
       setError(res.data?.error || 'Could not submit.')
     } else {
+      hasSubmittedRef.current = true
       setSubmitMsg(promptMode === 'sketch' ? 'Sketch submitted! Waiting...' : 'Word submitted! Waiting...')
       // Track own submission locally immediately
       setSubmittedIds((prev) => new Set([...prev, String(currentUserId)]))
@@ -271,6 +283,7 @@ export default function MovementAScreen({
       }
       setPhase('waiting')
       setWord('')
+      setSubmitting(false)
       sketchRef.current?.clear()
     }
   }
@@ -315,22 +328,7 @@ export default function MovementAScreen({
           </div>
         )}
 
-        {/* Progress */}
-        {totalCount > 0 && (
-          <div style={styles.progressRow}>
-            <span style={styles.progressText}>
-              {completedCount}/{totalCount} submitted
-            </span>
-            <div style={styles.progressBar}>
-              <div
-                style={{
-                  ...styles.progressFill,
-                  width: `${(completedCount / totalCount) * 100}%`,
-                }}
-              />
-            </div>
-          </div>
-        )}
+
 
         {/* Turn order list */}
         {sortedMembers.length > 0 && phase !== 'deliberation' && (
@@ -363,46 +361,7 @@ export default function MovementAScreen({
           </div>
         )}
 
-        {/* Submitted so far */}
-        {phase !== 'deliberation' && submittedIds.size > 0 && (() => {
-          if (promptMode === 'sketch') {
-            const submittedMembers = (contextGroupMembers || []).filter((m) => submittedIds.has(String(m.id)))
-            if (submittedMembers.length === 0) return null
-            return (
-              <div style={styles.submittedSection}>
-                <p style={styles.submittedLabel}>SUBMITTED SO FAR</p>
-                {submittedMembers.map((m) => {
-                  const isMe = String(m.id) === String(currentUserId)
-                  return (
-                    <div key={m.id} style={styles.submittedRow}>
-                      <span style={{ ...styles.submittedName, ...(isMe ? styles.submittedNameMe : {}) }}>
-                        {isMe ? 'You' : m.username}
-                      </span>
-                      <span style={styles.submittedCheck}>✓</span>
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          }
-          if (submittedWords.length === 0) return null
-          return (
-            <div style={styles.submittedSection}>
-              <p style={styles.submittedLabel}>SUBMITTED SO FAR</p>
-              {submittedWords.map((entry, i) => {
-                const isMe = String(entry.userId) === String(currentUserId)
-                return (
-                  <div key={i} style={styles.submittedRow}>
-                    <span style={{ ...styles.submittedName, ...(isMe ? styles.submittedNameMe : {}) }}>
-                      {isMe ? 'You' : entry.username}
-                    </span>
-                    <span style={styles.submittedWord}>{entry.word}</span>
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })()}
+
 
         {/* Turn status */}
         {phase === 'waiting' && !submitMsg && currentPlayerId && (
