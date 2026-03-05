@@ -492,11 +492,6 @@ async function advanceMovement(gameId) {
       const votingResult = await _resolveVoting(client, gameId, roundNumber);
       console.log(`[Game] Voting resolved at completeC game=${gameId} round=${roundNumber}: sus'd=${votingResult.susApplied} cleared=${votingResult.clearedApplied} phos=+${votingResult.phosPointsEarned} skotia=+${votingResult.skotiaPointsEarned}`);
 
-      // Supermajority is only an instant-win condition on the final round.
-      const isFinalRound = roundNumber >= totalRounds;
-      const supermajority = isFinalRound && await _checkSupermajority(client, gameId);
-      if (supermajority) console.log(`[Game] SUPERMAJORITY detected game=${gameId} — Phos wins!`);
-
       // Build per-player mark status map for per-socket emissions
       const marksRes = await client.query(
         'SELECT user_id::text, is_marked FROM game_players WHERE game_id = $1',
@@ -510,25 +505,6 @@ async function advanceMovement(gameId) {
         'UPDATE rounds SET voting_summary = $1 WHERE id = $2',
         [JSON.stringify(votingSummary), roundId]
       );
-
-      if (supermajority) {
-        await client.query("UPDATE rounds SET status = 'completed' WHERE id = $1", [roundId]);
-        const gameOverData = await _endGame(client, gameId, 'phos', 'supermajority');
-        await client.query('COMMIT');
-        // Clean up after commit so it doesn't deadlock the transaction above
-        cleanupGameData(String(gameId)).catch((err) =>
-          console.error('[endGame supermajority] cleanup error (non-fatal):', err.message)
-        );
-        return {
-          step:         'gameOver',
-          summary:      votingSummary,
-          groupResults: votingResult.groupResults,
-          gameOverData,
-          isSusMap,
-          lobbyId: String(lobbyId),
-          gameId:  String(gameId),
-        };
-      }
 
       await client.query('COMMIT');
       return {
@@ -819,23 +795,6 @@ async function _resolveVoting(client, gameId, roundNumber) {
   }
 
   return { susApplied, clearedApplied, phosPointsEarned, skotiaPointsEarned, groupResults, survivalBonus, survivingSkotia };
-}
-
-// ---------------------------------------------------------------------------
-// _checkSupermajority — inner helper (runs inside an existing transaction)
-// ---------------------------------------------------------------------------
-async function _checkSupermajority(client, gameId) {
-  const res = await client.query(
-    `SELECT
-       COUNT(*) FILTER (WHERE team = 'skotia')                   AS total_skotia,
-       COUNT(*) FILTER (WHERE team = 'skotia' AND is_marked)     AS marked_skotia
-     FROM game_players
-     WHERE game_id = $1`,
-    [gameId]
-  );
-  const { total_skotia, marked_skotia } = res.rows[0];
-  if (parseInt(total_skotia, 10) === 0) return false;
-  return parseInt(marked_skotia, 10) / parseInt(total_skotia, 10) >= 0.75;
 }
 
 // ---------------------------------------------------------------------------
