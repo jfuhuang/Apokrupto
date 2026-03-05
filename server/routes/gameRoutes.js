@@ -847,7 +847,7 @@ router.post('/:gameId/movement-b/complete', auth, async (req, res) => {
   // Streak bonus — client-sent, capped at 1x base (max 2x total)
   const basePoints = taskDef.points.alive;
   const cappedBonus = Number.isFinite(rawBonus) && rawBonus > 0
-    ? Math.min(Math.floor(rawBonus), basePoints)
+    ? Math.min(rawBonus, basePoints)
     : 0;
 
   const client = await db.connect();
@@ -882,7 +882,7 @@ router.post('/:gameId/movement-b/complete', auth, async (req, res) => {
     const rawPoints = basePoints + cappedBonus;
     const isSusPenaltyApplied = !!is_marked;
     const reducedPoints = isSusPenaltyApplied
-      ? Math.floor(rawPoints * POINTS.SUS_CHALLENGE_MULTIPLIER)
+      ? rawPoints * POINTS.SUS_CHALLENGE_MULTIPLIER
       : rawPoints;
     const pointsEarned = team === 'skotia' ? reducedPoints * 3 : reducedPoints;
 

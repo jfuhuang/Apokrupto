@@ -78,7 +78,7 @@ async function init() {
       id      SERIAL PRIMARY KEY,
       game_id INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
       team    VARCHAR(10) NOT NULL CHECK (team IN ('phos', 'skotia')),
-      points  INT NOT NULL DEFAULT 0,
+      points  FLOAT8 NOT NULL DEFAULT 0,
       UNIQUE (game_id, team)
     );
 
@@ -174,6 +174,11 @@ async function init() {
     ALTER TABLE lobbies DROP CONSTRAINT IF EXISTS lobbies_max_players_check;
     ALTER TABLE lobbies ADD CONSTRAINT lobbies_max_players_check
       CHECK (max_players >= 5 AND max_players <= 100);
+  `);
+
+  // Migrate: allow decimal/fractional points in game_teams (e.g. 0.5x sus penalty)
+  await pool.query(`
+    ALTER TABLE game_teams ALTER COLUMN points TYPE FLOAT8;
   `);
 
 }

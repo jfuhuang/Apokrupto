@@ -231,7 +231,7 @@ export default function TaskRushScreen({
     const newStreak = streak + 1;
     const multiplier = getMultiplier(newStreak);
     const basePoints = task.points.alive;
-    const bonusPoints = Math.floor(basePoints * (multiplier - 1.0));
+    const bonusPoints = basePoints * (multiplier - 1.0);
     const totalEarned = basePoints + bonusPoints;
 
     setStreak(newStreak);
