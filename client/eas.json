@@ -8,21 +8,21 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://apokrupto-server.onrender.com/",
+        "EXPO_PUBLIC_API_URL": "https://apokrupto-server.onrender.com",
         "EXPO_PUBLIC_API_PORT": "3000"
       }
     },
     "internal": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://apokrupto-server.onrender.com/",
+        "EXPO_PUBLIC_API_URL": "https://apokrupto-server.onrender.com",
         "EXPO_PUBLIC_API_PORT": "3000"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://apokrupto-server.onrender.com/",
+        "EXPO_PUBLIC_API_URL": "https://apokrupto-server.onrender.com",
         "EXPO_PUBLIC_API_PORT": "3000"
       }
     },
@@ -30,7 +30,7 @@
       "autoIncrement": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://apokrupto-server.onrender.com/",
+        "EXPO_PUBLIC_API_URL": "https://apokrupto-server.onrender.com",
         "EXPO_PUBLIC_API_PORT": "3000"
       }
     }

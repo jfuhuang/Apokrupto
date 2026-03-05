@@ -1,14 +1,42 @@
-import React, { useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Animated } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Animated, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedBackground from '../../components/AnimatedBackground';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
+import { getApiUrl } from '../../utils/networkUtils';
 
 export default function WelcomeScreen({ onCreateAccount, onLogin }) {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const floatAnim = useRef(new Animated.Value(0)).current;
+  const [debugClicks, setDebugClicks] = useState(0);
+  const debugTimeoutRef = useRef(null);
+
+  const handleTitlePress = async () => {
+    const newClicks = debugClicks + 1;
+    setDebugClicks(newClicks);
+
+    // Clear existing timeout
+    if (debugTimeoutRef.current) {
+      clearTimeout(debugTimeoutRef.current);
+    }
+
+    // Reset counter after 5 seconds of inactivity
+    debugTimeoutRef.current = setTimeout(() => {
+      setDebugClicks(0);
+    }, 5000);
+
+    // Show server URL after 7 clicks
+    if (newClicks === 7) {
+      const apiUrl = await getApiUrl();
+      Alert.alert(
+        'Debug Info',
+        `Server URL: ${apiUrl}`,
+        [{ text: 'OK', onPress: () => setDebugClicks(0) }]
+      );
+    }
+  };
 
   useEffect(() => {
     Animated.loop(
@@ -25,6 +53,13 @@ export default function WelcomeScreen({ onCreateAccount, onLogin }) {
         }),
       ])
     ).start();
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (debugTimeoutRef.current) {
+        clearTimeout(debugTimeoutRef.current);
+      }
+    };
   }, []);
 
   return (
@@ -38,7 +73,9 @@ export default function WelcomeScreen({ onCreateAccount, onLogin }) {
             { transform: [{ translateY: floatAnim }] }
           ]}
         >
-          <Text style={[styles.title, isLandscape && styles.titleLandscape]} numberOfLines={1} adjustsFontSizeToFit>APOKRUPTO</Text>
+          <TouchableOpacity onPress={handleTitlePress}>
+            <Text style={[styles.title, isLandscape && styles.titleLandscape]} numberOfLines={1} adjustsFontSizeToFit>APOKRUPTO</Text>
+          </TouchableOpacity>
           <Text style={[styles.subtitle, isLandscape && styles.subtitleLandscape]}>Real World Deception</Text>
         </Animated.View>
 
