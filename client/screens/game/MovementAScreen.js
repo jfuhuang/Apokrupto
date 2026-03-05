@@ -799,7 +799,7 @@ export default function MovementAScreen({
       );
 
       if (promptMode === 'sketch') {
-        const slideSize = Math.min(windowWidth - 64, 220); // cap so slides stay compact
+        const slideSize = Math.min(windowWidth - 80, 320); // one sketch per page, fill available width
         return (
           <View style={styles.phaseContainer}>
             <Text style={styles.deliberationTitle}>DISCUSS</Text>

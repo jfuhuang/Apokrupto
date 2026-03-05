@@ -368,6 +368,7 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
       {/* ── Center fill zone indicator (shown while carrying) ── */}
       {step === 'carry' && (
         <View
+          pointerEvents="none"
           style={[
             styles.centerHint,
             {
@@ -387,13 +388,13 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
       {/* ── Side dump hints (shown when ready to toss) ── */}
       {step === 'dump' && (
         <>
-          <View style={[styles.dumpHint, {
+          <View pointerEvents="none" style={[styles.dumpHint, {
             left: 0, width: DUMP_MARGIN, top: H * 0.25, height: H * 0.50,
           }]}>
             <Text style={styles.dumpArrow}>{'←'}</Text>
             <Text style={styles.dumpHintLabel}>TOSS{`\n`}OVER</Text>
           </View>
-          <View style={[styles.dumpHint, {
+          <View pointerEvents="none" style={[styles.dumpHint, {
             right: 0, width: DUMP_MARGIN, top: H * 0.25, height: H * 0.50,
           }]}>
             <Text style={styles.dumpArrow}>{'→'}</Text>
@@ -409,7 +410,7 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
       <Text style={[styles.cyclesSubLabel, { top: H * 0.06 + 28 }]}>BUCKETS BAILED</Text>
 
       {/* ── Per-step instruction banner ── */}
-      <View style={[styles.instructionBanner, { top: H * 0.10 }]}>
+      <View pointerEvents="none" style={[styles.instructionBanner, { top: H * 0.10 }]}>
         {step === 'carry' && (
           <Text style={styles.instructionText}>🪣 Drag the bucket into the centre</Text>
         )}
@@ -430,6 +431,7 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
             top:    bucketPos.y,
             width:  BUCKET_SIZE,
             height: BUCKET_SIZE + 16,
+            zIndex: 10,
           },
         ]}
         {...panResponder.panHandlers}
@@ -439,7 +441,7 @@ export default function BailWaterTask({ config, onSuccess, onFail, timeLimit, ta
       </Animated.View>
 
       {/* ── Step indicator ── */}
-      <View style={[styles.stepRow, { bottom: 16 }]}>
+      <View pointerEvents="none" style={[styles.stepRow, { bottom: 16 }]}>
         {stepLabels.map(({ key, label }) => (
           <View key={key} style={styles.stepItem}>
             <View style={[styles.stepDot, step === key && styles.stepDotActive]} />

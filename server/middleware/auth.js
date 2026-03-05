@@ -8,6 +8,9 @@ if (!JWT_SECRET) {
 }
 
 async function authenticateToken(req, res, next) {
+  // Always allow CORS preflight requests without authentication
+  if (req.method === 'OPTIONS') return next();
+
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 

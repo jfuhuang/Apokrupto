@@ -18,6 +18,16 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'],
   maxAge: 7200,
 };
+// Belt-and-suspenders: manually handle OPTIONS before any route middleware (auth etc.) can
+// intercept it. This fires before app.use(cors()) and before all routers.
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning');
+  res.setHeader('Access-Control-Max-Age', '7200');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  next();
+});
 app.options('*', cors(corsOptions)); // Handle preflight for all routes before any other middleware
 app.use(cors(corsOptions));
 app.use(express.json());
