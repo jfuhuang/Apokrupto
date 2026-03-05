@@ -12,7 +12,14 @@ const { setupLobbySocket } = require('./websocket/lobbySocket');
 const { registerCoopHandlers } = require('./websocket/coopSocket');
 
 // Allow all origins (supports ngrok tunnels, local dev, and production)
-app.use(cors());
+const corsOptions = {
+  origin: '*',
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'],
+  maxAge: 7200,
+};
+app.options('*', cors(corsOptions)); // Handle preflight for all routes before any other middleware
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 

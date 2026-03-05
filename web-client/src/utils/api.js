@@ -19,12 +19,19 @@ const BASE = getServerUrl()
 console.log('[Network] API base URL:', BASE)
 
 const authH = (token) => ({ Authorization: `Bearer ${token}` })
-const ngrokH = { 'ngrok-skip-browser-warning': '69420' } // Skip ngrok's browser interstitial
+// Only add the ngrok interstitial-skip header when actually talking to an ngrok tunnel
+const ngrokH = BASE.includes('ngrok') ? { 'ngrok-skip-browser-warning': '69420' } : {}
 const jsonH = { 'Content-Type': 'application/json' }
 
 async function req(path, options = {}) {
   const url = `${BASE}${path}`
-  const res = await fetch(url, options)
+  let res
+  try {
+    res = await fetch(url, options)
+  } catch (err) {
+    console.error('[API] Network error:', err)
+    return { ok: false, status: 0, data: { error: 'Network error' } }
+  }
   let data
   const text = await res.text()
   try { 

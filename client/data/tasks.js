@@ -121,7 +121,7 @@ export const TASKS = [
     reference: '1 Samuel 17:49',
     mechanic: MECHANIC.SLING,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 8,
     config: {},
@@ -133,7 +133,7 @@ export const TASKS = [
     reference: '2 Timothy 4:13',
     mechanic: MECHANIC.COLLECT,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 4, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -147,7 +147,7 @@ export const TASKS = [
     reference: 'Matthew 7:15',
     mechanic: MECHANIC.COLLECT,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 6, dead: 4 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 8,
     config: {
@@ -162,7 +162,7 @@ export const TASKS = [
     reference: 'Matthew 5:15',
     mechanic: MECHANIC.DRAG_PLACE,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -176,7 +176,7 @@ export const TASKS = [
     reference: 'John 10:10–11',
     mechanic: MECHANIC.GUARD,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 6, dead: 4 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'hard',
     timeLimit: 0,
     config: {
@@ -205,7 +205,7 @@ export const TASKS = [
     reference: 'Exodus 16:4',
     mechanic: MECHANIC.COLLECT,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 4, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -219,7 +219,7 @@ export const TASKS = [
     reference: 'Joshua 6:3–5',
     mechanic: MECHANIC.RAPID_TAP,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 5, dead: 3 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 8,
     config: {
@@ -233,7 +233,7 @@ export const TASKS = [
     reference: 'Joshua 6:4',
     mechanic: MECHANIC.MARCH_JERICHO,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 7, dead: 4 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'hard',
     timeLimit: 45,
     config: {},
@@ -245,7 +245,7 @@ export const TASKS = [
     reference: 'Joshua 3:15–16',
     mechanic: MECHANIC.DRAG_PLACE,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 4, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 8,
     config: {
@@ -259,7 +259,7 @@ export const TASKS = [
     reference: 'Judges 7:20',
     mechanic: MECHANIC.HOLD,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -273,7 +273,7 @@ export const TASKS = [
     reference: 'Daniel 3:17–18',
     mechanic: MECHANIC.HOLD,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 0,
     config: {
@@ -287,7 +287,7 @@ export const TASKS = [
     reference: '1 Kings 6',
     mechanic: MECHANIC.DRAG_PLACE,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 5, dead: 3 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'hard',
     timeLimit: 8,
     config: {
@@ -315,7 +315,7 @@ export const TASKS = [
     reference: 'Luke 15:4',
     mechanic: MECHANIC.GUARD,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 5, dead: 3 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'hard',
     timeLimit: 0,
     config: {
@@ -330,7 +330,7 @@ export const TASKS = [
     reference: 'Jonah 1:4–5',
     mechanic: MECHANIC.BAIL_WATER,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 25,           // seconds — slightly generous to allow learning the gesture
     config: {
@@ -345,7 +345,7 @@ export const TASKS = [
     reference: 'Matthew 14:29–30',
     mechanic: MECHANIC.FOCUS,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'hard',
     timeLimit: 0,
     config: {
@@ -363,7 +363,7 @@ export const TASKS = [
     reference: 'Exodus 13:21',
     mechanic: MECHANIC.GUARD,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 5, dead: 3 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'hard',
     timeLimit: 0,
     config: {
@@ -378,7 +378,7 @@ export const TASKS = [
     reference: 'Joshua 4:3',
     mechanic: MECHANIC.COLLECT,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 8,
     config: {
@@ -392,7 +392,7 @@ export const TASKS = [
     reference: 'Numbers 20:8–12',
     mechanic: MECHANIC.PATIENCE,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 0,
     config: {
@@ -406,7 +406,7 @@ export const TASKS = [
     reference: 'Psalm 46:10',
     mechanic: MECHANIC.PATIENCE,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 0,
     config: {
@@ -420,7 +420,7 @@ export const TASKS = [
     reference: 'Isaiah 40:31',
     mechanic: MECHANIC.PATIENCE,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'hard',
     timeLimit: 0,
     config: {
@@ -436,7 +436,7 @@ export const TASKS = [
     reference: 'Psalm 3 (title)',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -452,7 +452,7 @@ export const TASKS = [
     reference: 'Luke 6:13',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -468,7 +468,7 @@ export const TASKS = [
     reference: 'Jonah 1:17',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -484,7 +484,7 @@ export const TASKS = [
     reference: 'Matthew 26:75',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -500,7 +500,7 @@ export const TASKS = [
     reference: 'Matthew 3:13',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -516,7 +516,7 @@ export const TASKS = [
     reference: 'Genesis 1:1',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -532,7 +532,7 @@ export const TASKS = [
     reference: '1 Samuel 17:50',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -550,7 +550,7 @@ export const TASKS = [
     reference: 'Exodus 3:2',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -566,7 +566,7 @@ export const TASKS = [
     reference: 'Genesis 2:17',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -582,7 +582,7 @@ export const TASKS = [
     reference: 'Exodus 14:21',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -598,7 +598,7 @@ export const TASKS = [
     reference: 'Judges 16:17',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -614,7 +614,7 @@ export const TASKS = [
     reference: 'Genesis 6:14',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -630,7 +630,7 @@ export const TASKS = [
     reference: 'Daniel 6:16',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -646,7 +646,7 @@ export const TASKS = [
     reference: 'Genesis 5:27',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 8,
     config: {
@@ -662,7 +662,7 @@ export const TASKS = [
     reference: '2 Peter 3:15–16',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 8,
     config: {
@@ -678,7 +678,7 @@ export const TASKS = [
     reference: 'Exodus 7–12',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 8,
     config: {
@@ -694,7 +694,7 @@ export const TASKS = [
     reference: 'Matthew 5:3–12',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 8,
     config: {
@@ -712,7 +712,7 @@ export const TASKS = [
     reference: 'Iowa State Athletics',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -728,7 +728,7 @@ export const TASKS = [
     reference: 'Iowa State Athletics',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -744,7 +744,7 @@ export const TASKS = [
     reference: 'Iowa State University',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -760,7 +760,7 @@ export const TASKS = [
     reference: 'Iowa State Athletics',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -776,7 +776,7 @@ export const TASKS = [
     reference: 'Iowa State University History',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 8,
     config: {
@@ -792,7 +792,7 @@ export const TASKS = [
     reference: 'Iowa State Athletics',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -808,7 +808,7 @@ export const TASKS = [
     reference: 'Iowa State Athletics',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 2, dead: 1 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 8,
     config: {
@@ -824,7 +824,7 @@ export const TASKS = [
     reference: 'Iowa State Athletics',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 8,
     config: {
@@ -840,7 +840,7 @@ export const TASKS = [
     reference: 'Iowa State University History',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 8,
     config: {
@@ -856,7 +856,7 @@ export const TASKS = [
     reference: 'Iowa State University',
     mechanic: MECHANIC.TRIVIA,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 8,
     config: {
@@ -874,7 +874,7 @@ export const TASKS = [
     reference: '2 Corinthians 5:17',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -891,7 +891,7 @@ export const TASKS = [
     reference: 'Galatians 2:20',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 4, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 0,
     config: {
@@ -908,7 +908,7 @@ export const TASKS = [
     reference: 'Romans 12:1',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 4, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 0,
     config: {
@@ -925,7 +925,7 @@ export const TASKS = [
     reference: 'John 14:21',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -942,7 +942,7 @@ export const TASKS = [
     reference: '2 Timothy 3:16',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -959,7 +959,7 @@ export const TASKS = [
     reference: 'Joshua 1:8',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 4, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 0,
     config: {
@@ -976,7 +976,7 @@ export const TASKS = [
     reference: 'John 15:7',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -993,7 +993,7 @@ export const TASKS = [
     reference: 'Philippians 4:6–7',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 4, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 0,
     config: {
@@ -1010,7 +1010,7 @@ export const TASKS = [
     reference: 'Matthew 18:20',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -1027,7 +1027,7 @@ export const TASKS = [
     reference: 'Hebrews 10:24–25',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 5, dead: 3 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'hard',
     timeLimit: 0,
     config: {
@@ -1044,7 +1044,7 @@ export const TASKS = [
     reference: 'Matthew 4:19',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -1061,7 +1061,7 @@ export const TASKS = [
     reference: 'Romans 1:16',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 4, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 0,
     config: {
@@ -1080,7 +1080,7 @@ export const TASKS = [
     reference: 'Romans 3:23',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -1097,7 +1097,7 @@ export const TASKS = [
     reference: 'Isaiah 53:6',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 4, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 0,
     config: {
@@ -1114,7 +1114,7 @@ export const TASKS = [
     reference: 'Romans 6:23',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -1131,7 +1131,7 @@ export const TASKS = [
     reference: 'Hebrews 9:27',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -1148,7 +1148,7 @@ export const TASKS = [
     reference: 'Romans 5:8',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -1165,7 +1165,7 @@ export const TASKS = [
     reference: '1 Peter 3:18',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 4, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 0,
     config: {
@@ -1182,7 +1182,7 @@ export const TASKS = [
     reference: 'Ephesians 2:8–9',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -1199,7 +1199,7 @@ export const TASKS = [
     reference: 'Titus 3:5',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 4, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 0,
     config: {
@@ -1216,7 +1216,7 @@ export const TASKS = [
     reference: 'John 1:12',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -1233,7 +1233,7 @@ export const TASKS = [
     reference: 'Revelation 3:20',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -1250,7 +1250,7 @@ export const TASKS = [
     reference: '1 John 5:13',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 3, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'easy',
     timeLimit: 0,
     config: {
@@ -1267,7 +1267,7 @@ export const TASKS = [
     reference: 'John 5:24',
     mechanic: MECHANIC.SCRIPTURE_BLANK,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 4, dead: 2 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 0,
     config: {
@@ -1286,7 +1286,7 @@ export const TASKS = [
     reference: 'Nehemiah 4:17',
     mechanic: MECHANIC.BUILD,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 5, dead: 3 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'medium',
     timeLimit: 12,
     config: {
@@ -1301,7 +1301,7 @@ export const TASKS = [
     reference: '1 Kings 18:30-32',
     mechanic: MECHANIC.BUILD,
     category: TASK_CATEGORY.CHALLENGES,
-    points: { alive: 6, dead: 4 },
+    points: { alive: 1, dead: 1 },
     difficulty: 'hard',
     timeLimit: 12,
     config: {
