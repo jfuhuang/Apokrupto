@@ -48,30 +48,89 @@ function WolfSvg() {
   return (
     <Svg width={ENEMY_SIZE} height={ENEMY_SIZE} viewBox="0 0 56 56">
       <G>
-        {/* Body */}
-        <Ellipse cx="28" cy="36" rx="16" ry="11" fill="#555" />
-        {/* Head */}
-        <Ellipse cx="28" cy="20" rx="11" ry="10" fill="#555" />
+        {/* Ground shadow */}
+        <Ellipse cx="27" cy="54" rx="17" ry="3.5" fill="#000" opacity="0.30" />
+
+        {/* ── Tail — bushy, swept upward ── */}
+        <Path d="M42 38 Q52 30 51 20 Q53 18 52 15" stroke="#3A3A3A" strokeWidth="6" fill="none" strokeLinecap="round" />
+        <Path d="M42 38 Q51 32 50 22 Q52 20 51 17" stroke="#5A5A5A" strokeWidth="3" fill="none" strokeLinecap="round" />
+        {/* Tail tip — pale */}
+        <Circle cx="51" cy="15" r="4" fill="#B0A898" />
+        <Circle cx="51" cy="15" r="2" fill="#D0C8B8" />
+
+        {/* ── Body ── */}
+        {/* Body shadow underside */}
+        <Ellipse cx="27" cy="40" rx="16" ry="9" fill="#1A1A1A" opacity="0.5" />
+        {/* Main body */}
+        <Ellipse cx="27" cy="37" rx="16" ry="11" fill="#484848" />
+        {/* Fur highlight — top of back */}
+        <Ellipse cx="24" cy="30" rx="10" ry="5" fill="#686868" opacity="0.55" />
+        {/* Scruff / mane fur at neck */}
+        <Path d="M20 28 Q16 24 18 20" stroke="#585858" strokeWidth="4" fill="none" strokeLinecap="round" />
+        <Path d="M22 27 Q19 23 21 19" stroke="#686868" strokeWidth="3" fill="none" strokeLinecap="round" />
+
+        {/* ── Legs — four, with paws ── */}
+        {/* Rear legs */}
+        <Rect x="13" y="44" width="7" height="12" rx="3.5" fill="#3C3C3C" />
+        <Rect x="24" y="44" width="7" height="12" rx="3.5" fill="#3C3C3C" />
+        {/* Front legs */}
+        <Rect x="33" y="43" width="7" height="12" rx="3.5" fill="#404040" />
+        <Rect x="40" y="40" width="7" height="12" rx="3.5" fill="#404040" />
+        {/* Paws */}
+        <Ellipse cx="16.5" cy="56" rx="4"  ry="2.5" fill="#2A2A2A" />
+        <Ellipse cx="27.5" cy="56" rx="4"  ry="2.5" fill="#2A2A2A" />
+        <Ellipse cx="36.5" cy="55" rx="4"  ry="2.5" fill="#2A2A2A" />
+        <Ellipse cx="43.5" cy="52" rx="4"  ry="2.5" fill="#2A2A2A" />
+        {/* Claw tips */}
+        <Path d="M13 56 L12 58 M15.5 57 L15 59 M18 56 L19 58" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round" />
+        <Path d="M37 55 L36 57 M40 55 L40 57" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round" />
+
+        {/* ── Head ── */}
+        {/* Neck */}
+        <Ellipse cx="22" cy="28" rx="8" ry="9" fill="#484848" />
+        {/* Head base */}
+        <Ellipse cx="22" cy="19" rx="11" ry="10" fill="#505050" />
+        {/* Head underside shading */}
+        <Ellipse cx="22" cy="22" rx="9"  ry="7" fill="#3A3A3A" opacity="0.4" />
+        {/* Forehead highlight */}
+        <Ellipse cx="20" cy="14" rx="6"  ry="4" fill="#686868" opacity="0.45" />
+
         {/* Pointed ears */}
-        <Polygon points="19,14 14,4 24,10" fill="#555" />
-        <Polygon points="37,14 42,4 32,10" fill="#555" />
-        {/* Inner ears */}
-        <Polygon points="20,13 16,7 24,10" fill="#FF3366" opacity="0.6" />
-        <Polygon points="36,13 40,7 32,10" fill="#FF3366" opacity="0.6" />
-        {/* Eyes - glowing red */}
-        <Circle cx="23" cy="18" r="2.5" fill="#FF3366" />
-        <Circle cx="33" cy="18" r="2.5" fill="#FF3366" />
-        <Circle cx="23" cy="18" r="1"   fill="#FF0000" />
-        <Circle cx="33" cy="18" r="1"   fill="#FF0000" />
-        {/* Snout */}
-        <Ellipse cx="28" cy="25" rx="7" ry="5" fill="#444" />
-        {/* Nose */}
-        <Ellipse cx="28" cy="23" rx="3" ry="2" fill="#222" />
-        {/* Tail */}
-        <Path d="M44 36 Q52 28 50 20" stroke="#555" strokeWidth="5" fill="none" strokeLinecap="round" />
-        {/* Legs */}
-        <Rect x="16" y="45" width="7" height="10" rx="3" fill="#555" />
-        <Rect x="33" y="45" width="7" height="10" rx="3" fill="#555" />
+        <Polygon points="13,15 8,3 20,10"  fill="#484848" />
+        <Polygon points="31,15 36,3 24,10" fill="#484848" />
+        {/* Inner ears — deep red-pink */}
+        <Polygon points="14,14 10,6 19,10"  fill="#7A1A2A" opacity="0.80" />
+        <Polygon points="30,14 34,6 25,10" fill="#7A1A2A" opacity="0.80" />
+        {/* Ear highlight ridge */}
+        <Line x1="11" y1="5"  x2="14" y2="11" stroke="#5A5A5A" strokeWidth="1" opacity="0.5" />
+        <Line x1="33" y1="5"  x2="30" y2="11" stroke="#5A5A5A" strokeWidth="1" opacity="0.5" />
+
+        {/* ── Snout / Muzzle ── */}
+        <Ellipse cx="22" cy="24" rx="7.5" ry="5.5" fill="#3C3C3C" />
+        <Ellipse cx="22" cy="24" rx="6"   ry="4"   fill="#444" />
+        {/* Nose — dark leather */}
+        <Ellipse cx="22" cy="21" rx="3.5" ry="2.5" fill="#1A1A1A" />
+        <Ellipse cx="21" cy="20" rx="1.5" ry="1"   fill="#3C3C3C" opacity="0.6" />
+        {/* Mouth line */}
+        <Path d="M22 24 Q19 27 17 26" stroke="#2A2A2A" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+        <Path d="M22 24 Q25 27 27 26" stroke="#2A2A2A" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+        {/* Fangs */}
+        <Polygon points="20,26 19,30 21,27" fill="#E8E8E0" opacity="0.85" />
+        <Polygon points="24,26 25,30 23,27" fill="#E8E8E0" opacity="0.85" />
+
+        {/* ── Eyes — glowing threat ── */}
+        {/* Eye glow aura */}
+        <Circle cx="17" cy="17" r="4.5" fill="#FF1A3C" opacity="0.18" />
+        <Circle cx="27" cy="17" r="4.5" fill="#FF1A3C" opacity="0.18" />
+        {/* Iris */}
+        <Circle cx="17" cy="17" r="3"   fill="#CC0028" />
+        <Circle cx="27" cy="17" r="3"   fill="#CC0028" />
+        {/* Pupil — vertical slit */}
+        <Ellipse cx="17" cy="17" rx="1" ry="2.2" fill="#0A0005" />
+        <Ellipse cx="27" cy="17" rx="1" ry="2.2" fill="#0A0005" />
+        {/* Eye shine */}
+        <Circle cx="18" cy="16" r="0.8" fill="#FF6080" opacity="0.70" />
+        <Circle cx="28" cy="16" r="0.8" fill="#FF6080" opacity="0.70" />
       </G>
     </Svg>
   );

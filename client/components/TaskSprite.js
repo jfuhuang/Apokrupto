@@ -25,6 +25,7 @@
  * solomons_temple        solomons_temple              Temple columned facade with pediment
  * water_from_rock        water_from_rock              Jagged rock with water gushing from crack
  * the_lost_sheep         the_lost_sheep               Figure carrying sheep across shoulders
+ * wolves_in_sheeps_clothing wolves_in_sheeps_clothing  Menacing wolf head peering through wool fleece
  * jonah_storm            jonah_storm                  Whale breaching with spout and storm waves
  * walking_on_water       walking_on_water             Figure striding upright on wave crests
  * pillar_of_fire         pillar_of_fire               Tall column of fire with glowing base
@@ -247,6 +248,42 @@ const SPRITES = {
       <Circle cx="7.5"  cy="29" r="1.5" fill={c} />
       <Circle cx="14.5" cy="30" r="1.5" fill={c} />
       <Circle cx="25.5" cy="29" r="1.5" fill={c} />
+    </G>
+  ),
+
+  // Menacing wolf head peeking through a fluffy sheep fleece disguise // AI-generated
+  wolves_in_sheeps_clothing: (c) => (
+    <G>
+      {/* Sheep wool body — fluffy cloud puffs around the wolf */}
+      <Circle cx="9"  cy="20" r="6"   fill={OUT} opacity="0.85" />
+      <Circle cx="16" cy="17" r="6.5" fill={OUT} opacity="0.90" />
+      <Circle cx="23" cy="19" r="6"   fill={OUT} opacity="0.85" />
+      <Circle cx="12" cy="24" r="5"   fill={OUT} opacity="0.80" />
+      <Circle cx="20" cy="24" r="5"   fill={OUT} opacity="0.80" />
+      {/* Sheep legs poking below the disguise */}
+      <Line x1="10" y1="27" x2="9"  y2="31" stroke={OUT} strokeWidth="2.5" strokeLinecap="round" />
+      <Line x1="14" y1="28" x2="14" y2="32" stroke={OUT} strokeWidth="2.5" strokeLinecap="round" />
+      <Line x1="18" y1="28" x2="18" y2="32" stroke={OUT} strokeWidth="2.5" strokeLinecap="round" />
+      <Line x1="22" y1="27" x2="23" y2="31" stroke={OUT} strokeWidth="2.5" strokeLinecap="round" />
+      {/* Wolf head emerging from center of the wool — menacing */}
+      {/* Wolf snout */}
+      <Ellipse cx="16" cy="20" rx="5" ry="4" fill="#484848" />
+      <Ellipse cx="16" cy="18" rx="3" ry="2" fill="#1A1A1A" />
+      {/* Wolf ears poking up through wool */}
+      <Polygon points="11,14 7,6 15,11"  fill="#484848" />
+      <Polygon points="21,14 25,6 17,11" fill="#484848" />
+      <Polygon points="12,13 9,7 15,11"  fill="#7A1A2A" opacity="0.75" />
+      <Polygon points="20,13 23,7 17,11" fill="#7A1A2A" opacity="0.75" />
+      {/* Wolf glowing eyes */}
+      <Circle cx="12" cy="16" r="2.8" fill="#CC0028" />
+      <Circle cx="20" cy="16" r="2.8" fill="#CC0028" />
+      <Ellipse cx="12" cy="16" rx="0.9" ry="1.8" fill="#0A0005" />
+      <Ellipse cx="20" cy="16" rx="0.9" ry="1.8" fill="#0A0005" />
+      <Circle cx="12.8" cy="15" r="0.7" fill="#FF6080" opacity="0.65" />
+      <Circle cx="20.8" cy="15" r="0.7" fill="#FF6080" opacity="0.65" />
+      {/* Fangs */}
+      <Polygon points="14,22 13,26 15,23" fill="#E8E8E0" opacity="0.85" />
+      <Polygon points="18,22 19,26 17,23" fill="#E8E8E0" opacity="0.85" />
     </G>
   ),
 
