@@ -34,7 +34,7 @@ const SketchCanvas = forwardRef(function SketchCanvas({ strokeColor = '#00D4FF',
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round';
     (strokesToDraw || strokes).forEach(stroke => {
-      if (stroke.length < 2) return
+      if (!stroke || stroke.length < 2) return
       ctx.beginPath()
       ctx.moveTo(stroke[0][0], stroke[0][1])
       stroke.slice(1).forEach(([x, y]) => ctx.lineTo(x, y))

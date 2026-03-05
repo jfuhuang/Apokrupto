@@ -19,7 +19,7 @@ export default function SketchThumbnail({
   const strokes = sketchData?.strokes ?? [];
 
   const strokeToPath = (points) => {
-    if (points.length === 0) return '';
+    if (!points || points.length === 0) return '';
     const [first, ...rest] = points;
     let d = `M ${first.x * size} ${first.y * size}`;
     for (const p of rest) {

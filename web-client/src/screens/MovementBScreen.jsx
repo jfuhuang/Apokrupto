@@ -123,7 +123,12 @@ export default function MovementBScreen({
         socket={socket}
         onBack={() => setMode('hub')}
         onSessionStart={(data) => {
-          setCoopSession(data)
+          setCoopSession({
+            sessionId: data.sessionId,
+            role: data.role,
+            partnerUsername: data.partner?.username || 'Partner',
+            initialTask: data.task,
+          })
           setMode('coopRush')
         }}
       />
@@ -226,7 +231,7 @@ const styles = {
   acceptBtn: { padding: '8px 16px', background: 'rgba(0,255,159,0.15)', border: '1px solid #00FF9F', borderRadius: 4, color: '#00FF9F', fontFamily: 'Orbitron, sans-serif', fontSize: 11, cursor: 'pointer' },
   declineBtn: { padding: '8px 16px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, color: '#ADB5BD', fontFamily: 'Rajdhani, sans-serif', fontSize: 12, cursor: 'pointer' },
   tabs: { display: 'flex', gap: 0, borderRadius: 6, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' },
-  tab: { flex: 1, padding: '12px', background: 'rgba(31,40,51,0.8)', border: 'none', color: '#ADB5BD', fontFamily: 'Rajdhani, sans-serif', fontSize: 13, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.05em' },
+  tab: { flex: 1, padding: '12px', background: 'rgba(31,40,51,0.8)', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: 'none', color: '#ADB5BD', fontFamily: 'Rajdhani, sans-serif', fontSize: 13, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.05em' },
   tabActive: { background: 'rgba(255,166,61,0.12)', color: '#FFA63D', borderBottom: '2px solid #FFA63D' },
   modeCard: { background: 'rgba(31,40,51,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' },
   modeIcon: { fontSize: 48 },

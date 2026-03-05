@@ -16,7 +16,7 @@ function SketchThumbnail({ sketchData, size = 120, isMe }) {
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
     sketchData.strokes.forEach(stroke => {
-      if (stroke.length < 2) return
+      if (!stroke || stroke.length < 2) return
       ctx.beginPath()
       ctx.moveTo(stroke[0][0], stroke[0][1])
       stroke.slice(1).forEach(([x, y]) => ctx.lineTo(x, y))
