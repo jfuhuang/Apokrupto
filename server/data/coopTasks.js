@@ -58,7 +58,7 @@ function pick(arr) {
 }
 
 function randomPoints() {
-  return Math.floor(Math.random() * 10) + 1; // 1–10
+  return Math.floor(Math.random() * 5) + 1; // 1–5
 }
 
 function shuffleArray(arr) {

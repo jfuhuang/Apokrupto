@@ -318,7 +318,7 @@ function registerCoopHandlers(socket) {
         const enacted = remaining.find((d) => d.index === decreeIndex);
         if (!enacted) throw new Error('Invalid decree index');
 
-        const finalPoints = enacted.points * COOP_MULTIPLIER;
+        const finalPoints = enacted.points; // decrees are not multiplied by COOP_MULTIPLIER
         const awarded = await awardCoopPoints(session.gameId, enacted.team, finalPoints, session, 'B');
         coopService.updateSessionPoints(sessionId, 'B', awarded);
 
