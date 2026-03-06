@@ -29,7 +29,7 @@ async function init() {
     CREATE TABLE IF NOT EXISTS lobbies (
       id          SERIAL PRIMARY KEY,
       name        VARCHAR(100) NOT NULL,
-      max_players INT NOT NULL CHECK (max_players >= 5 AND max_players <= 100),
+      max_players INT NOT NULL CHECK (max_players >= 5 AND max_players <= 200),
       created_by  INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       status      VARCHAR(20) DEFAULT 'waiting'
                     CHECK (status IN ('waiting', 'in_progress', 'completed')),
@@ -173,7 +173,7 @@ async function init() {
   await pool.query(`
     ALTER TABLE lobbies DROP CONSTRAINT IF EXISTS lobbies_max_players_check;
     ALTER TABLE lobbies ADD CONSTRAINT lobbies_max_players_check
-      CHECK (max_players >= 5 AND max_players <= 100);
+      CHECK (max_players >= 5 AND max_players <= 200);
   `);
 
   // Migrate: allow decimal/fractional points in game_teams (e.g. 0.5x sus penalty)
