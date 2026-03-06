@@ -722,8 +722,8 @@
         <input id="new-lobby-name" type="text" placeholder="e.g. Alpha Station" />
       </div>
       <div class="field">
-        <label>Max Players (5–100)</label>
-        <input id="new-lobby-max" type="number" min="5" max="100" value="20" />
+        <label>Max Players (5–200)</label>
+        <input id="new-lobby-max" type="number" min="5" max="200" value="20" />
       </div>
       <div id="modal-error"></div>
       <div class="modal-actions">
@@ -983,8 +983,8 @@
       const errEl = document.getElementById('modal-error');
       errEl.textContent = '';
       if (!name) { errEl.textContent = 'Name is required.'; return; }
-      if (max_players < 5 || max_players > 100 || isNaN(max_players)) {
-        errEl.textContent = 'Max players must be 5–100.'; return;
+      if (max_players < 5 || max_players > 200 || isNaN(max_players)) {
+        errEl.textContent = 'Max players must be 5–200.'; return;
       }
       try {
         await apiFetch('/api/lobbies', { method: 'POST', body: JSON.stringify({ name, max_players }) });
